@@ -1,24 +1,82 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Filter, MoreVertical, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Filter, MoreVertical, Edit, Trash2, Download } from 'lucide-react';
 import { db } from '../../lib/firebase';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-
+import { collection, getDocs, query, orderBy, deleteDoc, doc, limit, startAfter } from 'firebase/firestore';
+import { exportToCsv } from '../../utils/exportCsv';
+import { deleteCloudinaryImage } from '../../utils/cloudinary';
 export default function ProductsList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+
+  // Pagination state
+  const [pageSize, setPageSize] = useState(25);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [cursors, setCursors] = useState<any[]>([null]);
+  const [hasNextPage, setHasNextPage] = useState(true);
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this product? This will also delete its images from Cloudinary.")) {
+      try {
+        const productToDelete = products.find(p => p.id === id);
+        
+        // Delete images from Cloudinary first
+        if (productToDelete?.imageUrls?.length > 0) {
+          console.log(`Deleting ${productToDelete.imageUrls.length} images from Cloudinary...`);
+          for (const url of productToDelete.imageUrls) {
+            await deleteCloudinaryImage(url);
+          }
+        }
+
+        await deleteDoc(doc(db, "products", id));
+        setProducts(products.filter(p => p.id !== id));
+      } catch (error) {
+        console.error("Error deleting product:", error);
+        alert("Failed to delete product.");
+      }
+    }
+  };
+
+  const toggleDropdown = (id: string) => {
+    if (openDropdownId === id) {
+      setOpenDropdownId(null);
+    } else {
+      setOpenDropdownId(id);
+    }
+  };
 
   useEffect(() => {
     const fetchProducts = async () => {
+      setLoading(true);
       try {
-        const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
+        let q;
+        const currentCursor = cursors[currentPage];
+        
+        if (currentCursor) {
+          q = query(collection(db, "products"), orderBy("createdAt", "desc"), startAfter(currentCursor), limit(pageSize));
+        } else {
+          q = query(collection(db, "products"), orderBy("createdAt", "desc"), limit(pageSize));
+        }
+
         const querySnapshot = await getDocs(q);
         const productsData = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
+        
         setProducts(productsData);
+        setHasNextPage(querySnapshot.docs.length === pageSize);
+        
+        if (querySnapshot.docs.length > 0) {
+          const lastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+          setCursors(prev => {
+            const newCursors = [...prev];
+            newCursors[currentPage + 1] = lastDoc;
+            return newCursors;
+          });
+        }
       } catch (error) {
         console.error("Error fetching products:", error);
       } finally {
@@ -26,7 +84,7 @@ export default function ProductsList() {
       }
     };
     fetchProducts();
-  }, []);
+  }, [pageSize, currentPage]);
 
   const filteredProducts = products.filter(p => 
     p.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -61,10 +119,16 @@ export default function ProductsList() {
               className="bg-white/5 border border-white/10 rounded-full py-2 pl-10 pr-4 text-sm w-full focus:outline-none focus:ring-1 focus:ring-blue-500 text-white placeholder-slate-500"
             />
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 border border-white/10 rounded-full text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-white transition-colors uppercase tracking-widest">
-            <Filter className="h-4 w-4" />
-            Filters
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => exportToCsv('products.csv', products)} className="flex items-center gap-2 px-4 py-2 border border-white/10 rounded-full text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-white transition-colors uppercase tracking-widest">
+              <Download className="h-4 w-4" />
+              Export
+            </button>
+            <button className="flex items-center gap-2 px-4 py-2 border border-white/10 rounded-full text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-white transition-colors uppercase tracking-widest">
+              <Filter className="h-4 w-4" />
+              Filters
+            </button>
+          </div>
         </div>
 
         {/* Table */}
@@ -118,21 +182,37 @@ export default function ProductsList() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-white font-bold">{product.stock}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-white font-bold">₹{Number(product.price).toLocaleString('en-IN')}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-1 text-[10px] font-bold rounded-md border bg-blue-500/10 text-blue-500 border-blue-500/20">
-                        {(product.status || 'Unknown').toUpperCase()}
+                      <span className={`px-2 py-1 text-[10px] font-bold rounded-md border ${
+                        product.stock <= 0 
+                          ? 'bg-red-500/10 text-red-500 border-red-500/20' 
+                          : 'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                      }`}>
+                        {product.stock <= 0 ? 'OUT OF STOCK' : (product.status || 'Unknown').toUpperCase()}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end gap-2">
-                        <button className="text-slate-500 hover:text-blue-400 transition-colors p-1">
+                      <div className="flex items-center justify-end gap-2 relative">
+                        <Link to={`/admin/products/edit/${product.id}`} className="text-slate-500 hover:text-blue-400 transition-colors p-1" title="Edit">
                           <Edit className="h-4 w-4" />
-                        </button>
-                        <button className="text-slate-500 hover:text-red-400 transition-colors p-1">
+                        </Link>
+                        <button onClick={() => handleDelete(product.id)} className="text-slate-500 hover:text-red-400 transition-colors p-1" title="Delete">
                           <Trash2 className="h-4 w-4" />
                         </button>
-                        <button className="text-slate-500 hover:text-white transition-colors p-1">
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
+                        <div className="relative">
+                          <button onClick={() => toggleDropdown(product.id)} className="text-slate-500 hover:text-white transition-colors p-1" title="More options">
+                            <MoreVertical className="h-4 w-4" />
+                          </button>
+                          {openDropdownId === product.id && (
+                            <div className="absolute right-0 mt-2 w-48 bg-[#1a1a1c] border border-white/10 rounded-xl shadow-2xl z-10 py-1 flex flex-col">
+                              <Link to={`/products/${product.id}`} target="_blank" className="text-left px-4 py-2 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
+                                View in Store
+                              </Link>
+                              <button onClick={() => { navigator.clipboard.writeText(product.id); setOpenDropdownId(null); }} className="text-left px-4 py-2 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
+                                Copy Product ID
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -143,11 +223,39 @@ export default function ProductsList() {
         </div>
         
         <div className="p-6 border-t border-white/5 flex items-center justify-between text-xs text-slate-500 uppercase tracking-widest font-bold">
-          <div>Showing 1 to 4 of 4 entries</div>
-          <div className="flex gap-2">
-            <button className="px-4 py-2 border border-white/10 rounded-full hover:bg-white/5 hover:text-white transition-colors disabled:opacity-50">Previous</button>
-            <button className="px-4 py-2 border border-blue-500/20 rounded-full bg-blue-600/10 text-blue-400">1</button>
-            <button className="px-4 py-2 border border-white/10 rounded-full hover:bg-white/5 hover:text-white transition-colors disabled:opacity-50">Next</button>
+          <div className="flex items-center gap-4">
+            <span className="whitespace-nowrap">Rows per page:</span>
+            <select 
+              value={pageSize} 
+              onChange={(e) => { 
+                setPageSize(Number(e.target.value)); 
+                setCurrentPage(0); 
+                setCursors([null]); 
+              }} 
+              className="bg-[#1a1a1c] border border-white/10 rounded-md py-1 px-2 text-white outline-none cursor-pointer"
+            >
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={75}>75</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
+          <div className="flex gap-2 items-center">
+            <span className="mr-4">Page {currentPage + 1}</span>
+            <button 
+              onClick={() => setCurrentPage(p => p - 1)}
+              disabled={currentPage === 0 || loading}
+              className="px-4 py-2 border border-white/10 rounded-full hover:bg-white/5 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <button 
+              onClick={() => setCurrentPage(p => p + 1)}
+              disabled={!hasNextPage || loading}
+              className="px-4 py-2 border border-white/10 rounded-full hover:bg-white/5 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
           </div>
         </div>
       </div>

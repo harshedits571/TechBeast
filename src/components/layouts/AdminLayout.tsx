@@ -1,22 +1,26 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Package, 
-  Wrench, 
-  Users, 
-  ShoppingCart, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Package,
+  Wrench,
+  Users,
+  ShoppingCart,
+  Settings,
   LogOut,
   Bell,
   Search,
-  MonitorSmartphone
+  MonitorSmartphone,
+  ClipboardList,
+  ShoppingBag
 } from 'lucide-react';
 
 export default function AdminLayout() {
   const location = useLocation();
-  
+
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+    { name: 'Offline POS', href: '/admin/offline-sale', icon: ShoppingBag },
+    { name: 'Orders', href: '/admin/orders', icon: ClipboardList },
     { name: 'Products', href: '/admin/products', icon: Package },
     { name: 'Repairs', href: '/admin/repairs', icon: Wrench },
     { name: 'Inventory', href: '/admin/inventory', icon: ShoppingCart },
@@ -27,11 +31,11 @@ export default function AdminLayout() {
   return (
     <div className="min-h-screen bg-[#0a0a0b] text-slate-300 flex font-sans select-none">
       {/* Sidebar */}
-      <aside className="w-64 bg-[#0d0d0e] border-r border-white/5 flex flex-col fixed inset-y-0 z-10">
+      <aside className="w-64 bg-[#0d0d0e] border-r border-white/5 flex flex-col fixed inset-y-0 z-10 print:hidden">
         <div className="h-20 flex items-center px-6 border-b border-white/5 gap-3">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white">TB</div>
           <Link to="/" className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-            Tech Best <span className="text-blue-500 underline decoration-2 underline-offset-4 text-sm mt-1">ERP</span>
+            Tech Beast <span className="text-blue-500 underline decoration-2 underline-offset-4 text-sm mt-1">ERP</span>
           </Link>
         </div>
         <div className="flex-1 overflow-y-auto py-4">
@@ -43,11 +47,10 @@ export default function AdminLayout() {
                 <Link
                   key={item.name}
                   to={item.href}
-                  className={`group flex items-center px-4 py-3 rounded-xl transition-colors ${
-                    isActive 
-                      ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20' 
+                  className={`group flex items-center px-4 py-3 rounded-xl transition-colors ${isActive
+                      ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'
                       : 'hover:bg-white/5 text-slate-300'
-                  }`}
+                    }`}
                 >
                   <div className={`w-2 h-2 rounded-full mr-3 flex-shrink-0 ${isActive ? 'bg-blue-500' : 'bg-slate-600 group-hover:bg-slate-400'}`}></div>
                   <span className="text-sm">{item.name}</span>
@@ -71,9 +74,9 @@ export default function AdminLayout() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col ml-64 min-h-screen">
+      <main className="flex-1 flex flex-col ml-64 print:ml-0 min-h-screen">
         {/* Top Header */}
-        <header className="h-20 border-b border-white/5 px-8 flex items-center justify-between bg-[#0a0a0b] sticky top-0 z-10">
+        <header className="h-20 border-b border-white/5 px-8 flex items-center justify-between bg-[#0a0a0b] sticky top-0 z-10 print:hidden">
           <div className="flex items-center gap-4">
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -101,9 +104,9 @@ export default function AdminLayout() {
         <div className="flex-1 p-8">
           <Outlet />
         </div>
-        
+
         {/* Footer / Status Bar */}
-        <footer className="h-10 bg-[#0d0d0e] border-t border-white/5 px-8 flex items-center justify-between text-[10px] uppercase tracking-widest text-slate-500">
+        <footer className="h-10 bg-[#0d0d0e] border-t border-white/5 px-8 flex items-center justify-between text-[10px] uppercase tracking-widest text-slate-500 print:hidden">
           <div className="flex gap-6">
             <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]"></div> Database Online</div>
             <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]"></div> Storefront Live</div>
@@ -111,7 +114,7 @@ export default function AdminLayout() {
           </div>
           <div className="font-bold flex gap-4">
             <Link to="/" className="hover:text-white transition-colors">View Storefront</Link>
-            <span>Tech Best Ecosystem v1.0.0</span>
+            <span>Tech Beast Ecosystem v1.0.0</span>
           </div>
         </footer>
       </main>

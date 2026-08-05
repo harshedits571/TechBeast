@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Save, X, Printer, User, Laptop, Wrench, FileText } from 'lucide-react';
 import { db } from '../../lib/firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 
 export default function RepairForm() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
+  const [customerFound, setCustomerFound] = useState(false);
   const [formData, setFormData] = useState({
     customerName: '',
     customerPhone: '',
@@ -20,11 +22,39 @@ export default function RepairForm() {
     issue: '',
     estimatedCost: '',
     deliveryDate: '',
+    devicePassword: '',
     status: 'Pending'
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handlePhoneBlur = async () => {
+    const phone = formData.customerPhone.trim();
+    if (!phone || phone.length < 5) return;
+
+    setIsSearchingCustomer(true);
+    try {
+      const q = query(collection(db, 'customers'), where('phone', '==', phone));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const customerData = querySnapshot.docs[0].data();
+        setFormData(prev => ({
+          ...prev,
+          customerName: customerData.name || prev.customerName,
+          customerEmail: customerData.email || prev.customerEmail
+        }));
+        setCustomerFound(true);
+      } else {
+        setCustomerFound(false);
+      }
+    } catch (error) {
+      console.error("Error searching for customer:", error);
+    } finally {
+      setIsSearchingCustomer(false);
+    }
   };
 
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,10 +76,31 @@ export default function RepairForm() {
 
     setIsSubmitting(true);
     try {
+      // Auto-create customer if they don't exist
+      try {
+        const q = query(collection(db, 'customers'), where('phone', '==', formData.customerPhone.trim()));
+        const querySnapshot = await getDocs(q);
+        
+        if (querySnapshot.empty) {
+          await addDoc(collection(db, 'customers'), {
+            name: formData.customerName,
+            phone: formData.customerPhone.trim(),
+            email: formData.customerEmail,
+            totalSpent: 0,
+            ordersCount: 0,
+            createdAt: new Date().toISOString()
+          });
+        }
+      } catch (custError) {
+        console.error("Non-fatal error creating customer record:", custError);
+        // Continue to save repair ticket even if CRM update fails (e.g. permission rules)
+      }
+
       const dataToSave = {
         ...formData,
         estimatedCost: Number(formData.estimatedCost) || 0,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        internalNotes: []
       };
       
       await addDoc(collection(db, "repairs"), dataToSave);
@@ -84,18 +135,23 @@ export default function RepairForm() {
         <div className="md:col-span-2 space-y-6">
           {/* Customer Information */}
           <div className="bg-[#0d0d0e] p-8 rounded-3xl border border-white/10 shadow-2xl">
-            <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-6">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-              Customer Information
+            <h2 className="text-sm font-bold text-white flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                Customer Information
+              </div>
+              {isSearchingCustomer && <span className="text-[10px] text-slate-500 uppercase tracking-widest">Searching...</span>}
+              {customerFound && <span className="text-[10px] text-emerald-500 uppercase tracking-widest bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/20">Existing Customer Found</span>}
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
-                <label className="block text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-2">Full Name *</label>
-                <input name="customerName" value={formData.customerName} onChange={handleChange} type="text" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all" placeholder="e.g. John Doe" />
+                <label className="block text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-2">Phone Number *</label>
+                <input name="customerPhone" value={formData.customerPhone} onChange={handleChange} onBlur={handlePhoneBlur} type="tel" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all" placeholder="+91..." />
+                <p className="text-[10px] text-slate-500 mt-1">Type phone and click away to auto-fetch details</p>
               </div>
               <div>
-                <label className="block text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-2">Phone Number *</label>
-                <input name="customerPhone" value={formData.customerPhone} onChange={handleChange} type="tel" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all" placeholder="+1 (555) 000-0000" />
+                <label className="block text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-2">Full Name *</label>
+                <input name="customerName" value={formData.customerName} onChange={handleChange} type="text" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all" placeholder="e.g. John Doe" />
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-2">Email Address</label>
@@ -133,6 +189,10 @@ export default function RepairForm() {
               <div>
                 <label className="block text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-2">Serial Number *</label>
                 <input name="serialNumber" value={formData.serialNumber} onChange={handleChange} type="text" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all" placeholder="S/N or Service Tag" />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-2">Device Password / PIN</label>
+                <input name="devicePassword" value={formData.devicePassword} onChange={handleChange} type="text" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all" placeholder="Leave blank if none or removed" />
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-2">Cosmetic Condition</label>
