@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../../lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { FormSkeleton } from '../../components/ui/Skeleton';
 import { ArrowLeft, Send, Clock, User, Laptop, Save, AlertCircle } from 'lucide-react';
 
 export default function RepairDetail() {
@@ -78,7 +79,7 @@ export default function RepairDetail() {
   };
 
   if (loading) {
-    return <div className="p-8 text-white text-center">Loading ticket details...</div>;
+    return <FormSkeleton />;
   }
 
   if (!ticket) return null;

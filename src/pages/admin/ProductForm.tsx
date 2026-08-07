@@ -4,12 +4,16 @@ import { ArrowLeft, Save } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { collection, addDoc, doc, getDoc, updateDoc, getDocs, query, where } from 'firebase/firestore';
 import ImageUpload from '../../components/admin/ImageUpload';
+import { FormSkeleton } from '../../components/ui/Skeleton';
+import { useSettings } from '../../contexts/SettingsContext';
 
 export default function ProductForm() {
   const navigate = useNavigate();
   const { id } = useParams();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { settings } = useSettings();
+  const combos = settings.accessoryCombos || [];
   const [availableAccessories, setAvailableAccessories] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     title: '',
@@ -26,43 +30,35 @@ export default function ProductForm() {
     graphics: '',
     description: '',
     accessories: '',
+    comboId: '',
     modelNumber: '',
     processorGen: '',
+    processorModel: '',
     ramType: '',
+    ramFreq: '',
     storageType: '',
     displayType: '',
     os: '',
     color: '',
+    brandWarranty: '',
     imageUrls: [] as string[],
   });
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Default predefined free accessories (works even if Firebase rules block inventory fetch)
-        const defaultAccessories = [
-          'Laptop Bag', 
-          'Wireless Mouse', 
-          'Wired Mouse', 
-          'Power Adapter / Charger', 
-          'Cleaning Kit', 
-          'Mousepad',
-          'Cooling Pad',
-          'Keyboard Cover'
-        ];
-
+        // Fetch available accessories from inventory
         let inventoryAccessories: string[] = [];
         try {
-          // Fetch available accessories from inventory
           const accQuery = query(collection(db, 'inventory'), where('isFreeAccessory', '==', true));
           const accSnap = await getDocs(accQuery);
           inventoryAccessories = accSnap.docs.map(d => d.data().name).filter(Boolean);
         } catch (err) {
-          console.error("Inventory fetch blocked by Firebase Rules - using defaults only", err);
+          console.error("Inventory fetch blocked by Firebase Rules or failed", err);
         }
 
-        // Combine defaults with inventory ones, removing duplicates
-        const combinedAccessories = [...new Set([...defaultAccessories, ...inventoryAccessories])];
+        // Only use inventory ones, removing duplicates just in case
+        const combinedAccessories = [...new Set([...inventoryAccessories])];
         setAvailableAccessories(combinedAccessories);
 
         if (id) {
@@ -123,7 +119,7 @@ export default function ProductForm() {
   };
 
   if (loading) {
-    return <div className="p-8 text-white">Loading product details...</div>;
+    return <FormSkeleton />;
   }
 
   return (
@@ -157,7 +153,15 @@ export default function ProductForm() {
           </label>
           <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
             Brand (Optional)
-            <input name="brand" value={formData.brand} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. Apple, Asus, Dell" />
+            <select name="brand" value={formData.brand} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
+              <option value="" className="bg-[#0d0d0e]">Select Brand</option>
+              <option value="Asus" className="bg-[#0d0d0e]">Asus</option>
+              <option value="Dell" className="bg-[#0d0d0e]">Dell</option>
+              <option value="HP" className="bg-[#0d0d0e]">HP</option>
+              <option value="Lenovo" className="bg-[#0d0d0e]">Lenovo</option>
+              <option value="MSI" className="bg-[#0d0d0e]">MSI</option>
+              <option value="Acer" className="bg-[#0d0d0e]">Acer</option>
+            </select>
           </label>
         </div>
 
@@ -180,13 +184,20 @@ export default function ProductForm() {
           </label>
           <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
             Condition *
-            <select name="condition" value={formData.condition} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
+            <select required name="condition" value={formData.condition} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
+              <option value="" className="bg-[#0d0d0e]">Select Condition</option>
               <option value="New" className="bg-[#0d0d0e]">New</option>
-              <option value="Used - Like New" className="bg-[#0d0d0e]">Used - Like New</option>
-              <option value="Used - Good" className="bg-[#0d0d0e]">Used - Good</option>
-              <option value="Used - Fair" className="bg-[#0d0d0e]">Used - Fair</option>
+              <option value="Used" className="bg-[#0d0d0e]">Used / Second Hand</option>
+              <option value="Refurbished" className="bg-[#0d0d0e]">Refurbished</option>
             </select>
           </label>
+          
+          {formData.condition === 'New' && (
+            <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest animate-in fade-in zoom-in duration-200">
+              Brand Warranty Terms *
+              <input required name="brandWarranty" value={formData.brandWarranty} onChange={handleChange} type="text" className="bg-white/5 border border-blue-500/30 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal shadow-[0_0_15px_rgba(59,130,246,0.1)]" placeholder="e.g. 1 Year, 3 Years + ADP" />
+            </label>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -209,15 +220,81 @@ export default function ProductForm() {
 
         <div className="pt-6 border-t border-white/10">
           <h3 className="text-lg font-bold text-white mb-6">Detailed Specifications (Optional)</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+          
+          {/* Processor Group */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8 border-b border-white/10 pb-8">
             <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
-              Processor (CPU)
-              <input name="processor" value={formData.processor} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" />
+              Processor Line
+              <select name="processor" value={formData.processor} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
+                <option value="" className="bg-[#0d0d0e]">Select Line</option>
+                <option value="Core i3" className="bg-[#0d0d0e]">Core i3</option>
+                <option value="Core i5" className="bg-[#0d0d0e]">Core i5</option>
+                <option value="Core i7" className="bg-[#0d0d0e]">Core i7</option>
+                <option value="Core i9" className="bg-[#0d0d0e]">Core i9</option>
+                <option value="Ryzen 3" className="bg-[#0d0d0e]">Ryzen 3</option>
+                <option value="Ryzen 5" className="bg-[#0d0d0e]">Ryzen 5</option>
+                <option value="Ryzen 7" className="bg-[#0d0d0e]">Ryzen 7</option>
+                <option value="Ryzen 9" className="bg-[#0d0d0e]">Ryzen 9</option>
+                <option value="Apple M1" className="bg-[#0d0d0e]">Apple M1</option>
+                <option value="Apple M2" className="bg-[#0d0d0e]">Apple M2</option>
+                <option value="Apple M3" className="bg-[#0d0d0e]">Apple M3</option>
+                {formData.processor && !['Core i3', 'Core i5', 'Core i7', 'Core i9', 'Ryzen 3', 'Ryzen 5', 'Ryzen 7', 'Ryzen 9', 'Apple M1', 'Apple M2', 'Apple M3'].includes(formData.processor) && (
+                  <option value={formData.processor} className="bg-[#0d0d0e]">{formData.processor}</option>
+                )}
+              </select>
             </label>
+            <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+              Processor Gen
+              <select name="processorGen" value={formData.processorGen} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
+                <option value="" className="bg-[#0d0d0e]">Select Gen</option>
+                {[...Array(14)].map((_, i) => <option key={i} value={`${i+1}th Gen`} className="bg-[#0d0d0e]">{i+1}th Gen</option>)}
+                <option value="N/A" className="bg-[#0d0d0e]">N/A</option>
+                {formData.processorGen && formData.processorGen !== 'N/A' && !formData.processorGen.includes('th Gen') && !formData.processorGen.includes('st Gen') && !formData.processorGen.includes('nd Gen') && !formData.processorGen.includes('rd Gen') && (
+                  <option value={formData.processorGen} className="bg-[#0d0d0e]">{formData.processorGen}</option>
+                )}
+              </select>
+            </label>
+            <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+              Processor Model
+              <input name="processorModel" value={formData.processorModel || ''} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. 12500H" />
+            </label>
+          </div>
+
+          {/* RAM Group */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8 border-b border-white/10 pb-8">
             <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
               Memory (RAM)
-              <input name="ram" value={formData.ram} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" />
+              <select name="ram" value={formData.ram} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
+                <option value="" className="bg-[#0d0d0e]">Select RAM</option>
+                <option value="4GB" className="bg-[#0d0d0e]">4GB</option>
+                <option value="8GB" className="bg-[#0d0d0e]">8GB</option>
+                <option value="16GB" className="bg-[#0d0d0e]">16GB</option>
+                <option value="32GB" className="bg-[#0d0d0e]">32GB</option>
+                <option value="64GB" className="bg-[#0d0d0e]">64GB</option>
+                {formData.ram && !['4GB', '8GB', '16GB', '32GB', '64GB'].includes(formData.ram) && (
+                  <option value={formData.ram} className="bg-[#0d0d0e]">{formData.ram}</option>
+                )}
+              </select>
             </label>
+            <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+              RAM Type
+              <select name="ramType" value={formData.ramType} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
+                <option value="" className="bg-[#0d0d0e]">Select Type</option>
+                <option value="DDR3" className="bg-[#0d0d0e]">DDR3</option>
+                <option value="DDR4" className="bg-[#0d0d0e]">DDR4</option>
+                <option value="DDR5" className="bg-[#0d0d0e]">DDR5</option>
+                {formData.ramType && !['DDR3', 'DDR4', 'DDR5'].includes(formData.ramType) && (
+                  <option value={formData.ramType} className="bg-[#0d0d0e]">{formData.ramType}</option>
+                )}
+              </select>
+            </label>
+            <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+              RAM Frequency
+              <input name="ramFreq" value={formData.ramFreq || ''} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. 4800MHz" />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
             <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
               Storage
               <input name="storage" value={formData.storage} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" />
@@ -229,14 +306,6 @@ export default function ProductForm() {
             <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
               Model Number
               <input name="modelNumber" value={formData.modelNumber} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" />
-            </label>
-            <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
-              Processor Generation
-              <input name="processorGen" value={formData.processorGen} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. 12th Gen, 13th Gen" />
-            </label>
-            <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
-              RAM Type & Speed
-              <input name="ramType" value={formData.ramType} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. DDR5 4800MHz" />
             </label>
             <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
               Storage Type
@@ -282,8 +351,20 @@ export default function ProductForm() {
               )}
             </div>
             
+            <div className="grid grid-cols-1 gap-8 mb-6">
+              <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+                Accessory Combo (Recommended)
+                <select name="comboId" value={formData.comboId} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
+                  <option value="" className="bg-[#0d0d0e]">None / Custom only</option>
+                  {combos.map(combo => (
+                    <option key={combo.id} value={combo.id} className="bg-[#0d0d0e]">{combo.name} ({combo.items?.length || 0} items)</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
             <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest mb-8">
-              Custom Accessories (Comma separated)
+              Additional Custom Accessories (Comma separated)
               <input name="accessories" value={formData.accessories} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. Custom Bag, Special Charger" />
             </label>
           </div>

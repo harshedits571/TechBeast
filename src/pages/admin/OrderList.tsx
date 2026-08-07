@@ -12,8 +12,9 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { db } from '../../lib/firebase';
-import { collection, getDocs, query, orderBy, addDoc, limit, startAfter } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, deleteDoc, doc, limit, startAfter, writeBatch, addDoc } from 'firebase/firestore';
 import { exportToCsv } from '../../utils/exportCsv';
+import { TableBodySkeleton } from '../../components/ui/Skeleton';
 
 // Mock data generator for testing
 const MOCK_ORDERS = [
@@ -264,9 +265,7 @@ export default function OrderList() {
             </thead>
             <tbody className="text-sm">
               {loading ? (
-                <tr>
-                  <td colSpan={8} className="p-8 text-center text-slate-500">Loading orders...</td>
-                </tr>
+                <TableBodySkeleton columns={8} rows={5} />
               ) : filteredOrders.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="p-8 text-center text-slate-500">No orders found. Click (Generate Mock Data) to generate samples.</td>

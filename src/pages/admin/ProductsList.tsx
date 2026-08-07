@@ -4,6 +4,7 @@ import { Plus, Search, Filter, MoreVertical, Edit, Trash2, Download } from 'luci
 import { db } from '../../lib/firebase';
 import { collection, getDocs, query, orderBy, deleteDoc, doc, limit, startAfter } from 'firebase/firestore';
 import { exportToCsv } from '../../utils/exportCsv';
+import { TableBodySkeleton } from '../../components/ui/Skeleton';
 import { deleteCloudinaryImage } from '../../utils/cloudinary';
 export default function ProductsList() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -21,7 +22,7 @@ export default function ProductsList() {
     if (window.confirm("Are you sure you want to delete this product? This will also delete its images from Cloudinary.")) {
       try {
         const productToDelete = products.find(p => p.id === id);
-        
+
         // Delete images from Cloudinary first
         if (productToDelete?.imageUrls?.length > 0) {
           console.log(`Deleting ${productToDelete.imageUrls.length} images from Cloudinary...`);
@@ -53,7 +54,7 @@ export default function ProductsList() {
       try {
         let q;
         const currentCursor = cursors[currentPage];
-        
+
         if (currentCursor) {
           q = query(collection(db, "products"), orderBy("createdAt", "desc"), startAfter(currentCursor), limit(pageSize));
         } else {
@@ -63,12 +64,12 @@ export default function ProductsList() {
         const querySnapshot = await getDocs(q);
         const productsData = querySnapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
-        
+
         setProducts(productsData);
         setHasNextPage(querySnapshot.docs.length === pageSize);
-        
+
         if (querySnapshot.docs.length > 0) {
           const lastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
           setCursors(prev => {
@@ -86,8 +87,8 @@ export default function ProductsList() {
     fetchProducts();
   }, [pageSize, currentPage]);
 
-  const filteredProducts = products.filter(p => 
-    p.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const filteredProducts = products.filter(p =>
+    p.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -148,9 +149,7 @@ export default function ProductsList() {
             </thead>
             <tbody className="text-sm">
               {loading ? (
-                <tr>
-                  <td colSpan={8} className="px-6 py-8 text-center text-slate-500">Loading products...</td>
-                </tr>
+                <TableBodySkeleton columns={8} rows={5} />
               ) : filteredProducts.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-6 py-8 text-center text-slate-500">No products found.</td>
@@ -158,35 +157,37 @@ export default function ProductsList() {
               ) : (
                 filteredProducts.map((product) => (
                   <tr key={product.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="h-10 w-10 flex-shrink-0 bg-slate-800 rounded-xl border border-white/5 flex items-center justify-center">
-                          <span className="text-slate-500 text-[10px] font-bold">IMG</span>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center w-full max-w-[200px] sm:max-w-xs lg:max-w-sm">
+                        <div className="h-10 w-10 flex-shrink-0 bg-slate-800 rounded-xl border border-white/5 flex items-center justify-center overflow-hidden">
+                          {product.imageUrls && product.imageUrls.length > 0 ? (
+                            <img src={product.imageUrls[0]} alt={product.title} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-slate-500 text-[10px] font-bold">IMG</span>
+                          )}
                         </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-bold text-slate-200">{product.title}</div>
+                        <div className="ml-4 flex-1 min-w-0">
+                          <div className="text-sm font-bold text-slate-200 truncate" title={product.title}>{product.title}</div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap font-mono text-xs text-slate-400">{product.sku}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">{product.category}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-[10px] font-bold rounded-md border ${
-                        product.condition === 'New' 
-                        ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' 
-                        : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-                      }`}>
+                      <span className={`px-2 py-1 text-[10px] font-bold rounded-md border ${product.condition === 'New'
+                          ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                          : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                        }`}>
                         {(product.condition || 'Unknown').toUpperCase()}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-white font-bold">{product.stock}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-white font-bold">₹{Number(product.price).toLocaleString('en-IN')}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-[10px] font-bold rounded-md border ${
-                        product.stock <= 0 
-                          ? 'bg-red-500/10 text-red-500 border-red-500/20' 
+                      <span className={`px-2 py-1 text-[10px] font-bold rounded-md border ${product.stock <= 0
+                          ? 'bg-red-500/10 text-red-500 border-red-500/20'
                           : 'bg-blue-500/10 text-blue-500 border-blue-500/20'
-                      }`}>
+                        }`}>
                         {product.stock <= 0 ? 'OUT OF STOCK' : (product.status || 'Unknown').toUpperCase()}
                       </span>
                     </td>
@@ -221,17 +222,17 @@ export default function ProductsList() {
             </tbody>
           </table>
         </div>
-        
+
         <div className="p-6 border-t border-white/5 flex items-center justify-between text-xs text-slate-500 uppercase tracking-widest font-bold">
           <div className="flex items-center gap-4">
             <span className="whitespace-nowrap">Rows per page:</span>
-            <select 
-              value={pageSize} 
-              onChange={(e) => { 
-                setPageSize(Number(e.target.value)); 
-                setCurrentPage(0); 
-                setCursors([null]); 
-              }} 
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setCurrentPage(0);
+                setCursors([null]);
+              }}
               className="bg-[#1a1a1c] border border-white/10 rounded-md py-1 px-2 text-white outline-none cursor-pointer"
             >
               <option value={25}>25</option>
@@ -242,14 +243,14 @@ export default function ProductsList() {
           </div>
           <div className="flex gap-2 items-center">
             <span className="mr-4">Page {currentPage + 1}</span>
-            <button 
+            <button
               onClick={() => setCurrentPage(p => p - 1)}
               disabled={currentPage === 0 || loading}
               className="px-4 py-2 border border-white/10 rounded-full hover:bg-white/5 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Previous
             </button>
-            <button 
+            <button
               onClick={() => setCurrentPage(p => p + 1)}
               disabled={!hasNextPage || loading}
               className="px-4 py-2 border border-white/10 rounded-full hover:bg-white/5 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"

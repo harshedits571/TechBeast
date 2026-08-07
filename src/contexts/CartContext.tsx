@@ -6,6 +6,7 @@ export interface CartItem {
   price: number;
   image?: string;
   quantity: number;
+  stock?: number;
 }
 
 interface CartContextType {
@@ -37,11 +38,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setCart(prevCart => {
       const existingItem = prevCart.find(i => i.id === item.id);
       if (existingItem) {
-        return prevCart.map(i => 
-          i.id === item.id ? { ...i, quantity: i.quantity + item.quantity } : i
-        );
+        return prevCart.map(i => {
+          if (i.id === item.id) {
+            const newQuantity = i.quantity + item.quantity;
+            return { ...i, quantity: i.stock !== undefined ? Math.min(newQuantity, i.stock) : newQuantity };
+          }
+          return i;
+        });
       }
-      return [...prevCart, item];
+      return [...prevCart, { ...item, quantity: item.stock !== undefined ? Math.min(item.quantity, item.stock) : item.quantity }];
     });
     setIsCartOpen(true); // Open cart automatically when adding
   };
@@ -56,7 +61,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     setCart(prevCart => 
-      prevCart.map(i => i.id === id ? { ...i, quantity } : i)
+      prevCart.map(i => {
+        if (i.id === id) {
+          return { ...i, quantity: i.stock !== undefined ? Math.min(quantity, i.stock) : quantity };
+        }
+        return i;
+      })
     );
   };
 

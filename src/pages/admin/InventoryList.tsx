@@ -4,6 +4,8 @@ import { Plus, Search, Filter, MoreVertical, Edit, Trash2, Package } from 'lucid
 import { db } from '../../lib/firebase';
 import { collection, getDocs, doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { deleteCloudinaryImage } from '../../utils/cloudinary';
+import { TableBodySkeleton } from '../../components/ui/Skeleton';
+import ComboManagerModal from '../../components/admin/ComboManagerModal';
 
 export default function InventoryList() {
   const navigate = useNavigate();
@@ -12,9 +14,8 @@ export default function InventoryList() {
   const [inventory, setInventory] = useState<any[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState('');
+  const [isComboModalOpen, setIsComboModalOpen] = useState(false);
+
 
   useEffect(() => {
     fetchData();
@@ -50,26 +51,6 @@ export default function InventoryList() {
     }
   };
 
-  const handleAddCategory = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCategoryName.trim()) return;
-    const catName = newCategoryName.trim();
-    if (categories.includes(catName)) {
-      alert("Category already exists.");
-      return;
-    }
-
-    try {
-      const updatedCategories = [...categories, catName].sort();
-      await setDoc(doc(db, 'settings', 'inventory'), { categories: updatedCategories });
-      setCategories(updatedCategories);
-      setNewCategoryName('');
-      setIsCategoryModalOpen(false);
-    } catch (error) {
-      console.error("Error adding category:", error);
-      alert("Failed to add category.");
-    }
-  };
 
   const handleDeleteItem = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this inventory item? This will also delete its images from Cloudinary.")) {
@@ -114,8 +95,9 @@ export default function InventoryList() {
           <p className="text-sm text-slate-500 mt-1">Track parts, components, and accessories stock levels.</p>
         </div>
         <div className="flex gap-3">
-          <button onClick={() => setIsCategoryModalOpen(true)} className="px-5 py-2 text-xs font-bold text-slate-300 bg-white/5 border border-white/10 rounded-full hover:bg-white/10 transition-all uppercase tracking-wider">
-            Manage Categories
+          <button onClick={() => setIsComboModalOpen(true)} className="bg-white/5 hover:bg-white/10 text-white px-5 py-2 rounded-full text-xs font-bold transition-all shadow-lg border border-white/10 uppercase tracking-wider flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            Combos
           </button>
           <Link to="/admin/inventory/new" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-full text-xs font-bold transition-all shadow-lg shadow-blue-900/20 uppercase tracking-wider flex items-center gap-2">
             <Plus className="h-4 w-4" />
@@ -169,7 +151,7 @@ export default function InventoryList() {
             </thead>
             <tbody className="text-sm">
               {loading ? (
-                <tr><td colSpan={6} className="px-6 py-4 text-center text-slate-500">Loading inventory...</td></tr>
+                <TableBodySkeleton columns={6} rows={5} />
               ) : filteredInventory.length === 0 ? (
                 <tr><td colSpan={6} className="px-6 py-4 text-center text-slate-500">No items found in inventory.</td></tr>
               ) : (
@@ -213,45 +195,11 @@ export default function InventoryList() {
         </div>
       </div>
 
-      {/* Category Management Modal */}
-      {isCategoryModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#141415] border border-white/10 rounded-3xl p-6 w-full max-w-md shadow-2xl">
-            <h2 className="text-lg font-bold text-white mb-4">Manage Categories</h2>
-            <div className="mb-6 max-h-48 overflow-y-auto custom-scrollbar pr-2">
-              <div className="flex flex-wrap gap-2">
-                {categories.map(cat => (
-                  <span key={cat} className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs font-bold text-slate-300">
-                    {cat}
-                  </span>
-                ))}
-              </div>
-            </div>
-            
-            <form onSubmit={handleAddCategory}>
-              <label className="block text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-2">Add New Category</label>
-              <div className="flex gap-3">
-                <input 
-                  type="text" 
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
-                  placeholder="e.g. Cables"
-                  className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-                />
-                <button type="submit" disabled={!newCategoryName.trim()} className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all uppercase tracking-wider">
-                  Add
-                </button>
-              </div>
-            </form>
-            
-            <div className="mt-6 flex justify-end">
-              <button onClick={() => setIsCategoryModalOpen(false)} className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white uppercase tracking-wider">
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ComboManagerModal 
+        isOpen={isComboModalOpen} 
+        onClose={() => setIsComboModalOpen(false)} 
+        inventory={inventory} 
+      />
     </div>
   );
 }

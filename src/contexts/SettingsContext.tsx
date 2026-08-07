@@ -9,6 +9,15 @@ interface StoreSettings {
   warrantyText: string;
   storeName: string;
   contactEmail: string;
+  promoBannerText: string;
+  promoBannerEnabled: boolean;
+  heroBanners: { imageUrl: string; link: string }[];
+  flashSaleEnabled: boolean;
+  flashSaleEndTime: string;
+  flashSaleProductIds: string[];
+  bestSellerIds: string[];
+  newArrivalIds: string[];
+  accessoryCombos: { id: string; name: string; items: string[] }[];
 }
 
 const defaultSettings: StoreSettings = {
@@ -17,7 +26,16 @@ const defaultSettings: StoreSettings = {
   bankOfferText: '7.5% Instant Discount Up To Rs.2000/- with HDFC Bank',
   warrantyText: '6 Months TechBeast Certified Warranty',
   storeName: 'TechBeast',
-  contactEmail: 'support@techbeast.com'
+  contactEmail: 'support@techbeast.com',
+  promoBannerText: 'Get 10% Off on all Laptops! Use code TECH10',
+  promoBannerEnabled: true,
+  heroBanners: [],
+  flashSaleEnabled: false,
+  flashSaleEndTime: new Date(Date.now() + 86400000).toISOString(),
+  flashSaleProductIds: [],
+  bestSellerIds: [],
+  newArrivalIds: [],
+  accessoryCombos: []
 };
 
 interface SettingsContextType {

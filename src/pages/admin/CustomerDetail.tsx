@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { db } from '../../lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs, updateDoc, arrayUnion } from 'firebase/firestore';
 import InvoiceModal from '../../components/admin/InvoiceModal';
+import { FormSkeleton } from '../../components/ui/Skeleton';
 
 export default function CustomerDetail() {
   const { id } = useParams();
@@ -94,7 +95,7 @@ export default function CustomerDetail() {
   };
 
   if (loading) {
-    return <div className="p-8 text-center text-slate-500">Loading Customer Profile...</div>;
+    return <FormSkeleton />;
   }
 
   if (!customer) return null;

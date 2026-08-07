@@ -3,6 +3,14 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Filter, ChevronDown, Check, Star, X, Search } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { CardGridSkeleton } from '../../components/ui/Skeleton';
+
+function normalizeBrand(brand: string) {
+  if (!brand) return 'Unknown';
+  const upper = brand.trim().toUpperCase();
+  if (['HP', 'MSI', 'LG', 'IBM', 'JBL', 'AMD'].includes(upper)) return upper;
+  return brand.charAt(0).toUpperCase() + brand.slice(1).toLowerCase();
+}
 
 export default function ProductList() {
   const [searchParams] = useSearchParams();
@@ -42,9 +50,9 @@ export default function ProductList() {
   }, []);
 
   const availableBrands = Array.from(new Set(products.map(p => {
-    if (p.brand) return p.brand;
-    if (p.title) return p.title.split(' ')[0];
-    return 'Unknown';
+    let b = p.brand;
+    if (!b && p.title) b = p.title.split(' ')[0];
+    return normalizeBrand(b);
   }))).filter(Boolean).sort();
 
   const availableGens = Array.from(new Set(products.map(p => p.processorGen))).filter(Boolean).sort();
@@ -63,7 +71,8 @@ export default function ProductList() {
     if (categoryFilter && p.category !== categoryFilter) return false;
     
     // Brand Filter
-    const productBrand = p.brand || (p.title ? p.title.split(' ')[0] : 'Unknown');
+    let productBrand = p.brand || (p.title ? p.title.split(' ')[0] : 'Unknown');
+    productBrand = normalizeBrand(productBrand);
     if (selectedBrands.length > 0 && !selectedBrands.includes(productBrand)) return false;
     
     // Condition Filter
@@ -108,35 +117,31 @@ export default function ProductList() {
                   <ChevronDown className="h-4 w-4 rotate-180 text-slate-400" />
                 </div>
                 <ul className="space-y-2">
-                  {availableBrands.map((brand: any) => (
-                    <li key={brand} className="flex items-center justify-between group">
-                      <label className="flex items-center cursor-pointer text-sm text-slate-600 group-hover:text-blue-600">
-                        <input
-                          type="checkbox"
-                          checked={selectedBrands.includes(brand)}
-                          onChange={(e) => {
-                            if (e.target.checked) setSelectedBrands([...selectedBrands, brand]);
-                            else setSelectedBrands(selectedBrands.filter(b => b !== brand));
-                          }}
-                          className="mr-3 h-4 w-4 rounded-sm border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        {brand}
-                      </label>
-                      <span className="text-xs text-slate-400">(22)</span>
-                    </li>
-                  ))}
-                  {/* Mock extra brands to look like screenshot */}
-                  {['Acer', 'Asus', 'Dell', 'Gigabyte', 'HP', 'Lenovo', 'MSI', 'Samsung'].map(mockBrand => (
-                    !availableBrands.includes(mockBrand) && (
-                      <li key={mockBrand} className="flex items-center justify-between group">
+                  {['Asus', 'Dell', 'HP', 'Lenovo', 'MSI', 'Acer'].map((brand) => {
+                    const count = products.filter(p => {
+                      let b = p.brand;
+                      if (!b && p.title) b = p.title.split(' ')[0];
+                      return normalizeBrand(b) === brand;
+                    }).length;
+                    
+                    return (
+                      <li key={brand} className="flex items-center justify-between group">
                         <label className="flex items-center cursor-pointer text-sm text-slate-600 group-hover:text-blue-600">
-                          <input type="checkbox" className="mr-3 h-4 w-4 rounded-sm border-slate-300 text-blue-600 focus:ring-blue-500" />
-                          {mockBrand}
+                          <input
+                            type="checkbox"
+                            checked={selectedBrands.includes(brand)}
+                            onChange={(e) => {
+                              if (e.target.checked) setSelectedBrands([...selectedBrands, brand]);
+                              else setSelectedBrands(selectedBrands.filter(b => b !== brand));
+                            }}
+                            className="mr-3 h-4 w-4 rounded-sm border-slate-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          {brand}
                         </label>
-                        <span className="text-xs text-slate-400">({Math.floor(Math.random() * 30) + 1})</span>
+                        <span className="text-xs text-slate-400">({count})</span>
                       </li>
-                    )
-                  ))}
+                    );
+                  })}
                 </ul>
               </div>
 
@@ -318,7 +323,10 @@ export default function ProductList() {
             </div>
 
             {/* Product Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {loading ? (
+              <CardGridSkeleton count={8} />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {displayedProducts.map((product) => {
                 const isDiscounted = product.oldPrice && product.oldPrice > product.price;
                 const discountPercent = isDiscounted 
@@ -389,6 +397,7 @@ export default function ProductList() {
                 );
               })}
             </div>
+            )}
             
             {displayedProducts.length === 0 && (
               <div className="text-center py-20 bg-white rounded-sm border border-slate-200">

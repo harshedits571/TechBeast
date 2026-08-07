@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { db } from '../../lib/firebase';
 import { collection, getDocs, addDoc, query, orderBy, limit, startAfter } from 'firebase/firestore';
 import { exportToCsv } from '../../utils/exportCsv';
+import { TableBodySkeleton } from '../../components/ui/Skeleton';
 
 export default function CustomerList() {
   const navigate = useNavigate();
@@ -159,7 +160,7 @@ export default function CustomerList() {
             </thead>
             <tbody className="text-sm">
               {loading ? (
-                <tr><td colSpan={7} className="px-6 py-4 text-center text-slate-500">Loading customers...</td></tr>
+                <TableBodySkeleton columns={7} rows={5} />
               ) : filteredCustomers.length === 0 ? (
                 <tr><td colSpan={7} className="px-6 py-4 text-center text-slate-500">No customers found.</td></tr>
               ) : (

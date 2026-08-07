@@ -10,6 +10,7 @@ export default function Checkout() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -21,7 +22,7 @@ export default function Checkout() {
     paymentMethod: 'COD'
   });
 
-  if (cart.length === 0) {
+  if (cart.length === 0 && !isSubmitted) {
     return <Navigate to="/products" />;
   }
 
@@ -62,14 +63,7 @@ export default function Checkout() {
 
       await addDoc(collection(db, 'orders'), orderData);
 
-      // 2. Reduce Stock
-      for (const item of cart) {
-        await updateDoc(doc(db, 'products', item.id), {
-          stock: increment(-item.quantity)
-        });
-      }
-
-      // 3. Update Customer Record
+      // 2. Update Customer Record
       const q = query(collection(db, 'customers'), where('phone', '==', formData.phone));
       const querySnapshot = await getDocs(q);
       
@@ -92,6 +86,7 @@ export default function Checkout() {
         });
       }
 
+      setIsSubmitted(true);
       clearCart();
       navigate('/checkout/success', { state: { orderNumber } });
 
@@ -117,10 +112,10 @@ export default function Checkout() {
           </div>
         )}
 
-        <div className="flex flex-col lg:flex-row gap-12">
+        <form id="checkout-form" onSubmit={handleCheckout} className="flex flex-col lg:flex-row gap-12">
           {/* Left Column: Form */}
           <div className="flex-1 space-y-8">
-            <form id="checkout-form" onSubmit={handleCheckout} className="space-y-8">
+            <div className="space-y-8">
               
               {/* Contact Details */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8">
@@ -168,27 +163,7 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {/* Payment */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="h-8 w-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold"><CreditCard className="h-4 w-4" /></div>
-                  <h2 className="text-xl font-bold text-slate-900">Payment Method</h2>
-                </div>
-                
-                <div className="space-y-4">
-                  <label className={`flex items-center p-4 border rounded-xl cursor-pointer transition-colors ${formData.paymentMethod === 'COD' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-blue-200 bg-white'}`}>
-                    <input type="radio" name="paymentMethod" value="COD" checked={formData.paymentMethod === 'COD'} onChange={handleChange} className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300" />
-                    <span className="ml-3 font-semibold text-slate-900">Cash on Delivery (COD)</span>
-                  </label>
-
-                  <label className={`flex items-center p-4 border rounded-xl cursor-pointer transition-colors ${formData.paymentMethod === 'ONLINE' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-blue-200 bg-white'}`}>
-                    <input type="radio" name="paymentMethod" value="ONLINE" checked={formData.paymentMethod === 'ONLINE'} onChange={handleChange} className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300" />
-                    <span className="ml-3 font-semibold text-slate-900">Pay Online (Card / UPI / NetBanking)</span>
-                  </label>
-                </div>
-              </div>
-
-            </form>
+            </div>
           </div>
 
           {/* Right Column: Order Summary */}
@@ -240,17 +215,17 @@ export default function Checkout() {
                   </>
                 ) : (
                   <>
-                    Place Order ₹{totalPrice.toLocaleString()}
+                    Submit Inquiry
                   </>
                 )}
               </button>
               
               <p className="text-center text-xs text-slate-500 mt-4">
-                By placing your order, you agree to our Terms of Service and Privacy Policy.
+                By submitting this inquiry, you agree to our Terms of Service and Privacy Policy.
               </p>
             </div>
           </div>
-        </div>
+        </form>
 
       </div>
     </div>

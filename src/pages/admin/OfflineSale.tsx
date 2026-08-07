@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, getDocs, addDoc, updateDoc, doc, query, where, increment } from 'firebase/firestore';
-import { ShoppingBag, Printer, ArrowLeft, Package, User, CheckCircle2, Gift } from 'lucide-react';
+import { ShoppingBag, Printer, ArrowLeft, Package, User, CheckCircle2, Gift, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { FormSkeleton } from '../../components/ui/Skeleton';
 
 export default function OfflineSale() {
   const [loading, setLoading] = useState(true);
@@ -23,6 +24,9 @@ export default function OfflineSale() {
   const [selectedProductId, setSelectedProductId] = useState('');
   const [selectedAccessories, setSelectedAccessories] = useState<string[]>([]);
   const [discountAmount, setDiscountAmount] = useState(0);
+  
+  const [warrantyType, setWarrantyType] = useState('none');
+  const [warrantyPrice, setWarrantyPrice] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -44,8 +48,16 @@ export default function OfflineSale() {
   const selectedProduct = products.find(p => p.id === selectedProductId);
   const selectedAccessoriesData = inventory.filter(i => selectedAccessories.includes(i.id));
   
-  const subTotal = selectedProduct ? Number(selectedProduct.price) : 0;
+  const subTotal = (selectedProduct ? Number(selectedProduct.price) : 0) + warrantyPrice;
   const total = Math.max(0, subTotal - discountAmount);
+
+  const handleWarrantyTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setWarrantyType(val);
+    if (val === '6_months') setWarrantyPrice(500);
+    else if (val === '1_year') setWarrantyPrice(1000);
+    else setWarrantyPrice(0);
+  };
 
   const toggleAccessory = (id: string) => {
     if (selectedAccessories.includes(id)) {
@@ -72,6 +84,31 @@ export default function OfflineSale() {
       const invNumber = generateInvoiceNumber();
       const now = new Date().toISOString();
 
+      const itemsPayload = [
+        {
+          type: 'product',
+          id: selectedProduct.id,
+          name: selectedProduct.title,
+          price: selectedProduct.price,
+          sku: selectedProduct.sku || ''
+        },
+        ...selectedAccessoriesData.map(a => ({
+          type: 'accessory',
+          id: a.id,
+          name: a.name,
+          price: 0 // Free accessories
+        }))
+      ];
+      
+      if (warrantyType !== 'none') {
+        itemsPayload.push({
+          type: 'warranty',
+          id: `WARRANTY-${warrantyType}`,
+          name: `Extended Warranty (${warrantyType === '6_months' ? '6 Months' : '1 Year'})`,
+          price: warrantyPrice
+        });
+      }
+
       // 1. Create Order
       const orderData = {
         orderNumber: invNumber,
@@ -82,21 +119,7 @@ export default function OfflineSale() {
         paymentStatus: 'PAID',
         fulfillmentStatus: 'FULFILLED',
         deliveryType: 'In-Store POS',
-        items: [
-          {
-            type: 'product',
-            id: selectedProduct.id,
-            name: selectedProduct.title,
-            price: selectedProduct.price,
-            sku: selectedProduct.sku || ''
-          },
-          ...selectedAccessoriesData.map(a => ({
-            type: 'accessory',
-            id: a.id,
-            name: a.name,
-            price: 0 // Free accessories
-          }))
-        ],
+        items: itemsPayload,
         createdAt: now
       };
 
@@ -155,7 +178,7 @@ export default function OfflineSale() {
   };
 
   if (loading) {
-    return <div className="p-8 text-white">Loading POS system...</div>;
+    return <FormSkeleton />;
   }
 
   // --- INVOICE VIEW (PRINTABLE) ---
@@ -211,6 +234,16 @@ export default function OfflineSale() {
               <td className="py-4 text-center">1</td>
               <td className="py-4 text-right font-bold">₹{Number(selectedProduct?.price).toLocaleString()}</td>
             </tr>
+            {warrantyType !== 'none' && (
+              <tr className="border-b border-slate-200">
+                <td className="py-4">
+                  <p className="font-semibold text-slate-700">Extended Warranty ({warrantyType === '6_months' ? '6 Months' : '1 Year'})</p>
+                  <p className="text-xs text-slate-500">Add-on Service</p>
+                </td>
+                <td className="py-4 text-center">1</td>
+                <td className="py-4 text-right font-bold">₹{warrantyPrice.toLocaleString()}</td>
+              </tr>
+            )}
             {selectedAccessoriesData.map((acc) => (
               <tr key={acc.id} className="border-b border-slate-200 bg-slate-50/50">
                 <td className="py-4">
@@ -299,6 +332,24 @@ export default function OfflineSale() {
             </select>
           </div>
 
+          {/* Extended Warranty */}
+          <div className="bg-[#0d0d0e] p-6 rounded-2xl border border-white/10 shadow-xl">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400 mb-6 flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-blue-500" /> Extended Warranty
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <select value={warrantyType} onChange={handleWarrantyTypeChange} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500 cursor-pointer">
+                <option value="none" className="bg-[#0d0d0e]">None (Standard 3 Months)</option>
+                <option value="6_months" className="bg-[#0d0d0e]">6 Months</option>
+                <option value="1_year" className="bg-[#0d0d0e]">1 Year</option>
+              </select>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">₹</span>
+                <input type="number" min="0" value={warrantyPrice} onChange={e => setWarrantyPrice(Number(e.target.value))} disabled={warrantyType === 'none'} className="w-full bg-white/5 border border-white/10 rounded-xl pl-8 pr-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500 disabled:opacity-50" placeholder="Price" />
+              </div>
+            </div>
+          </div>
+
           {/* Free Accessories Selection */}
           <div className="bg-[#0d0d0e] p-6 rounded-2xl border border-white/10 shadow-xl">
             <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400 mb-6 flex items-center gap-2">
@@ -333,6 +384,13 @@ export default function OfflineSale() {
                 </div>
               ) : (
                 <div className="text-sm text-slate-600 italic">No product selected</div>
+              )}
+              
+              {warrantyType !== 'none' && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-300 line-clamp-1 flex-1 pr-4">Warranty ({warrantyType === '6_months' ? '6 Months' : '1 Year'})</span>
+                  <span className="text-white font-bold whitespace-nowrap">₹{warrantyPrice.toLocaleString()}</span>
+                </div>
               )}
 
               {selectedAccessoriesData.map(acc => (

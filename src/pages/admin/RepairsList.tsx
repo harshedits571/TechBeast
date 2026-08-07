@@ -4,6 +4,7 @@ import { Plus, Search, Filter, Wrench, MoreVertical, ArrowUpDown, Calendar } fro
 import { format, parseISO } from 'date-fns';
 import { db } from '../../lib/firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { TableBodySkeleton } from '../../components/ui/Skeleton';
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -153,7 +154,7 @@ export default function RepairsList() {
             </thead>
             <tbody className="text-sm">
               {loading ? (
-                <tr><td colSpan={7} className="px-6 py-4 text-center text-slate-500">Loading repairs...</td></tr>
+                <TableBodySkeleton columns={7} rows={5} />
               ) : filteredRepairs.length === 0 ? (
                 <tr><td colSpan={7} className="px-6 py-4 text-center text-slate-500">No repair tickets found.</td></tr>
               ) : (

@@ -12,6 +12,25 @@ service cloud.firestore {
     match /repairs/{document=**} {
       allow read, write: if true;
     }
-    
+
+    // Allow read/write for inventory items
+    match /inventory/{document=**} {
+      allow read, write: if true;
+    }
+
+    // Allow read/write for settings (like inventory categories)
+    match /settings/{document=**} {
+      allow read, write: if true;
+    }
+
+    // Allow read/write for customers
+    match /customers/{document=**} {
+      allow read, write: if true;
+    }
+
+    // Allow read/write for orders
+    match /orders/{document=**} {
+      allow read, write: if true;
+    }
   }
 }

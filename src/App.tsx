@@ -11,6 +11,7 @@ import ProductList from './pages/customer/ProductList';
 import ProductDetail from './pages/customer/ProductDetail';
 import Checkout from './pages/customer/Checkout';
 import CheckoutSuccess from './pages/customer/CheckoutSuccess';
+import LegalPage from './pages/customer/LegalPage';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminProductsList from './pages/admin/ProductsList';
 import AdminRepairsList from './pages/admin/RepairsList';
@@ -39,6 +40,7 @@ export default function App() {
             <Route path="products/:id" element={<ProductDetail />} />
             <Route path="checkout" element={<Checkout />} />
             <Route path="checkout/success" element={<CheckoutSuccess />} />
+            <Route path="legal/:policyId" element={<LegalPage />} />
           </Route>
 
           {/* Admin Routes */}

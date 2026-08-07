@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { Save, X, Printer, User, Laptop, Wrench, FileText } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
+import { FormSkeleton } from '../../components/ui/Skeleton';
 
 export default function RepairForm() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
   const [customerFound, setCustomerFound] = useState(false);
   const [formData, setFormData] = useState({
@@ -112,6 +114,10 @@ export default function RepairForm() {
       setIsSubmitting(false);
     }
   };
+
+  if (loading) {
+    return <FormSkeleton />;
+  }
 
   return (
     <form onSubmit={handleSubmit} className="max-w-5xl mx-auto space-y-6">

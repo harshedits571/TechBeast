@@ -1,21 +1,144 @@
 import React, { useState, useEffect } from 'react';
-import { Save } from 'lucide-react';
+import { Save, Plus, Trash2 } from 'lucide-react';
+import { FormSkeleton } from '../../components/ui/Skeleton';
 import { useSettings } from '../../contexts/SettingsContext';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
+import ImageUpload from '../../components/admin/ImageUpload';
+import { deleteCloudinaryImage } from '../../utils/cloudinary';
 
 export default function Settings() {
   const { settings, updateSettings, loading } = useSettings();
   const [formData, setFormData] = useState(settings);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  
+  const [activeTab, setActiveTab] = useState('general');
+  const [allProducts, setAllProducts] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!loading) {
-      setFormData(settings);
+    if (!loading && settings) {
+      // Initialize any missing arrays
+      setFormData({
+        ...settings,
+        heroBanners: settings.heroBanners || [],
+        flashSaleProductIds: settings.flashSaleProductIds || [],
+        bestSellerIds: settings.bestSellerIds || [],
+        newArrivalIds: settings.newArrivalIds || []
+      });
     }
   }, [settings, loading]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'products'));
+        setAllProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchProducts();
+  }, []);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    if (type === 'checkbox') {
+      setFormData({ ...formData, [name]: (e.target as HTMLInputElement).checked });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
+  };
+
+  const handleMultiSelect = (e: React.ChangeEvent<HTMLSelectElement>, field: string) => {
+    const options = e.target.options;
+    const selected: string[] = [];
+    for (let i = 0; i < options.length; i++) {
+      if (options[i].selected) {
+        selected.push(options[i].value);
+      }
+    }
+    setFormData({ ...formData, [field]: selected });
+  };
+
+  const renderProductSelector = (field: 'bestSellerIds' | 'newArrivalIds' | 'flashSaleProductIds', title: string, desc: string) => {
+    const selectedIds = formData[field] || [];
+    
+    const handleAdd = (id: string) => {
+      if (id && !selectedIds.includes(id)) {
+        setFormData({ ...formData, [field]: [...selectedIds, id] });
+      }
+    };
+
+    const handleRemove = (id: string) => {
+      setFormData({ ...formData, [field]: selectedIds.filter(itemId => itemId !== id) });
+    };
+
+    const unselectedProducts = allProducts.filter(p => !selectedIds.includes(p.id));
+
+    return (
+      <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
+        <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest mb-4">
+          {title}
+          <span className="text-xs text-slate-500 normal-case font-normal">{desc}</span>
+        </label>
+        
+        <div className="space-y-2 mb-4">
+          {selectedIds.length === 0 ? (
+            <p className="text-sm text-slate-500 italic">No products selected.</p>
+          ) : (
+            selectedIds.map(id => {
+              const prod = allProducts.find(p => p.id === id);
+              return (
+                <div key={id} className="flex items-center justify-between bg-black/40 border border-white/5 p-3 rounded-lg group hover:border-white/10 transition-colors">
+                  <span className="text-sm text-slate-200 line-clamp-1">{prod ? prod.title : 'Unknown Product'}</span>
+                  <button type="button" onClick={() => handleRemove(id)} className="text-slate-500 hover:text-red-400 p-1 transition-colors">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+        
+        <select 
+          onChange={(e) => { handleAdd(e.target.value); e.target.value = ''; }}
+          className="w-full bg-[#0d0d0e] border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
+          defaultValue=""
+        >
+          <option value="" disabled>-- Select a product to add --</option>
+          {unselectedProducts.map(p => (
+            <option key={p.id} value={p.id}>{p.title}</option>
+          ))}
+        </select>
+      </div>
+    );
+  };
+
+  const addHeroBanner = () => {
+    setFormData({
+      ...formData,
+      heroBanners: [...formData.heroBanners, { imageUrl: '', link: '' }]
+    });
+  };
+
+  const updateHeroBanner = (index: number, field: string, value: string) => {
+    const newBanners = [...formData.heroBanners];
+    newBanners[index] = { ...newBanners[index], [field]: value };
+    setFormData({ ...formData, heroBanners: newBanners });
+  };
+
+  const removeHeroBanner = async (index: number) => {
+    const bannerToRemove = formData.heroBanners[index];
+    if (bannerToRemove && bannerToRemove.imageUrl) {
+      try {
+        await deleteCloudinaryImage(bannerToRemove.imageUrl);
+      } catch (err) {
+        console.error("Failed to delete banner image from Cloudinary:", err);
+      }
+    }
+    const newBanners = formData.heroBanners.filter((_, i) => i !== index);
+    setFormData({ ...formData, heroBanners: newBanners });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -34,18 +157,22 @@ export default function Settings() {
     }
   };
 
-  if (loading) {
-    return <div className="p-8 text-white">Loading settings...</div>;
-  }
+  if (loading) return <FormSkeleton />;
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-5xl">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-white">Global Store Settings</h1>
-        <p className="text-sm text-slate-500 mt-1">Manage global configuration for your storefront like contact info, default policies, and offers.</p>
+        <h1 className="text-2xl font-bold tracking-tight text-white">Store Settings</h1>
+        <p className="text-sm text-slate-500 mt-1">Manage global configuration, homepage design, and product curation.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-[#0d0d0e] rounded-3xl border border-white/10 shadow-2xl p-8 space-y-8">
+      <div className="flex border-b border-white/10">
+        <button onClick={() => setActiveTab('general')} className={`px-6 py-3 text-sm font-bold uppercase tracking-wider ${activeTab === 'general' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-300'}`}>General</button>
+        <button onClick={() => setActiveTab('homepage')} className={`px-6 py-3 text-sm font-bold uppercase tracking-wider ${activeTab === 'homepage' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-300'}`}>Homepage & Offers</button>
+        <button onClick={() => setActiveTab('curation')} className={`px-6 py-3 text-sm font-bold uppercase tracking-wider ${activeTab === 'curation' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-300'}`}>Product Curation</button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="bg-[#0d0d0e] rounded-3xl border border-white/10 shadow-2xl p-8 space-y-8 relative">
         
         {successMsg && (
           <div className="bg-emerald-500/10 border border-emerald-500/50 text-emerald-500 px-4 py-3 rounded-xl text-sm font-semibold">
@@ -53,42 +180,129 @@ export default function Settings() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
-            Store Name
-            <input required name="storeName" value={formData.storeName} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. TechBeast" />
-          </label>
-          <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
-            Contact Email
-            <input required name="contactEmail" value={formData.contactEmail} onChange={handleChange} type="email" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. support@techbeast.com" />
-          </label>
-        </div>
+        {/* GENERAL TAB */}
+        {activeTab === 'general' && (
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+                Store Name
+                <input required name="storeName" value={formData.storeName} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. TechBeast" />
+              </label>
+              <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+                Contact Email
+                <input required name="contactEmail" value={formData.contactEmail} onChange={handleChange} type="email" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. support@techbeast.com" />
+              </label>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+                Support Phone Number
+                <input required name="supportPhone" value={formData.supportPhone} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. +91-9248071734" />
+              </label>
+              <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+                Estimated Dispatch Time
+                <input required name="estimatedDispatch" value={formData.estimatedDispatch} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. 24 - 48hrs" />
+              </label>
+            </div>
+            <div className="grid grid-cols-1 gap-8">
+              <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+                Bank Offer Text (Global)
+                <input required name="bankOfferText" value={formData.bankOfferText} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. 7.5% Instant Discount Up To Rs.2000/- with HDFC Bank" />
+              </label>
+              <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+                Default Warranty Text
+                <input required name="warrantyText" value={formData.warrantyText} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. 6 Months TechBeast Certified Warranty" />
+              </label>
+            </div>
+          </div>
+        )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
-            Support Phone Number
-            <input required name="supportPhone" value={formData.supportPhone} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. +91-9248071734" />
-          </label>
-          <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
-            Estimated Dispatch Time
-            <input required name="estimatedDispatch" value={formData.estimatedDispatch} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. 24 - 48hrs" />
-          </label>
-        </div>
+        {/* HOMEPAGE TAB */}
+        {activeTab === 'homepage' && (
+          <div className="space-y-8">
+            {/* Promo Banner */}
+            <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
+              <h3 className="text-lg font-bold text-white mb-4">Top Promotional Banner</h3>
+              <div className="flex items-center gap-4 mb-4">
+                <input type="checkbox" id="promoBannerEnabled" name="promoBannerEnabled" checked={formData.promoBannerEnabled} onChange={handleChange} className="w-5 h-5 rounded bg-white/5 border border-white/20 text-blue-600 focus:ring-blue-500" />
+                <label htmlFor="promoBannerEnabled" className="text-sm font-bold text-slate-300 cursor-pointer">Enable Promo Banner</label>
+              </div>
+              {formData.promoBannerEnabled && (
+                <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+                  Promo Text
+                  <input type="text" name="promoBannerText" value={formData.promoBannerText} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 normal-case font-normal" placeholder="e.g. Weekend Sale! Get 20% off all accessories." />
+                </label>
+              )}
+            </div>
 
-        <div className="grid grid-cols-1 gap-8">
-          <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
-            Bank Offer Text (Global)
-            <input required name="bankOfferText" value={formData.bankOfferText} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. 7.5% Instant Discount Up To Rs.2000/- with HDFC Bank" />
-            <span className="text-xs text-slate-500 normal-case tracking-normal font-normal">This offer text will be shown on all product pages.</span>
-          </label>
-          
-          <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
-            Default Warranty Text
-            <input required name="warrantyText" value={formData.warrantyText} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. 6 Months TechBeast Certified Warranty" />
-          </label>
-        </div>
+            {/* Hero Banners */}
+            <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-bold text-white">Hero Banners (Slider)</h3>
+                <button type="button" onClick={addHeroBanner} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider">
+                  <Plus className="h-4 w-4" /> Add Banner
+                </button>
+              </div>
+              
+              {formData.heroBanners.length === 0 ? (
+                <p className="text-slate-500 text-sm italic">No banners added. Homepage will use default design.</p>
+              ) : (
+                <div className="space-y-6">
+                  {formData.heroBanners.map((banner, index) => (
+                    <div key={index} className="flex gap-6 items-start p-4 bg-[#0d0d0e] rounded-xl border border-white/5">
+                      <div className="w-48 flex-shrink-0">
+                        <ImageUpload
+                          images={banner.imageUrl ? [banner.imageUrl] : []}
+                          onChange={(urls) => updateHeroBanner(index, 'imageUrl', urls[0] || '')}
+                        />
+                      </div>
+                      <div className="flex-1 space-y-4">
+                        <label className="flex flex-col gap-2 text-xs text-slate-400 font-bold uppercase tracking-widest">
+                          Link URL (Optional)
+                          <input type="text" value={banner.link} onChange={(e) => updateHeroBanner(index, 'link', e.target.value)} className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm normal-case" placeholder="/products?category=Laptops" />
+                        </label>
+                      </div>
+                      <button type="button" onClick={() => removeHeroBanner(index)} className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors">
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-        <div className="flex justify-end pt-6 border-t border-white/10">
+            {/* Flash Sale */}
+            <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
+              <h3 className="text-lg font-bold text-white mb-4">Flash Sale Deals</h3>
+              <div className="flex items-center gap-4 mb-4">
+                <input type="checkbox" id="flashSaleEnabled" name="flashSaleEnabled" checked={formData.flashSaleEnabled} onChange={handleChange} className="w-5 h-5 rounded bg-white/5 border border-white/20 text-blue-600 focus:ring-blue-500" />
+                <label htmlFor="flashSaleEnabled" className="text-sm font-bold text-slate-300 cursor-pointer">Enable Flash Sale Section</label>
+              </div>
+              
+              {formData.flashSaleEnabled && (
+                <div className="space-y-4">
+                  <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+                    End Date/Time
+                    <input type="datetime-local" name="flashSaleEndTime" value={formData.flashSaleEndTime ? new Date(formData.flashSaleEndTime).toISOString().slice(0, 16) : ''} onChange={(e) => setFormData({...formData, flashSaleEndTime: new Date(e.target.value).toISOString()})} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 normal-case font-normal" />
+                  </label>
+                  
+                  <div className="pt-4">
+                    {renderProductSelector('flashSaleProductIds', 'Flash Sale Products', 'Select which products are part of the current flash sale.')}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* CURATION TAB */}
+        {activeTab === 'curation' && (
+          <div className="space-y-8">
+            {renderProductSelector('bestSellerIds', 'Best Sellers', 'Select which products to showcase in the Best Sellers section on the homepage.')}
+            {renderProductSelector('newArrivalIds', 'New Arrivals', 'Select which products to showcase in the New Arrivals section.')}
+          </div>
+        )}
+
+        <div className="flex justify-end pt-6 border-t border-white/10 pb-2">
           <button type="submit" disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-full text-sm font-bold transition-all shadow-lg shadow-blue-900/20 uppercase tracking-wider flex items-center gap-2">
             <Save className="h-4 w-4" />
             {isSubmitting ? "Saving..." : "Save Settings"}

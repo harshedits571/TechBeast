@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { DashboardSkeleton } from '../../components/ui/Skeleton';
 import { 
   DollarSign, 
   ShoppingBag, 
@@ -89,7 +90,7 @@ export default function AdminDashboard() {
   });
 
   if (loading) {
-    return <div className="text-white p-8">Loading dashboard metrics...</div>;
+    return <DashboardSkeleton />;
   }
 
   return (

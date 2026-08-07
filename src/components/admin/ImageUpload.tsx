@@ -9,7 +9,10 @@ interface ImageUploadProps {
 
 export default function ImageUpload({ images, onChange }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
+  const [linkInput, setLinkInput] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragItem = useRef<number | null>(null);
+  const dragOverItem = useRef<number | null>(null);
 
   const UPLOAD_PRESET = 'vihdngdx';
   // TODO: Replace this with the actual cloud name once provided by the user
@@ -69,18 +72,60 @@ export default function ImageUpload({ images, onChange }: ImageUploadProps) {
     onChange(newImages);
     
     // Auto-delete from Cloudinary
-    if (imageToRemove) {
+    if (imageToRemove && imageToRemove.includes('cloudinary.com')) {
       console.log("Auto-deleting image from Cloudinary...");
       await deleteCloudinaryImage(imageToRemove);
     }
+  };
+
+  const handleAddLink = () => {
+    if (!linkInput.trim()) return;
+    onChange([...(images || []), linkInput.trim()]);
+    setLinkInput('');
+  };
+
+  const handleDragStart = (e: React.DragEvent, position: number) => {
+    dragItem.current = position;
+    // For Firefox to allow dragging
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/html', e.currentTarget.outerHTML);
+    }
+  };
+
+  const handleDragEnter = (e: React.DragEvent, position: number) => {
+    dragOverItem.current = position;
+  };
+
+  const handleDragEnd = () => {
+    if (dragItem.current !== null && dragOverItem.current !== null && dragItem.current !== dragOverItem.current) {
+      const newImages = [...(images || [])];
+      const draggedItemContent = newImages[dragItem.current];
+      newImages.splice(dragItem.current, 1);
+      newImages.splice(dragOverItem.current, 0, draggedItemContent);
+      onChange(newImages);
+    }
+    dragItem.current = null;
+    dragOverItem.current = null;
   };
 
   return (
     <div className="space-y-4 w-full">
       <div className="flex flex-wrap gap-4 mb-4">
         {(images || []).map((url, index) => (
-          <div key={index} className="relative w-24 h-24 group rounded-xl border border-white/10 overflow-hidden bg-white/5 shadow-md">
-            <img src={url} alt={`Upload ${index + 1}`} className="w-full h-full object-cover" />
+          <div 
+            key={index} 
+            draggable
+            onDragStart={(e) => handleDragStart(e, index)}
+            onDragEnter={(e) => handleDragEnter(e, index)}
+            onDragEnd={handleDragEnd}
+            onDragOver={(e) => e.preventDefault()}
+            className="relative w-24 h-24 group rounded-xl border border-white/10 overflow-hidden bg-white/5 shadow-md cursor-grab active:cursor-grabbing"
+          >
+            {index === 0 && (
+               <div className="absolute bottom-0 w-full bg-blue-600/90 text-white text-[9px] font-bold text-center py-0.5 z-10 uppercase tracking-widest backdrop-blur-sm">Main</div>
+            )}
+            <img src={url} alt={`Upload ${index + 1}`} className="w-full h-full object-cover pointer-events-none" />
             <button
               type="button"
               onClick={() => removeImage(index)}
@@ -119,6 +164,23 @@ export default function ImageUpload({ images, onChange }: ImageUploadProps) {
       <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">
         Upload high-quality images. Hosted securely on Cloudinary.
       </p>
+      
+      <div className="flex gap-2 pt-2 border-t border-white/10">
+        <input 
+          type="text" 
+          placeholder="Or paste an image URL here..." 
+          value={linkInput}
+          onChange={(e) => setLinkInput(e.target.value)}
+          className="flex-1 bg-[#0d0d0e] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors normal-case"
+        />
+        <button 
+          type="button" 
+          onClick={handleAddLink}
+          className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors"
+        >
+          Add URL
+        </button>
+      </div>
     </div>
   );
 }
