@@ -358,7 +358,7 @@ export default function OfflineSale() {
             </div>
             <p className="text-sm text-slate-500">Ground Floor, Shinde Complex,</p>
             <p className="text-sm text-slate-500">No.183 C Block, Hubballi, Karnataka 580029</p>
-            <p className="text-sm text-slate-500">+91-9248071734 | support@techbeast.com</p>
+            <p className="text-sm text-slate-500">+91-9248071734 |techbeasthubli@gmail.com</p>
           </div>
           <div className="text-right">
             <h2 className="text-4xl font-bold text-slate-200 uppercase tracking-widest mb-4">INVOICE</h2>
@@ -446,10 +446,10 @@ export default function OfflineSale() {
           <div className="flex-1">
             <h4 className="text-sm print:text-xs font-bold text-slate-700 mb-2 print:mb-1 uppercase tracking-wider">Terms & Conditions</h4>
             <ul className="text-xs print:text-[9px] text-slate-500 list-disc pl-4 space-y-1 print:space-y-0 text-left">
-              <li>All second-hand electronics come with a standard 3-month testing warranty unless specified otherwise.</li>
-              <li>Extended warranty (if purchased) covers internal hardware failures only.</li>
-              <li>Physical damage, liquid damage, and software issues are not covered under warranty.</li>
-              <li>Accessories (chargers, cables, bags, etc.) are not covered under any warranty.</li>
+              <li>All second-hand electronics come with a standard 3-month warranty.</li>
+              <li>Extended warranty (if purchased) covers internal hardware failures and OS and softwere issues only.</li>
+              <li>Physical damage, liquid damage, and short circuits are not covered under warranty.</li>
+              <li>Accessories (chargers, Battery,) are covered under warranty.</li>
               <li>Goods once sold cannot be returned or exchanged.</li>
             </ul>
           </div>

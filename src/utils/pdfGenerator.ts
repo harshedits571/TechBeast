@@ -122,7 +122,7 @@ export const generateBulkInvoices = async (
                 Tech Beast
               </div>
               <p style="margin: 0; font-size: 12px; color: #64748b;">Ground Floor, Shinde Complex, No.183 C Block, Hubballi, Karnataka 580029</p>
-              <p style="margin: 0; font-size: 12px; color: #64748b;">+1 (555) 123-4567 | support@techbeast.com</p>
+              <p style="margin: 0; font-size: 12px; color: #64748b;">+1 (555) 123-4567 |techbeasthubli@gmail.com</p>
             </div>
             <div style="text-align: right;">
               <h2 style="margin: 0 0 8px 0; font-size: 32px; color: #e2e8f0; letter-spacing: 2px;">INVOICE</h2>
@@ -174,10 +174,10 @@ export const generateBulkInvoices = async (
             <div style="flex: 1;">
               <h4 style="margin: 0 0 4px 0; font-size: 12px; font-weight: bold;">TERMS & CONDITIONS</h4>
               <ul style="margin: 0; padding-left: 16px; font-size: 9px; color: #64748b;">
-                <li>All second-hand electronics come with a standard 3-month testing warranty unless specified otherwise.</li>
-                <li>Extended warranty (if purchased) covers internal hardware failures only.</li>
-                <li>Physical damage, liquid damage, and software issues are not covered under warranty.</li>
-                <li>Accessories (chargers, cables, bags, etc.) are not covered under any warranty.</li>
+                <li>All second-hand electronics come with a standard 3-month warranty.</li>
+                <li>Extended warranty (if purchased) covers internal hardware failures and OS and softwere issues only.</li>
+                <li>Physical damage, liquid damage, and short circuits are not covered under warranty.</li>
+                <li>Accessories (chargers, Battery,) are covered under warranty.</li>
                 <li>Goods once sold cannot be returned or exchanged.</li>
               </ul>
             </div>
@@ -278,10 +278,10 @@ export const generateSingleInvoicePdf = async (order: any, onProgress?: (msg: st
               Tech Beast
             </div>
             <p style="margin: 0; font-size: 12px; color: #64748b;">Ground Floor, Shinde Complex, No.183 C Block, Hubballi, Karnataka 580029</p>
-            <p style="margin: 0; font-size: 12px; color: #64748b;">+1 (555) 123-4567 | support@techbeast.com</p>
+            <p style="margin: 0; font-size: 12px; color: #64748b;">+1 (555) 123-4567 |techbeasthubli@gmail.com</p>
           </div>
           <div style="text-align: right;">
-            <h2 style="margin: 0 0 8px 0; font-size: 32px; color: #e2e8f0; letter-spacing: 2px;">INVOICE</h2>
+            <h2 style="margin: 0 0 8px 0; font-size: 32px; color: #e2e8f0; letter-spacing: 2px;">Proforma Invoice</h2>
             <p style="margin: 0; font-size: 12px; font-weight: bold;">Invoice No: ${order.orderNumber}</p>
             <p style="margin: 0; font-size: 12px; color: #64748b;">Date: ${order.createdAt ? new Date(order.createdAt).toLocaleDateString() : '-'}</p>
             ${order.paymentMethod ? `<p style="margin: 4px 0 0 0; font-size: 12px; font-weight: bold; color: #059669; background: #ecfdf5; display: inline-block; padding: 2px 8px; border-radius: 4px;">Paid via ${order.paymentMethod}</p>` : ''}
@@ -330,10 +330,10 @@ export const generateSingleInvoicePdf = async (order: any, onProgress?: (msg: st
           <div style="flex: 1;">
             <h4 style="margin: 0 0 4px 0; font-size: 12px; font-weight: bold;">TERMS & CONDITIONS</h4>
             <ul style="margin: 0; padding-left: 16px; font-size: 9px; color: #64748b;">
-              <li>All second-hand electronics come with a standard 3-month testing warranty unless specified otherwise.</li>
-              <li>Extended warranty (if purchased) covers internal hardware failures only.</li>
-              <li>Physical damage, liquid damage, and software issues are not covered under warranty.</li>
-              <li>Accessories (chargers, cables, bags, etc.) are not covered under any warranty.</li>
+              <li>All second-hand electronics come with a standard 3-month warranty.</li>
+              <li>Extended warranty (if purchased) covers internal hardware failures and OS and softwere issues only.</li>
+              <li>Physical damage, liquid damage, and short circuits are not covered under warranty.</li>
+              <li>Accessories (chargers, Battery,) are covered under warranty.</li>
               <li>Goods once sold cannot be returned or exchanged.</li>
             </ul>
           </div>

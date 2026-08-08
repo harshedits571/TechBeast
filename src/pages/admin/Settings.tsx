@@ -190,7 +190,7 @@ export default function Settings() {
               </label>
               <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
                 Contact Email
-                <input required name="contactEmail" value={formData.contactEmail} onChange={handleChange} type="email" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. support@techbeast.com" />
+                <input required name="contactEmail" value={formData.contactEmail} onChange={handleChange} type="email" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g.techbeasthubli@gmail.com" />
               </label>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
