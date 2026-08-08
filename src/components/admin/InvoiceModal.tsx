@@ -41,10 +41,10 @@ export default function InvoiceModal({ order, onClose }: InvoiceModalProps) {
             </div>
             <p className="text-sm text-slate-500">Ground Floor, Shinde Complex,</p>
             <p className="text-sm text-slate-500">No.183 C Block, Hubballi, Karnataka 580029</p>
-            <p className="text-sm text-slate-500">{settings?.supportPhone || '+1 (555) 123-4567'} | {settings?.contactEmail || 'support@techbeast.com'}</p>
+            <p className="text-sm text-slate-500">{settings?.supportPhone || '+91 95352 25266'} | {settings?.contactEmail || 'techbeasthubli@gmail.com'}</p>
           </div>
           <div className="text-right">
-            <h2 className="text-4xl font-bold text-slate-200 uppercase tracking-widest mb-4">INVOICE</h2>
+            <h2 className="text-4xl font-bold text-slate-200 uppercase tracking-widest mb-4">Proforma Invoice</h2>
             <p className="text-sm font-bold text-slate-700">Invoice No: {order.orderNumber}</p>
             <p className="text-sm text-slate-500">Date: {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : '-'}</p>
             {order.paymentMethod && (

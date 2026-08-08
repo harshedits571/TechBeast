@@ -32,7 +32,7 @@ const defaultSettings: StoreSettings = {
   bankOfferText: '7.5% Instant Discount Up To Rs.2000/- with HDFC Bank',
   warrantyText: '6 Months TechBeast Certified Warranty',
   storeName: 'TechBeast',
-  contactEmail: 'support@techbeast.com',
+  contactEmail: 'techbeasthubli@gmail.com',
   promoBannerText: 'Get 10% Off on all Laptops! Use code TECH10',
   promoBannerEnabled: true,
   heroBanners: [],

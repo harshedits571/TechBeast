@@ -174,14 +174,14 @@ export default function LegalPage() {
 
         {/* Content Box */}
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 md:p-12 text-slate-600 leading-relaxed">
-          {formatContent(policy.content(settings.storeName || 'TechBeast', settings.contactEmail || 'support@techbeast.com'))}
+          {formatContent(policy.content(settings.storeName || 'TechBeast', settings.contactEmail || 'techbeasthubli@gmail.com'))}
         </div>
 
         {/* Footer info */}
         <div className="mt-12 text-center text-sm text-slate-500">
           If you have any questions regarding these policies, please contact us at{' '}
           <a href={`mailto:${settings.contactEmail}`} className="text-blue-600 hover:underline font-medium">
-            {settings.contactEmail || 'support@techbeast.com'}
+            {settings.contactEmail || 'techbeasthubli@gmail.com'}
           </a>
         </div>
       </div>
