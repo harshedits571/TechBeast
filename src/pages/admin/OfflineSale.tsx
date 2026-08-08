@@ -361,7 +361,7 @@ export default function OfflineSale() {
             <p className="text-sm text-slate-500">+91-9248071734 |techbeasthubli@gmail.com</p>
           </div>
           <div className="text-right">
-            <h2 className="text-4xl font-bold text-slate-200 uppercase tracking-widest mb-4">INVOICE</h2>
+            <h2 className="text-4xl font-bold text-slate-200 tracking-widest mb-4">Proforma Invoice</h2>
             <p className="text-sm font-bold text-slate-700">Invoice No: {orderId}</p>
             <p className="text-sm text-slate-500">Date: {new Date(invoiceDate).toLocaleDateString()}</p>
             <p className="text-sm font-bold text-emerald-600 mt-2 bg-emerald-50 inline-block px-2 py-1 rounded">Paid via {paymentMethod}</p>
