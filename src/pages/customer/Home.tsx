@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Monitor, ChevronRight, Smartphone, Tv, Headphones, Watch, Camera, Gamepad, Keyboard } from 'lucide-react';
+import { ArrowRight, Monitor, ChevronRight, Smartphone, Tv, Headphones, Watch, Camera, Gamepad, Keyboard, Zap } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -107,7 +107,7 @@ export default function Home() {
       {settings.heroBanners && settings.heroBanners.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pt-8 w-full">
           {settings.heroBanners.length >= 3 ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[500px] md:h-[450px] lg:h-[500px]">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[350px] sm:h-[450px] lg:h-[550px] xl:h-[650px]">
               {/* Main Banner (Left) */}
               <Link to={settings.heroBanners[0].link || '#'} className="md:col-span-2 relative rounded-2xl overflow-hidden group h-full shadow-md">
                 <img src={settings.heroBanners[0].imageUrl} alt="Hero Banner 1" className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" />
@@ -123,7 +123,7 @@ export default function Home() {
               </div>
             </div>
           ) : settings.heroBanners.length === 2 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[300px] md:h-[400px]">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[300px] sm:h-[400px] lg:h-[450px]">
               <Link to={settings.heroBanners[0].link || '#'} className="relative rounded-2xl overflow-hidden group h-full shadow-md">
                 <img src={settings.heroBanners[0].imageUrl} alt="Hero Banner 1" className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" />
               </Link>
@@ -132,7 +132,7 @@ export default function Home() {
               </Link>
             </div>
           ) : (
-            <div className="relative w-full h-[300px] md:h-[400px] rounded-2xl overflow-hidden group shadow-md">
+            <div className="relative w-full h-[250px] sm:h-[350px] md:h-[400px] lg:h-[500px] rounded-2xl overflow-hidden group shadow-md">
               <Link to={settings.heroBanners[0].link || '#'}>
                 <img src={settings.heroBanners[0].imageUrl} alt="Hero Banner" className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" />
               </Link>
@@ -144,11 +144,11 @@ export default function Home() {
       {/* 2. INTRO TEXT SECTION */}
       <section className="relative overflow-hidden border-b border-slate-200 bg-white">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-50 to-transparent"></div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 flex flex-col items-center text-center">
-          <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6 leading-tight text-slate-900">
-            Upgrade your tech element <br />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 flex flex-col items-center text-center">
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold tracking-tight mb-4 sm:mb-6 leading-tight text-slate-900">
+            Upgrade Your Tech Element <br />
           </h1>
-          <p className="text-sm text-slate-600 mb-8 max-w-lg leading-relaxed font-medium">
+          <p className="text-xs sm:text-sm lg:text-base text-slate-600 mb-8 max-w-md sm:max-w-lg lg:max-w-2xl leading-relaxed font-medium">
             Discover our curated selection of high-performance laptops, custom desktop builds, and professional repair services.
           </p>
           <div className="flex gap-4">
@@ -162,8 +162,8 @@ export default function Home() {
       {/* 3. BRANDS SECTION (Logos) */}
       <section className="py-10 bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h3 className="text-center text-sm font-bold text-slate-400 uppercase tracking-widest mb-8">Top Brands We Trust</h3>
-          <div className="flex justify-between md:justify-center items-center gap-8 md:gap-12 overflow-x-auto pb-4 hide-scrollbar">
+          <h3 className="text-center text-xs sm:text-sm font-bold text-slate-400 uppercase tracking-widest mb-6 sm:mb-8">Top Brands We Trust</h3>
+          <div className="flex justify-start md:justify-center items-center gap-6 sm:gap-8 md:gap-12 overflow-x-auto pb-4 hide-scrollbar px-2 touch-pan-y">
             {[
               { name: 'Asus', logo: 'https://logos-world.net/wp-content/uploads/2020/07/Asus-Logo-700x394.png', link: '/products?brand=Asus' },
               { name: 'Dell', logo: 'https://logos-world.net/wp-content/uploads/2020/08/Dell-Logo-700x394.png', link: '/products?brand=Dell' },
@@ -188,11 +188,12 @@ export default function Home() {
         <section className="py-16 bg-slate-900 text-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6 border-b border-white/10 pb-6">
-              <div className="flex items-center gap-4">
-                <div className="bg-red-600 text-white px-4 py-2 rounded-lg text-xl font-black italic tracking-widest uppercase transform -skew-x-12">
-                  Flash Sale
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2 mb-1">
+                   <Zap className="h-5 w-5 text-amber-400" fill="currentColor" />
+                   <span className="text-amber-400 font-bold tracking-widest uppercase text-sm">{settings.flashSaleTitle || 'Flash Sale'}</span>
                 </div>
-                <h2 className="text-2xl font-bold tracking-tight text-white">Today's Special Deals</h2>
+                <h2 className="text-3xl font-bold tracking-tight text-white">{settings.flashSaleSubtitle || "Today's Special Deals"}</h2>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-sm font-bold text-slate-400 uppercase tracking-wider">Ends in:</span>
@@ -251,27 +252,56 @@ export default function Home() {
         </section>
       )}
 
-      {/* 6. BANNER PLACEHOLDERS */}
-      <section className="py-16 bg-slate-50 border-t border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-gradient-to-r from-blue-900 to-blue-800 rounded-2xl p-8 flex flex-col justify-center min-h-[250px] relative overflow-hidden group cursor-pointer shadow-xl">
-              <div className="relative z-10 text-white max-w-xs">
-                <span className="text-blue-300 text-[10px] uppercase font-bold tracking-widest mb-2 block">Weekend Deals</span>
-                <h3 className="text-3xl font-bold mb-4 leading-tight">Next-gen gaming console</h3>
-                <span className="inline-block bg-white text-blue-900 font-bold px-4 py-2 rounded-full text-xs uppercase tracking-wider">Shop Now</span>
-              </div>
-            </div>
-            <div className="bg-gradient-to-r from-red-600 to-red-500 rounded-2xl p-8 flex flex-col justify-center min-h-[250px] relative overflow-hidden group cursor-pointer shadow-xl">
-              <div className="relative z-10 text-white max-w-xs">
-                <span className="text-red-200 text-[10px] uppercase font-bold tracking-widest mb-2 block">Back to school</span>
-                <h3 className="text-3xl font-bold mb-4 leading-tight">Special discount for students</h3>
-                <span className="inline-block bg-white text-red-600 font-bold px-4 py-2 rounded-full text-xs uppercase tracking-wider">Shop Now</span>
-              </div>
+      {/* 6. PROMOTIONAL CARDS (SLEEK TECH STYLE) */}
+      {settings.promoCards && (
+        <section className="py-16 bg-white border-t border-slate-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              
+              {/* CARD 1 */}
+              <Link to={settings.promoCards.card1.link || '#'} className={`group relative overflow-hidden rounded-3xl bg-[#0a0a0b] border ${settings.promoCards.card1.bgColor === 'red' ? 'border-red-500/20 hover:border-red-500/40 hover:shadow-[0_0_40px_-10px_rgba(239,68,68,0.3)]' : settings.promoCards.card1.bgColor === 'blue' ? 'border-blue-500/20 hover:border-blue-500/40 hover:shadow-[0_0_40px_-10px_rgba(59,130,246,0.3)]' : settings.promoCards.card1.bgColor === 'green' ? 'border-emerald-500/20 hover:border-emerald-500/40 hover:shadow-[0_0_40px_-10px_rgba(16,185,129,0.3)]' : 'border-white/10 hover:border-white/20 hover:shadow-[0_0_40px_-10px_rgba(255,255,255,0.1)]'} p-10 flex flex-col justify-center min-h-[280px] transition-all duration-500 cursor-pointer`}>
+                
+                {/* Background Glow */}
+                <div className={`absolute -right-20 -top-20 w-64 h-64 rounded-full blur-[80px] opacity-20 group-hover:opacity-40 transition-opacity duration-700 ${settings.promoCards.card1.bgColor === 'red' ? 'bg-red-500' : settings.promoCards.card1.bgColor === 'blue' ? 'bg-blue-500' : settings.promoCards.card1.bgColor === 'green' ? 'bg-emerald-500' : 'bg-slate-500'}`}></div>
+
+                <div className="relative z-10 flex flex-col items-start max-w-md">
+                  <span className={`${settings.promoCards.card1.bgColor === 'red' ? 'text-red-400' : settings.promoCards.card1.bgColor === 'blue' ? 'text-blue-400' : settings.promoCards.card1.bgColor === 'green' ? 'text-emerald-400' : 'text-slate-400'} text-[10px] uppercase font-bold tracking-[0.2em] mb-4 flex items-center gap-2`}>
+                    <span className={`w-2 h-2 rounded-full ${settings.promoCards.card1.bgColor === 'red' ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)]' : settings.promoCards.card1.bgColor === 'blue' ? 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)]' : settings.promoCards.card1.bgColor === 'green' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]' : 'bg-slate-400 shadow-[0_0_10px_rgba(148,163,184,0.8)]'}`}></span>
+                    {settings.promoCards.card1.subtitle}
+                  </span>
+                  
+                  <h3 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-6 sm:mb-8 leading-tight text-white group-hover:-translate-y-1 transition-transform duration-500">{settings.promoCards.card1.title}</h3>
+                  
+                  <span className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all duration-300 border ${settings.promoCards.card1.bgColor === 'red' ? 'border-red-500/30 text-red-400 bg-red-500/10 group-hover:bg-red-500 group-hover:text-white' : settings.promoCards.card1.bgColor === 'blue' ? 'border-blue-500/30 text-blue-400 bg-blue-500/10 group-hover:bg-blue-500 group-hover:text-white' : settings.promoCards.card1.bgColor === 'green' ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10 group-hover:bg-emerald-500 group-hover:text-white' : 'border-white/20 text-white bg-white/5 group-hover:bg-white group-hover:text-slate-900'} flex items-center gap-2`}>
+                    Shop Now <ChevronRight className="w-3 h-3" />
+                  </span>
+                </div>
+              </Link>
+              
+              {/* CARD 2 */}
+              <Link to={settings.promoCards.card2.link || '#'} className={`group relative overflow-hidden rounded-3xl bg-[#0a0a0b] border ${settings.promoCards.card2.bgColor === 'red' ? 'border-red-500/20 hover:border-red-500/40 hover:shadow-[0_0_40px_-10px_rgba(239,68,68,0.3)]' : settings.promoCards.card2.bgColor === 'blue' ? 'border-blue-500/20 hover:border-blue-500/40 hover:shadow-[0_0_40px_-10px_rgba(59,130,246,0.3)]' : settings.promoCards.card2.bgColor === 'green' ? 'border-emerald-500/20 hover:border-emerald-500/40 hover:shadow-[0_0_40px_-10px_rgba(16,185,129,0.3)]' : 'border-white/10 hover:border-white/20 hover:shadow-[0_0_40px_-10px_rgba(255,255,255,0.1)]'} p-10 flex flex-col justify-center min-h-[280px] transition-all duration-500 cursor-pointer`}>
+                
+                {/* Background Glow */}
+                <div className={`absolute -right-20 -top-20 w-64 h-64 rounded-full blur-[80px] opacity-20 group-hover:opacity-40 transition-opacity duration-700 ${settings.promoCards.card2.bgColor === 'red' ? 'bg-red-500' : settings.promoCards.card2.bgColor === 'blue' ? 'bg-blue-500' : settings.promoCards.card2.bgColor === 'green' ? 'bg-emerald-500' : 'bg-slate-500'}`}></div>
+
+                <div className="relative z-10 flex flex-col items-start max-w-md">
+                  <span className={`${settings.promoCards.card2.bgColor === 'red' ? 'text-red-400' : settings.promoCards.card2.bgColor === 'blue' ? 'text-blue-400' : settings.promoCards.card2.bgColor === 'green' ? 'text-emerald-400' : 'text-slate-400'} text-[10px] uppercase font-bold tracking-[0.2em] mb-4 flex items-center gap-2`}>
+                    <span className={`w-2 h-2 rounded-full ${settings.promoCards.card2.bgColor === 'red' ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)]' : settings.promoCards.card2.bgColor === 'blue' ? 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)]' : settings.promoCards.card2.bgColor === 'green' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]' : 'bg-slate-400 shadow-[0_0_10px_rgba(148,163,184,0.8)]'}`}></span>
+                    {settings.promoCards.card2.subtitle}
+                  </span>
+                  
+                  <h3 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-6 sm:mb-8 leading-tight text-white group-hover:-translate-y-1 transition-transform duration-500">{settings.promoCards.card2.title}</h3>
+                  
+                  <span className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all duration-300 border ${settings.promoCards.card2.bgColor === 'red' ? 'border-red-500/30 text-red-400 bg-red-500/10 group-hover:bg-red-500 group-hover:text-white' : settings.promoCards.card2.bgColor === 'blue' ? 'border-blue-500/30 text-blue-400 bg-blue-500/10 group-hover:bg-blue-500 group-hover:text-white' : settings.promoCards.card2.bgColor === 'green' ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10 group-hover:bg-emerald-500 group-hover:text-white' : 'border-white/20 text-white bg-white/5 group-hover:bg-white group-hover:text-slate-900'} flex items-center gap-2`}>
+                    Shop Now <ChevronRight className="w-3 h-3" />
+                  </span>
+                </div>
+              </Link>
+
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
     </div>
   );

@@ -25,38 +25,15 @@ import {
 } from 'recharts';
 import { db } from '../../lib/firebase';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { useAdmin } from '../../contexts/AdminContext';
 
 export default function AdminDashboard() {
-  const [repairs, setRepairs] = useState<any[]>([]);
-  const [inventory, setInventory] = useState<any[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        // Fetch Repairs
-        const repairsSnap = await getDocs(query(collection(db, 'repairs'), orderBy('createdAt', 'desc')));
-        const repairsData = repairsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setRepairs(repairsData);
-
-        // Fetch Inventory
-        const invSnap = await getDocs(collection(db, 'inventory'));
-        const invData = invSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setInventory(invData);
-
-        // Fetch Orders for charts
-        const ordersSnap = await getDocs(query(collection(db, 'orders'), orderBy('createdAt', 'desc')));
-        const ordersData = ordersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setOrders(ordersData);
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchDashboardData();
-  }, []);
+  const { repairsState, inventoryState, ordersState } = useAdmin();
+  
+  const repairs = repairsState.data;
+  const inventory = inventoryState.data;
+  const orders = ordersState.data;
+  const loading = repairsState.loading || inventoryState.loading || ordersState.loading;
 
   // Calculate Metrics
   const activeRepairs = repairs.filter(r => r.status !== 'Completed');
@@ -188,11 +165,11 @@ export default function AdminDashboard() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff10" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} tickFormatter={(value) => `$${value}`} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} tickFormatter={(value) => `₹${value}`} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#0d0d0e', borderRadius: '8px', border: '1px solid #ffffff10', color: '#fff' }}
                   itemStyle={{ color: '#3b82f6' }}
-                  formatter={(value: number) => [`$${value}`, 'Activity']}
+                  formatter={(value: number) => [`₹${value}`, 'Activity']}
                 />
                 <Area type="monotone" dataKey="total" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorTotal)" />
               </AreaChart>

@@ -8,12 +8,16 @@ import {
   Check,
   Clock,
   X,
-  AlertCircle
+  AlertCircle,
+  MessageCircle,
+  Trash2
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { db } from '../../lib/firebase';
+import { Link, useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, orderBy, deleteDoc, doc, limit, startAfter, writeBatch, addDoc } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
+import { useAdmin } from '../../contexts/AdminContext';
 import { exportToCsv } from '../../utils/exportCsv';
+import { generateBulkInvoices, generateSingleInvoicePdf } from '../../utils/pdfGenerator';
 import { TableBodySkeleton } from '../../components/ui/Skeleton';
 
 // Mock data generator for testing
@@ -29,64 +33,50 @@ const MOCK_ORDERS = [
 ];
 
 export default function OrderList() {
-  const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const { ordersState } = useAdmin();
+  const { data: orders, loading, pageSize, setPageSize, currentPage, setCurrentPage, hasNextPage, setCursors } = ordersState;
+
   const [activeTab, setActiveTab] = useState('All');
   
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('');
   const [fulfillmentFilter, setFulfillmentFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  
+  // Bulk Download
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [bulkProgress, setBulkProgress] = useState('');
 
-  // Pagination state
-  const [pageSize, setPageSize] = useState(25);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [cursors, setCursors] = useState<any[]>([null]);
-  const [hasNextPage, setHasNextPage] = useState(true);
-
-  const fetchOrders = async () => {
-    setLoading(true);
-    try {
-      let q;
-      const currentCursor = cursors[currentPage];
-      
-      if (currentCursor) {
-        q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), startAfter(currentCursor), limit(pageSize));
-      } else {
-        q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(pageSize));
-      }
-
-      const snap = await getDocs(q);
-      const data = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
-      
-      setOrders(data);
-      setHasNextPage(snap.docs.length === pageSize);
-      
-      if (snap.docs.length > 0) {
-        const lastDoc = snap.docs[snap.docs.length - 1];
-        setCursors(prev => {
-          const newCursors = [...prev];
-          newCursors[currentPage + 1] = lastDoc;
-          return newCursors;
-        });
-      }
-    } catch (error) {
-      console.error("Error fetching orders:", error);
-    } finally {
-      setLoading(false);
+  const handleWhatsApp = async (order: any) => {
+    if (!order.customerPhone) {
+      alert("No phone number available for this customer.");
+      return;
     }
+    
+    // 1. Trigger PDF Download
+    await generateSingleInvoicePdf(order);
+    
+    // 2. Open WhatsApp
+    let phone = order.customerPhone.replace(/[^0-9+]/g, '');
+    if (phone.length === 10 && !phone.startsWith('+')) {
+      phone = '+91' + phone; 
+    }
+    
+    const text = `Hi ${order.customerName || 'Customer'},\n\nThank you for your order at Tech Beast! Your order #${order.orderNumber || ''} is confirmed.\n\nTotal: ₹${Number(order.totalAmount || 0).toLocaleString()}\n\nI have attached your invoice PDF below.`;
+    const encodedText = encodeURIComponent(text);
+    
+    const waUrl = `https://wa.me/${phone}?text=${encodedText}`;
+    window.open(waUrl, '_blank');
   };
-
-  useEffect(() => {
-    fetchOrders();
-  }, [pageSize, currentPage]);
 
   const generateMockOrders = async () => {
     try {
       for (const order of MOCK_ORDERS) {
         await addDoc(collection(db, 'orders'), order);
       }
-      fetchOrders();
     } catch (error) {
       alert("Error generating mock data. Check your Firebase Rules for 'orders' collection!");
     }
@@ -136,6 +126,18 @@ export default function OrderList() {
     { name: 'Failed', count: orders.filter(o => ['FAILED'].includes(o.paymentStatus?.toUpperCase())).length }
   ];
 
+  const handleDeleteOrder = async (orderId: string) => {
+    if (window.confirm("Are you sure you want to delete this invoice/order?")) {
+      try {
+        await deleteDoc(doc(db, "orders", orderId));
+        alert("Order deleted successfully!");
+      } catch (error) {
+        console.error("Error deleting order:", error);
+        alert("Failed to delete order.");
+      }
+    }
+  };
+
   const filteredOrders = orders.filter(order => {
     // Tab filtering
     if (activeTab === 'Pending payment' && !['PENDING'].includes(order.paymentStatus?.toUpperCase())) return false;
@@ -152,13 +154,17 @@ export default function OrderList() {
     // Dropdown filters
     if (paymentFilter && order.paymentStatus?.toUpperCase() !== paymentFilter.toUpperCase()) return false;
     if (fulfillmentFilter && order.fulfillmentStatus?.toUpperCase() !== fulfillmentFilter.toUpperCase()) return false;
+    
+    // Type filtering (Offline POS vs Online)
+    if (typeFilter === 'OFFLINE' && order.deliveryType !== 'In-Store POS') return false;
+    if (typeFilter === 'ONLINE' && order.deliveryType === 'In-Store POS') return false;
 
     return true;
   });
 
   return (
     <div className="text-slate-300 min-h-screen pb-20">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
         <div>
           <div className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Page 1 &gt; Page 2 &gt; Default</div>
           <h1 className="text-3xl font-bold text-white">Orders</h1>
@@ -226,13 +232,49 @@ export default function OrderList() {
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
             </div>
 
-            <button className="px-4 py-2 border border-white/10 rounded-lg text-sm text-slate-300 hover:bg-white/5 transition-colors font-bold">
+            <div className="relative">
+              <select 
+                className="appearance-none bg-white/5 border border-white/10 rounded-lg py-2 pl-4 pr-10 text-sm text-slate-300 focus:outline-none focus:border-blue-500 transition-colors font-bold cursor-pointer"
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+              >
+                <option value="" className="bg-[#0d0d0e]">Order Type</option>
+                <option value="ONLINE" className="bg-[#0d0d0e]">Online Orders</option>
+                <option value="OFFLINE" className="bg-[#0d0d0e]">Offline (POS)</option>
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+            </div>
+
+            <button className="px-4 py-2 border border-white/10 rounded-lg text-sm text-slate-300 hover:bg-white/5 transition-colors font-bold whitespace-nowrap">
               More filters
             </button>
+
+            <div className="flex items-center gap-2 border-l border-white/10 pl-4">
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-slate-300 focus:outline-none focus:border-blue-500" title="Start Date" />
+              <span className="text-slate-500 text-sm">to</span>
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-slate-300 focus:outline-none focus:border-blue-500" title="End Date" />
+              
+              <button 
+                onClick={() => {
+                  if(!startDate || !endDate) { alert('Please select start and end dates'); return; }
+                  generateBulkInvoices(
+                    startDate, 
+                    endDate, 
+                    { paymentFilter, fulfillmentFilter, typeFilter, searchTerm, activeTab },
+                    setBulkProgress
+                  );
+                }}
+                disabled={!!bulkProgress}
+                className="bg-purple-600/20 text-purple-400 border border-purple-500/30 hover:bg-purple-600/30 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-lg text-sm font-bold transition-colors whitespace-nowrap"
+              >
+                {bulkProgress ? 'Processing...' : 'Bulk Download PDFs'}
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <button onClick={() => exportToCsv('orders.csv', orders)} className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors font-bold">
+          <div className="flex items-center gap-4 mt-4 lg:mt-0 w-full lg:w-auto justify-end">
+            {bulkProgress && <span className="text-xs text-purple-400 font-bold animate-pulse mr-2">{bulkProgress}</span>}
+            <button onClick={() => exportToCsv('orders.csv', orders)} className="flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors font-bold whitespace-nowrap">
               <Download className="w-4 h-4" /> Export
             </button>
             <Link to="/admin/offline-sale" className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">
@@ -261,30 +303,43 @@ export default function OrderList() {
                 <th className="p-4 font-bold">Fulfilment Status ⇅</th>
                 <th className="p-4 font-bold">Delivery Type ⇅</th>
                 <th className="p-4 font-bold">Date ⇅</th>
+                <th className="p-4 font-bold text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="text-sm">
               {loading ? (
-                <TableBodySkeleton columns={8} rows={5} />
+                <TableBodySkeleton columns={9} rows={5} />
               ) : filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-slate-500">No orders found. Click (Generate Mock Data) to generate samples.</td>
+                  <td colSpan={9} className="p-8 text-center text-slate-500">No orders found. Click (Generate Mock Data) to generate samples.</td>
                 </tr>
               ) : (
                 filteredOrders.map((order, i) => (
-                  <tr key={order.id || i} className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer">
+                  <tr 
+                    key={order.id || i} 
+                    onClick={() => navigate(`/admin/orders/${order.id}`)}
+                    className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
+                  >
                     <td className="p-4 text-center">
                       <input type="checkbox" className="w-4 h-4 rounded bg-white/5 border-white/10 text-blue-600 focus:ring-blue-500 cursor-pointer" />
                     </td>
                     <td className="p-4 font-mono text-blue-400 text-xs font-bold">{order.orderNumber}</td>
-                    <td className="p-4 font-bold text-white">${Number(order.totalAmount).toLocaleString()}</td>
+                    <td className="p-4 font-bold text-white">₹{Number(order.totalAmount).toLocaleString()}</td>
                     <td className="p-4">
                       <div className="flex items-center gap-3">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0
                           ${['bg-emerald-600', 'bg-blue-600', 'bg-purple-600', 'bg-amber-600', 'bg-rose-600'][i % 5]}`}>
                           {order.customerAvatar || (order.customerName ? order.customerName.substring(0,2).toUpperCase() : 'CU')}
                         </div>
-                        <span className="font-bold text-slate-300">{order.customerName}</span>
+                        <div className="flex flex-col items-start">
+                          <span className="font-bold text-slate-300">{order.customerName}</span>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleWhatsApp(order); }}
+                            className="text-[10px] text-[#25D366] hover:text-[#128C7E] flex items-center gap-1 font-bold mt-1 px-2 py-0.5 rounded-full bg-[#25D366]/10 border border-[#25D366]/20 transition-colors"
+                          >
+                            <MessageCircle className="w-3 h-3" /> WhatsApp
+                          </button>
+                        </div>
                       </div>
                     </td>
                     <td className="p-4">{getPaymentBadge(order.paymentStatus)}</td>
@@ -292,6 +347,15 @@ export default function OrderList() {
                     <td className="p-4 text-slate-400 text-xs font-bold">{order.deliveryType}</td>
                     <td className="p-4 text-slate-500 text-xs font-bold whitespace-nowrap">
                       {new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, {new Date(order.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                    <td className="p-4 text-center">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleDeleteOrder(order.id); }}
+                        className="text-slate-500 hover:text-red-400 p-2 rounded-lg hover:bg-red-500/10 transition-colors"
+                        title="Delete Invoice"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
                 ))

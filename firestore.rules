@@ -3,34 +3,55 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Allow read/write for products
+    // Check if the user is the store owner/admin
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'admin@gmail.com';
+    }
+
+    // Check if the user is signed in
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Products: Anyone can read (for the storefront), only admin can write
     match /products/{document=**} {
-      allow read, write: if true; 
+      allow read: if true;
+      allow write: if isAdmin();
     }
     
-    // Allow read/write for repair tickets
-    match /repairs/{document=**} {
-      allow read, write: if true;
-    }
-
-    // Allow read/write for inventory items
-    match /inventory/{document=**} {
-      allow read, write: if true;
-    }
-
-    // Allow read/write for settings (like inventory categories)
+    // Settings: Anyone can read (for store details), only admin can write
     match /settings/{document=**} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
-    // Allow read/write for customers
+    // Inventory (Accessories/Free Items): Admin only
+    match /inventory/{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    // Customers: Admin only.
     match /customers/{document=**} {
-      allow read, write: if true;
+      allow read, write: if isAdmin();
     }
 
-    // Allow read/write for orders
+    // Orders: Admin can do anything. Signed-in customers can create an order.
     match /orders/{document=**} {
-      allow read, write: if true;
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.token.email == resource.data.customerEmail);
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // Users (Auth Roles): Admin can do anything. Users can read/write their own profile.
+    match /users/{userId} {
+      allow read, write: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
+    }
+    
+    // Repairs: Admin can do anything. Signed-in customers can create a repair ticket.
+    match /repairs/{document=**} {
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.userId);
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
     }
   }
 }

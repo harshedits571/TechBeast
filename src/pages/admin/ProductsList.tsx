@@ -1,22 +1,18 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Filter, MoreVertical, Edit, Trash2, Download } from 'lucide-react';
-import { db } from '../../lib/firebase';
 import { collection, getDocs, query, orderBy, deleteDoc, doc, limit, startAfter } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
+import { useAdmin } from '../../contexts/AdminContext';
 import { exportToCsv } from '../../utils/exportCsv';
 import { TableBodySkeleton } from '../../components/ui/Skeleton';
 import { deleteCloudinaryImage } from '../../utils/cloudinary';
 export default function ProductsList() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [products, setProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const { productsState } = useAdmin();
+  const { data: products, loading, pageSize, setPageSize, currentPage, setCurrentPage, hasNextPage, setCursors } = productsState;
 
-  // Pagination state
-  const [pageSize, setPageSize] = useState(25);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [cursors, setCursors] = useState<any[]>([null]);
-  const [hasNextPage, setHasNextPage] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
   const handleDelete = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this product? This will also delete its images from Cloudinary.")) {
@@ -32,7 +28,6 @@ export default function ProductsList() {
         }
 
         await deleteDoc(doc(db, "products", id));
-        setProducts(products.filter(p => p.id !== id));
       } catch (error) {
         console.error("Error deleting product:", error);
         alert("Failed to delete product.");
@@ -47,45 +42,6 @@ export default function ProductsList() {
       setOpenDropdownId(id);
     }
   };
-
-  useEffect(() => {
-    const fetchProducts = async () => {
-      setLoading(true);
-      try {
-        let q;
-        const currentCursor = cursors[currentPage];
-
-        if (currentCursor) {
-          q = query(collection(db, "products"), orderBy("createdAt", "desc"), startAfter(currentCursor), limit(pageSize));
-        } else {
-          q = query(collection(db, "products"), orderBy("createdAt", "desc"), limit(pageSize));
-        }
-
-        const querySnapshot = await getDocs(q);
-        const productsData = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...(doc.data() as any)
-        }));
-
-        setProducts(productsData);
-        setHasNextPage(querySnapshot.docs.length === pageSize);
-
-        if (querySnapshot.docs.length > 0) {
-          const lastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
-          setCursors(prev => {
-            const newCursors = [...prev];
-            newCursors[currentPage + 1] = lastDoc;
-            return newCursors;
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching products:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProducts();
-  }, [pageSize, currentPage]);
 
   const filteredProducts = products.filter(p =>
     p.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||

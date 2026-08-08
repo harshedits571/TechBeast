@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter, Wrench, MoreVertical, ArrowUpDown, Calendar } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import { db } from '../../lib/firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { useAdmin } from '../../contexts/AdminContext';
 import { TableBodySkeleton } from '../../components/ui/Skeleton';
 
 const getStatusColor = (status: string) => {
@@ -19,30 +19,12 @@ const getStatusColor = (status: string) => {
 
 export default function RepairsList() {
   const navigate = useNavigate();
+  const { repairsState } = useAdmin();
+  const { data: repairs, loading } = repairsState;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [sortOrder, setSortOrder] = useState('received_desc');
-  const [repairs, setRepairs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchRepairs = async () => {
-      try {
-        const q = query(collection(db, "repairs"), orderBy("createdAt", "desc"));
-        const querySnapshot = await getDocs(q);
-        const repairsData = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setRepairs(repairsData);
-      } catch (error) {
-        console.error("Error fetching repairs:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchRepairs();
-  }, []);
 
   const filteredRepairs = repairs.filter(repair => {
     const matchesSearch = 
@@ -79,21 +61,29 @@ export default function RepairsList() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Repair Tickets</h1>
-          <p className="text-sm text-slate-500 mt-1">Manage service requests and track repair progress.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
+            <Wrench className="h-6 w-6 text-blue-500" />
+            Repair Queue
+          </h1>
+          <div className="flex items-center gap-6 mt-3 text-sm font-bold overflow-x-auto hide-scrollbar">
+            <span className="text-white border-b-2 border-blue-500 pb-1 whitespace-nowrap">Active ({repairs.length})</span>
+            <span className="text-slate-500 hover:text-white cursor-pointer transition-colors whitespace-nowrap">Completed (0)</span>
+          </div>
         </div>
-        <Link to="/admin/repairs/new" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-full text-xs font-bold transition-all shadow-lg shadow-blue-900/20 uppercase tracking-wider flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          New Ticket
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          <Link to="/admin/repairs/new" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-full text-xs font-bold transition-all shadow-lg shadow-blue-900/20 uppercase tracking-wider flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            New Ticket
+          </Link>
+        </div>
       </div>
 
       <div className="bg-[#0d0d0e] rounded-3xl border border-white/10 flex flex-col overflow-hidden shadow-2xl">
         {/* Toolbar */}
-        <div className="p-6 border-b border-white/5 flex items-center gap-4">
-          <div className="relative flex-1 max-w-md">
+        <div className="p-4 sm:p-6 border-b border-white/5 flex flex-wrap items-center gap-4">
+          <div className="relative flex-1 min-w-[200px] max-w-md">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-4 w-4 text-slate-500" />
             </div>
@@ -140,7 +130,7 @@ export default function RepairsList() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>
               <tr className="text-left text-[10px] text-slate-500 uppercase tracking-tighter border-b border-white/5">
                 <th className="px-6 py-4">Ticket ID</th>
@@ -161,7 +151,7 @@ export default function RepairsList() {
                 sortedRepairs.map((ticket) => (
                   <tr key={ticket.id} onClick={() => navigate(`/admin/repairs/${ticket.id}`)} className="border-t border-white/5 hover:bg-white/5 transition-colors cursor-pointer">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="font-mono text-xs text-blue-400">REP-{ticket.id.slice(0,4).toUpperCase()}</span>
+                      <span className="font-mono text-xs text-blue-400">{ticket.ticketNumber || `REP-${ticket.id.slice(0,4).toUpperCase()}`}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="font-bold text-slate-200">{ticket.customerName}</div>

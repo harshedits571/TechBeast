@@ -1,55 +1,47 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter, MoreVertical, Edit, Trash2, Package } from 'lucide-react';
-import { db } from '../../lib/firebase';
 import { collection, getDocs, doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
+import { useAdmin } from '../../contexts/AdminContext';
 import { deleteCloudinaryImage } from '../../utils/cloudinary';
 import { TableBodySkeleton } from '../../components/ui/Skeleton';
 import ComboManagerModal from '../../components/admin/ComboManagerModal';
 
 export default function InventoryList() {
   const navigate = useNavigate();
+  const { inventoryState } = useAdmin();
+  const { data: inventory, loading: inventoryLoading } = inventoryState;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
-  const [inventory, setInventory] = useState<any[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [isComboModalOpen, setIsComboModalOpen] = useState(false);
 
-
   useEffect(() => {
-    fetchData();
+    fetchCategories();
   }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchCategories = async () => {
     try {
-      // Fetch Categories
       const settingsRef = doc(db, 'settings', 'inventory');
       const settingsSnap = await getDoc(settingsRef);
       let loadedCategories = ['Accessories', 'SSD', 'HDD', 'RAM', 'Cabinet', 'Keyboard', 'Mouse', 'Graphics Card', 'Processor', 'Motherboard', 'Power Supply', 'Monitor'];
       if (settingsSnap.exists() && settingsSnap.data().categories) {
         loadedCategories = settingsSnap.data().categories;
       } else {
-        // Initialize if doesn't exist
         await setDoc(settingsRef, { categories: loadedCategories });
       }
       setCategories(loadedCategories);
-
-      // Fetch Inventory
-      const q = collection(db, 'inventory');
-      const querySnapshot = await getDocs(q);
-      const inventoryData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setInventory(inventoryData);
     } catch (error) {
-      console.error("Error fetching inventory data:", error);
+      console.error("Error fetching inventory categories:", error);
     } finally {
       setLoading(false);
     }
   };
+
+  const isLoading = loading || inventoryLoading;
 
 
   const handleDeleteItem = async (id: string) => {
@@ -65,8 +57,7 @@ export default function InventoryList() {
           }
         }
 
-        await deleteDoc(doc(db, 'inventory', id));
-        setInventory(inventory.filter(item => item.id !== id));
+        await deleteDoc(doc(db, "inventory", id));
       } catch (error) {
         console.error("Error deleting item:", error);
         alert("Failed to delete item.");
@@ -86,7 +77,7 @@ export default function InventoryList() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
             <Package className="h-6 w-6 text-blue-500" />
@@ -94,7 +85,7 @@ export default function InventoryList() {
           </h1>
           <p className="text-sm text-slate-500 mt-1">Track parts, components, and accessories stock levels.</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <button onClick={() => setIsComboModalOpen(true)} className="bg-white/5 hover:bg-white/10 text-white px-5 py-2 rounded-full text-xs font-bold transition-all shadow-lg border border-white/10 uppercase tracking-wider flex items-center gap-2">
             <Package className="h-4 w-4" />
             Combos
@@ -108,8 +99,8 @@ export default function InventoryList() {
 
       <div className="bg-[#0d0d0e] rounded-3xl border border-white/10 flex flex-col overflow-hidden shadow-2xl">
         {/* Toolbar */}
-        <div className="p-6 border-b border-white/5 flex items-center gap-4">
-          <div className="relative flex-1 max-w-md">
+        <div className="p-4 sm:p-6 border-b border-white/5 flex flex-wrap items-center gap-4">
+          <div className="relative flex-1 min-w-[200px] max-w-md">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-4 w-4 text-slate-500" />
             </div>
@@ -138,7 +129,7 @@ export default function InventoryList() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
               <tr className="text-left text-[10px] text-slate-500 uppercase tracking-tighter border-b border-white/5">
                 <th className="px-6 py-4">Item Details</th>
@@ -150,7 +141,7 @@ export default function InventoryList() {
               </tr>
             </thead>
             <tbody className="text-sm">
-              {loading ? (
+              {isLoading ? (
                 <TableBodySkeleton columns={6} rows={5} />
               ) : filteredInventory.length === 0 ? (
                 <tr><td colSpan={6} className="px-6 py-4 text-center text-slate-500">No items found in inventory.</td></tr>

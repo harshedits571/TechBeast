@@ -2,16 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, Plus, Filter, Users, Download, Mail, Phone, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
-import { db } from '../../lib/firebase';
 import { collection, getDocs, addDoc, query, orderBy, limit, startAfter } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
+import { useAdmin } from '../../contexts/AdminContext';
 import { exportToCsv } from '../../utils/exportCsv';
 import { TableBodySkeleton } from '../../components/ui/Skeleton';
 
 export default function CustomerList() {
   const navigate = useNavigate();
+  const { customersState } = useAdmin();
+  const { data: customers, loading, pageSize, setPageSize, currentPage, setCurrentPage, hasNextPage, setCursors } = customersState;
+
   const [searchTerm, setSearchTerm] = useState('');
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newCustomer, setNewCustomer] = useState({
@@ -21,51 +23,6 @@ export default function CustomerList() {
     city: '',
     address: ''
   });
-
-  // Pagination state
-  const [pageSize, setPageSize] = useState(25);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [cursors, setCursors] = useState<any[]>([null]);
-  const [hasNextPage, setHasNextPage] = useState(true);
-
-  useEffect(() => {
-    fetchCustomers();
-  }, [pageSize, currentPage]);
-
-  const fetchCustomers = async () => {
-    setLoading(true);
-    try {
-      let q;
-      const currentCursor = cursors[currentPage];
-      
-      if (currentCursor) {
-        q = query(collection(db, "customers"), orderBy("createdAt", "desc"), startAfter(currentCursor), limit(pageSize));
-      } else {
-        q = query(collection(db, "customers"), orderBy("createdAt", "desc"), limit(pageSize));
-      }
-
-      const querySnapshot = await getDocs(q);
-      const data = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...(doc.data() as any)
-      }));
-      setCustomers(data);
-      setHasNextPage(querySnapshot.docs.length === pageSize);
-      
-      if (querySnapshot.docs.length > 0) {
-        const lastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
-        setCursors(prev => {
-          const newCursors = [...prev];
-          newCursors[currentPage + 1] = lastDoc;
-          return newCursors;
-        });
-      }
-    } catch (error) {
-      console.error("Error fetching customers:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleAddCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,7 +37,6 @@ export default function CustomerList() {
         ordersCount: 0,
         createdAt: new Date().toISOString()
       });
-      setCustomers([{ id: docRef.id, ...newCustomer, totalSpent: 0, ordersCount: 0, createdAt: new Date().toISOString() }, ...customers]);
       setIsAddModalOpen(false);
       setNewCustomer({ name: '', email: '', phone: '', city: '', address: '' });
     } catch (error) {
@@ -97,19 +53,19 @@ export default function CustomerList() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
             <Users className="h-6 w-6 text-blue-500" />
             Customers
           </h1>
-          <div className="flex items-center gap-6 mt-3 text-sm font-bold">
-            <span className="text-white border-b-2 border-blue-500 pb-1">All ({customers.length})</span>
-            <span className="text-slate-500 hover:text-white cursor-pointer transition-colors">New (0)</span>
-            <span className="text-slate-500 hover:text-white cursor-pointer transition-colors">VIP (0)</span>
+          <div className="flex items-center gap-6 mt-3 text-sm font-bold overflow-x-auto hide-scrollbar">
+            <span className="text-white border-b-2 border-blue-500 pb-1 whitespace-nowrap">All ({customers.length})</span>
+            <span className="text-slate-500 hover:text-white cursor-pointer transition-colors whitespace-nowrap">New (0)</span>
+            <span className="text-slate-500 hover:text-white cursor-pointer transition-colors whitespace-nowrap">VIP (0)</span>
           </div>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <button onClick={() => exportToCsv('customers.csv', customers)} className="px-5 py-2 text-xs font-bold text-slate-300 bg-white/5 border border-white/10 rounded-full hover:bg-white/10 transition-all uppercase tracking-wider flex items-center gap-2">
             <Download className="h-4 w-4" />
             Export
@@ -123,8 +79,8 @@ export default function CustomerList() {
 
       <div className="bg-[#0d0d0e] rounded-3xl border border-white/10 flex flex-col overflow-hidden shadow-2xl">
         {/* Toolbar */}
-        <div className="p-6 border-b border-white/5 flex items-center gap-4">
-          <div className="relative flex-1 max-w-md">
+        <div className="p-4 sm:p-6 border-b border-white/5 flex flex-wrap items-center gap-4">
+          <div className="relative flex-1 min-w-[200px] max-w-md">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-4 w-4 text-slate-500" />
             </div>

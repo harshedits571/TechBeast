@@ -24,16 +24,21 @@ import CustomerDetail from './pages/admin/CustomerDetail';
 
 import ProductForm from './pages/admin/ProductForm';
 import OrderList from './pages/admin/OrderList';
+import OrderDetail from './pages/admin/OrderDetail';
 import Settings from './pages/admin/Settings';
 import OfflineSale from './pages/admin/OfflineSale';
 import { SettingsProvider } from './contexts/SettingsContext';
+import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './components/auth/ProtectedRoute';
+import Login from './pages/admin/Login';
 
 export default function App() {
   return (
-    <SettingsProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Customer Routes */}
+    <AuthProvider>
+      <SettingsProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Customer Routes */}
           <Route path="/" element={<CustomerLayout />}>
             <Route index element={<Home />} />
             <Route path="products" element={<ProductList />} />
@@ -43,31 +48,39 @@ export default function App() {
             <Route path="legal/:policyId" element={<LegalPage />} />
           </Route>
 
-          {/* Admin Routes */}
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<AdminDashboard />} />
-            <Route path="products" element={<AdminProductsList />} />
-            <Route path="products/new" element={<ProductForm />} />
-            <Route path="products/edit/:id" element={<ProductForm />} />
-            <Route path="repairs" element={<AdminRepairsList />} />
-            <Route path="repairs/new" element={<RepairForm />} />
-            <Route path="repairs/:id" element={<RepairDetail />} />
+            {/* Admin Routes */}
+            <Route path="/admin/login" element={<Login />} />
+            <Route path="/admin" element={
+              <ProtectedRoute>
+                <AdminLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<AdminDashboard />} />
+              <Route path="products" element={<AdminProductsList />} />
+              <Route path="products/new" element={<ProductForm />} />
+              <Route path="products/edit/:id" element={<ProductForm />} />
+              <Route path="repairs" element={<AdminRepairsList />} />
+              <Route path="repairs/new" element={<RepairForm />} />
+              <Route path="repairs/:id" element={<RepairDetail />} />
 
-            <Route path="inventory" element={<InventoryList />} />
-            <Route path="inventory/new" element={<InventoryForm />} />
-            <Route path="inventory/edit/:id" element={<InventoryForm />} />
+              <Route path="inventory" element={<InventoryList />} />
+              <Route path="inventory/new" element={<InventoryForm />} />
+              <Route path="inventory/edit/:id" element={<InventoryForm />} />
 
-            <Route path="customers" element={<CustomerList />} />
-            <Route path="customers/:id" element={<CustomerDetail />} />
+              <Route path="customers" element={<CustomerList />} />
+              <Route path="customers/:id" element={<CustomerDetail />} />
 
-            <Route path="orders" element={<OrderList />} />
+              <Route path="orders" element={<OrderList />} />
+              <Route path="orders/:id" element={<OrderDetail />} />
 
-            <Route path="offline-sale" element={<OfflineSale />} />
+              <Route path="offline-sale" element={<OfflineSale />} />
+              <Route path="offline-sale/edit/:id" element={<OfflineSale />} />
 
-            <Route path="settings" element={<Settings />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </SettingsProvider>
+              <Route path="settings" element={<Settings />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </SettingsProvider>
+    </AuthProvider>
   );
 }

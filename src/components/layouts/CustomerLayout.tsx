@@ -2,29 +2,35 @@ import { Outlet, Link } from 'react-router-dom';
 import { ShoppingCart, Menu, Search, User, MonitorSmartphone, Monitor, Cpu, Keyboard } from 'lucide-react';
 import { useState } from 'react';
 import { useCart } from '../../contexts/CartContext';
-import CartDrawer from '../CartDrawer';
 import { useSettings } from '../../contexts/SettingsContext';
+import { useAuth } from '../../contexts/AuthContext';
+import CartDrawer from '../CartDrawer';
+import AuthModal from '../auth/AuthModal';
 
 export default function CustomerLayout() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { totalItems, setIsCartOpen } = useCart();
   const { settings } = useSettings();
+  const { user, role, logout, isAuthModalOpen, openAuthModal, closeAuthModal } = useAuth();
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-700 flex flex-col font-sans select-none">
+    <div className="min-h-[100dvh] bg-slate-50 text-slate-700 flex flex-col font-sans">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             {/* Logo */}
             <div className="flex-shrink-0 flex items-center">
-              <Link to="/" className="flex items-center gap-2">
-                <img src="/logo.png" alt={settings.storeName || 'Store Logo'} className="h-12 object-contain" />
+              <Link to="/" className="flex items-center gap-3">
+                <img src="/logo2.jpeg" alt={settings.storeName || 'Store Logo'} className="h-12 object-contain rounded-xl" />
+                <span className="font-bold text-xl uppercase tracking-widest text-slate-900 hidden sm:block">
+                  {settings.storeName || 'Tech Beast'}
+                </span>
               </Link>
             </div>
 
             {/* Desktop Nav */}
-            <nav className="hidden md:flex items-center space-x-8 text-xs font-bold uppercase tracking-wider">
+            <nav className="hidden lg:flex items-center space-x-4 xl:space-x-8 text-xs font-bold uppercase tracking-wider">
               <Link to="/" className="text-slate-600 hover:text-red-600 transition-colors">Home</Link>
               <Link to="/products?category=Laptops" className="text-slate-600 hover:text-red-600 transition-colors">Laptops</Link>
               <Link to="/products?category=Desktops" className="text-slate-600 hover:text-red-600 transition-colors">Desktops</Link>
@@ -33,15 +39,29 @@ export default function CustomerLayout() {
             </nav>
 
             {/* Actions */}
-            <div className="hidden md:flex items-center space-x-6">
+            <div className="hidden lg:flex items-center space-x-4 xl:space-x-6">
               <button className="text-slate-500 hover:text-red-600 transition-colors relative">
                 <Search className="h-5 w-5" />
               </button>
-              
-              <Link to="/admin" className="text-slate-500 hover:text-red-600 transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
-                <User className="h-5 w-5" />
-                <span>Sign In / Account</span>
-              </Link>
+
+              {user ? (
+                role === 'admin' ? (
+                  <Link to="/admin" className="text-slate-500 hover:text-red-600 transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
+                    <User className="h-5 w-5" />
+                    <span>Admin Portal</span>
+                  </Link>
+                ) : (
+                  <button onClick={logout} className="text-slate-500 hover:text-red-600 transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
+                    <User className="h-5 w-5" />
+                    <span>Sign Out</span>
+                  </button>
+                )
+              ) : (
+                <button onClick={openAuthModal} className="text-slate-500 hover:text-red-600 transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
+                  <User className="h-5 w-5" />
+                  <span>Sign In</span>
+                </button>
+              )}
 
               <button onClick={() => setIsCartOpen(true)} className="text-slate-500 hover:text-red-600 transition-colors relative">
                 <ShoppingCart className="h-5 w-5" />
@@ -52,9 +72,15 @@ export default function CustomerLayout() {
             </div>
 
             {/* Mobile menu button */}
-            <div className="md:hidden flex items-center">
-              <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-slate-500 hover:text-blue-600 p-2">
-                <Menu className="h-6 w-6" />
+            <div className="lg:hidden flex items-center space-x-4">
+              <button onClick={() => setIsCartOpen(true)} className="text-slate-500 hover:text-red-600 transition-colors relative">
+                <ShoppingCart className="h-6 w-6" />
+                {totalItems > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">{totalItems}</span>
+                )}
+              </button>
+              <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-slate-500 hover:text-blue-600 p-1">
+                <Menu className="h-7 w-7" />
               </button>
             </div>
           </div>
@@ -62,12 +88,20 @@ export default function CustomerLayout() {
 
         {/* Mobile Nav */}
         {isMenuOpen && (
-          <div className="md:hidden bg-white border-t border-slate-200">
+          <div className="lg:hidden bg-white border-t border-slate-200 shadow-lg absolute w-full z-40">
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 text-xs font-bold uppercase tracking-wider">
-              <Link to="/" className="block px-3 py-2 text-slate-600 hover:text-red-600 hover:bg-slate-50 rounded-lg">Home</Link>
-              <Link to="/products" className="block px-3 py-2 text-slate-600 hover:text-red-600 hover:bg-slate-50 rounded-lg">Shop All</Link>
-              <Link to="/services" className="block px-3 py-2 text-slate-600 hover:text-red-600 hover:bg-slate-50 rounded-lg">Repair Services</Link>
-              <Link to="/admin" className="block px-3 py-2 text-slate-600 hover:text-red-600 hover:bg-slate-50 rounded-lg">Sign In / Account</Link>
+              <Link to="/" className="block px-3 py-2 text-slate-600 hover:text-red-600 hover:bg-slate-50 rounded-lg" onClick={() => setIsMenuOpen(false)}>Home</Link>
+              <Link to="/products" className="block px-3 py-2 text-slate-600 hover:text-red-600 hover:bg-slate-50 rounded-lg" onClick={() => setIsMenuOpen(false)}>Shop All</Link>
+              <Link to="/services" className="block px-3 py-2 text-slate-600 hover:text-red-600 hover:bg-slate-50 rounded-lg" onClick={() => setIsMenuOpen(false)}>Repair Services</Link>
+              {user ? (
+                role === 'admin' ? (
+                  <Link to="/admin" className="block px-3 py-2 text-slate-600 hover:text-red-600 hover:bg-slate-50 rounded-lg" onClick={() => setIsMenuOpen(false)}>Admin Portal</Link>
+                ) : (
+                  <button onClick={() => { logout(); setIsMenuOpen(false); }} className="block w-full text-left px-3 py-2 text-slate-600 hover:text-red-600 hover:bg-slate-50 rounded-lg">Sign Out</button>
+                )
+              ) : (
+                <button onClick={() => { openAuthModal(); setIsMenuOpen(false); }} className="block w-full text-left px-3 py-2 text-slate-600 hover:text-red-600 hover:bg-slate-50 rounded-lg">Sign In</button>
+              )}
             </div>
           </div>
         )}
@@ -120,10 +154,10 @@ export default function CustomerLayout() {
           <div>
             <h3 className="text-xs text-slate-900 font-bold uppercase tracking-widest mb-4">Contact</h3>
             <ul className="space-y-3 text-sm">
-              <li>123 Tech Avenue, Silicon Valley, CA</li>
+              <li>Ground Floor, Shinde Complex, No.183 C Block, Hubballi, Karnataka 580029</li>
               <li>Phone: {settings.supportPhone}</li>
               <li>Email: {settings.contactEmail}</li>
-              <li>Mon - Sat: 10:00 AM - 8:00 PM</li>
+              <li>Mon - Sat: 11:00 AM - 8:00 PM</li>
             </ul>
           </div>
           <div>
@@ -140,8 +174,10 @@ export default function CustomerLayout() {
           &copy; {new Date().getFullYear()} {settings.storeName}. All rights reserved.
         </div>
       </footer>
-      
+
       <CartDrawer />
+      {/* Auth Modal */}
+      <AuthModal isOpen={isAuthModalOpen} onClose={closeAuthModal} />
     </div>
   );
 }

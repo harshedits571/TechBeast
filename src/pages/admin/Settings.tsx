@@ -270,6 +270,42 @@ export default function Settings() {
               )}
             </div>
 
+            {/* Promo Cards */}
+            <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
+              <h3 className="text-lg font-bold text-white mb-4">Promotional Cards</h3>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {['card1', 'card2'].map((cardKey, index) => {
+                  const card = formData.promoCards?.[cardKey as keyof typeof formData.promoCards] || { subtitle: '', title: '', link: '', bgColor: 'blue' };
+                  return (
+                    <div key={cardKey} className="p-4 bg-[#0d0d0e] rounded-xl border border-white/5 space-y-4">
+                      <h4 className="text-white font-bold mb-2">Card {index + 1}</h4>
+                      <label className="flex flex-col gap-2 text-xs text-slate-400 font-bold uppercase tracking-widest">
+                        Subtitle (Small Text)
+                        <input type="text" value={card.subtitle} onChange={(e) => setFormData({...formData, promoCards: {...formData.promoCards, [cardKey]: {...card, subtitle: e.target.value}}})} className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm normal-case" placeholder="e.g. Weekend Deals" />
+                      </label>
+                      <label className="flex flex-col gap-2 text-xs text-slate-400 font-bold uppercase tracking-widest">
+                        Title (Large Text)
+                        <input type="text" value={card.title} onChange={(e) => setFormData({...formData, promoCards: {...formData.promoCards, [cardKey]: {...card, title: e.target.value}}})} className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm normal-case" placeholder="e.g. Next-gen gaming console" />
+                      </label>
+                      <label className="flex flex-col gap-2 text-xs text-slate-400 font-bold uppercase tracking-widest">
+                        Link URL
+                        <input type="text" value={card.link} onChange={(e) => setFormData({...formData, promoCards: {...formData.promoCards, [cardKey]: {...card, link: e.target.value}}})} className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm normal-case" placeholder="/products" />
+                      </label>
+                      <label className="flex flex-col gap-2 text-xs text-slate-400 font-bold uppercase tracking-widest">
+                        Background Color
+                        <select value={card.bgColor} onChange={(e) => setFormData({...formData, promoCards: {...formData.promoCards, [cardKey]: {...card, bgColor: e.target.value}}})} className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm normal-case">
+                          <option value="blue" className="bg-[#0d0d0e]">Blue</option>
+                          <option value="red" className="bg-[#0d0d0e]">Red</option>
+                          <option value="green" className="bg-[#0d0d0e]">Green</option>
+                          <option value="dark" className="bg-[#0d0d0e]">Dark Slate</option>
+                        </select>
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Flash Sale */}
             <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
               <h3 className="text-lg font-bold text-white mb-4">Flash Sale Deals</h3>
@@ -280,6 +316,16 @@ export default function Settings() {
               
               {formData.flashSaleEnabled && (
                 <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+                      Flash Sale Badge Text
+                      <input type="text" name="flashSaleTitle" value={formData.flashSaleTitle || ''} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 normal-case font-normal" placeholder="e.g. Flash Sale" />
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+                      Flash Sale Subtitle
+                      <input type="text" name="flashSaleSubtitle" value={formData.flashSaleSubtitle || ''} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 normal-case font-normal" placeholder="e.g. Today's Special Deals" />
+                    </label>
+                  </div>
                   <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
                     End Date/Time
                     <input type="datetime-local" name="flashSaleEndTime" value={formData.flashSaleEndTime ? new Date(formData.flashSaleEndTime).toISOString().slice(0, 16) : ''} onChange={(e) => setFormData({...formData, flashSaleEndTime: new Date(e.target.value).toISOString()})} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 normal-case font-normal" />

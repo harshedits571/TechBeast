@@ -13,11 +13,17 @@ interface StoreSettings {
   promoBannerEnabled: boolean;
   heroBanners: { imageUrl: string; link: string }[];
   flashSaleEnabled: boolean;
+  flashSaleTitle: string;
+  flashSaleSubtitle: string;
   flashSaleEndTime: string;
   flashSaleProductIds: string[];
   bestSellerIds: string[];
   newArrivalIds: string[];
   accessoryCombos: { id: string; name: string; items: string[] }[];
+  promoCards: {
+    card1: { subtitle: string; title: string; link: string; bgColor: string };
+    card2: { subtitle: string; title: string; link: string; bgColor: string };
+  };
 }
 
 const defaultSettings: StoreSettings = {
@@ -31,11 +37,17 @@ const defaultSettings: StoreSettings = {
   promoBannerEnabled: true,
   heroBanners: [],
   flashSaleEnabled: false,
+  flashSaleTitle: 'Flash Sale',
+  flashSaleSubtitle: "Today's Special Deals",
   flashSaleEndTime: new Date(Date.now() + 86400000).toISOString(),
   flashSaleProductIds: [],
   bestSellerIds: [],
   newArrivalIds: [],
-  accessoryCombos: []
+  accessoryCombos: [],
+  promoCards: {
+    card1: { subtitle: 'Weekend Deals', title: 'Next-gen gaming console', link: '/products', bgColor: 'blue' },
+    card2: { subtitle: 'Back to school', title: 'Special discount for students', link: '/products', bgColor: 'red' }
+  }
 };
 
 interface SettingsContextType {

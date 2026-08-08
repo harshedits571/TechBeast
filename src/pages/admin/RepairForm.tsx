@@ -2,14 +2,15 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Save, X, Printer, User, Laptop, Wrench, FileText } from 'lucide-react';
 import { db } from '../../lib/firebase';
-import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
+import { collection, addDoc, runTransaction, doc } from 'firebase/firestore';
 import { FormSkeleton } from '../../components/ui/Skeleton';
+import { useAdmin } from '../../contexts/AdminContext';
 
 export default function RepairForm() {
+  const { customersState } = useAdmin();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
   const [customerFound, setCustomerFound] = useState(false);
   const [formData, setFormData] = useState({
     customerName: '',
@@ -32,30 +33,28 @@ export default function RepairForm() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handlePhoneBlur = async () => {
-    const phone = formData.customerPhone.trim();
-    if (!phone || phone.length < 5) return;
-
-    setIsSearchingCustomer(true);
-    try {
-      const q = query(collection(db, 'customers'), where('phone', '==', phone));
-      const querySnapshot = await getDocs(q);
-      
-      if (!querySnapshot.empty) {
-        const customerData = querySnapshot.docs[0].data();
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setFormData(prev => ({ ...prev, customerPhone: val }));
+    
+    const cleanVal = val.replace(/[\s\-+]/g, '');
+    if (cleanVal.length >= 10) {
+      const match = customersState.data.find((c: any) => {
+        const cPhone = (c.phone || '').replace(/[\s\-+]/g, '');
+        return cPhone === cleanVal || cPhone.endsWith(cleanVal.slice(-10));
+      });
+      if (match) {
         setFormData(prev => ({
           ...prev,
-          customerName: customerData.name || prev.customerName,
-          customerEmail: customerData.email || prev.customerEmail
+          customerName: prev.customerName || match.name || '',
+          customerEmail: prev.customerEmail || match.email || ''
         }));
         setCustomerFound(true);
       } else {
         setCustomerFound(false);
       }
-    } catch (error) {
-      console.error("Error searching for customer:", error);
-    } finally {
-      setIsSearchingCustomer(false);
+    } else {
+      setCustomerFound(false);
     }
   };
 
@@ -66,6 +65,23 @@ export default function RepairForm() {
     } else {
       setFormData({ ...formData, accessories: formData.accessories.filter(a => a !== value) });
     }
+  };
+
+  const generateTicketNumber = async () => {
+    const counterRef = doc(db, 'counters', 'repairTickets');
+    const newSeq = await runTransaction(db, async (transaction) => {
+      const counterDoc = await transaction.get(counterRef);
+      if (!counterDoc.exists()) {
+        transaction.set(counterRef, { seq: 1 });
+        return 1;
+      }
+      const seq = (counterDoc.data().seq || 0) + 1;
+      transaction.update(counterRef, { seq });
+      return seq;
+    });
+
+    const date = new Date();
+    return `REP-${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}-${newSeq.toString().padStart(4, '0')}`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -80,10 +96,13 @@ export default function RepairForm() {
     try {
       // Auto-create customer if they don't exist
       try {
-        const q = query(collection(db, 'customers'), where('phone', '==', formData.customerPhone.trim()));
-        const querySnapshot = await getDocs(q);
+        const cleanPhone = formData.customerPhone.replace(/[\s\-+]/g, '');
+        const existingCust = customersState.data.find((c: any) => {
+          const cPhone = (c.phone || '').replace(/[\s\-+]/g, '');
+          return cPhone === cleanPhone || cPhone.endsWith(cleanPhone.slice(-10));
+        });
         
-        if (querySnapshot.empty) {
+        if (!existingCust) {
           await addDoc(collection(db, 'customers'), {
             name: formData.customerName,
             phone: formData.customerPhone.trim(),
@@ -98,8 +117,11 @@ export default function RepairForm() {
         // Continue to save repair ticket even if CRM update fails (e.g. permission rules)
       }
 
+      const ticketNumber = await generateTicketNumber();
+
       const dataToSave = {
         ...formData,
+        ticketNumber,
         estimatedCost: Number(formData.estimatedCost) || 0,
         createdAt: new Date().toISOString(),
         internalNotes: []
@@ -146,14 +168,13 @@ export default function RepairForm() {
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
                 Customer Information
               </div>
-              {isSearchingCustomer && <span className="text-[10px] text-slate-500 uppercase tracking-widest">Searching...</span>}
               {customerFound && <span className="text-[10px] text-emerald-500 uppercase tracking-widest bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/20">Existing Customer Found</span>}
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
                 <label className="block text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-2">Phone Number *</label>
-                <input name="customerPhone" value={formData.customerPhone} onChange={handleChange} onBlur={handlePhoneBlur} type="tel" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all" placeholder="+91..." />
-                <p className="text-[10px] text-slate-500 mt-1">Type phone and click away to auto-fetch details</p>
+                <input required type="tel" name="customerPhone" value={formData.customerPhone} onChange={handlePhoneChange} placeholder="Enter customer phone" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors" />
+                <p className="text-[10px] text-slate-500 mt-1">Type phone to auto-fetch details</p>
               </div>
               <div>
                 <label className="block text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-2">Full Name *</label>

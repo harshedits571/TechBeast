@@ -3,10 +3,12 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import { useCart } from '../../contexts/CartContext';
 import { db } from '../../lib/firebase';
 import { collection, addDoc, updateDoc, doc, increment, getDocs, query, where } from 'firebase/firestore';
-import { ShoppingBag, MapPin, CreditCard, AlertCircle, Loader2 } from 'lucide-react';
+import { ShoppingBag, MapPin, CreditCard, AlertCircle, Loader2, User } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function Checkout() {
   const { cart, totalPrice, clearCart } = useCart();
+  const { user, openAuthModal } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -14,7 +16,7 @@ export default function Checkout() {
 
   const [formData, setFormData] = useState({
     name: '',
-    email: '',
+    email: user?.email || '',
     phone: '',
     address: '',
     city: '',
@@ -96,6 +98,28 @@ export default function Checkout() {
       setLoading(false);
     }
   };
+
+  if (!user) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16 min-h-[60vh] flex flex-col items-center justify-center">
+        <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center border border-slate-100">
+          <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-6">
+            <User className="w-8 h-8" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">Sign in to Checkout</h2>
+          <p className="text-slate-500 mb-8">
+            You need an account to place an order. This helps you track your orders easily.
+          </p>
+          <button 
+            onClick={openAuthModal}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg shadow-blue-500/20"
+          >
+            Sign In / Create Account
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 py-8 lg:py-12">

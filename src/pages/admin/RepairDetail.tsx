@@ -93,7 +93,7 @@ export default function RepairDetail() {
           </button>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-              Ticket <span className="text-blue-400 font-mono text-xl">REP-{ticket.id.slice(0,4).toUpperCase()}</span>
+              Ticket <span className="text-blue-400 font-mono text-xl">{ticket.ticketNumber || `REP-${ticket.id.slice(0,4).toUpperCase()}`}</span>
             </h1>
             <p className="text-sm text-slate-500 mt-1">Received on {new Date(ticket.createdAt).toLocaleDateString()}</p>
           </div>
