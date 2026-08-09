@@ -17,7 +17,7 @@ import { collection, getDocs, query, orderBy, deleteDoc, doc, limit, startAfter,
 import { db } from '../../lib/firebase';
 import { useAdmin } from '../../contexts/AdminContext';
 import { exportToCsv } from '../../utils/exportCsv';
-import { generateBulkInvoices, generateSingleInvoicePdf } from '../../utils/pdfGenerator';
+import { generateBulkInvoices, generateSingleInvoicePdf, shareInvoiceViaWhatsApp } from '../../utils/pdfGenerator';
 import { TableBodySkeleton } from '../../components/ui/Skeleton';
 
 // Mock data generator for testing
@@ -51,25 +51,7 @@ export default function OrderList() {
   const [bulkProgress, setBulkProgress] = useState('');
 
   const handleWhatsApp = async (order: any) => {
-    if (!order.customerPhone) {
-      alert("No phone number available for this customer.");
-      return;
-    }
-    
-    // 1. Trigger PDF Download
-    await generateSingleInvoicePdf(order);
-    
-    // 2. Open WhatsApp
-    let phone = order.customerPhone.replace(/[^0-9+]/g, '');
-    if (phone.length === 10 && !phone.startsWith('+')) {
-      phone = '+91' + phone; 
-    }
-    
-    const text = `Hi ${order.customerName || 'Customer'},\n\nThank you for your order at Tech Beast! Your order #${order.orderNumber || ''} is confirmed.\n\nTotal: ₹${Number(order.totalAmount || 0).toLocaleString()}\n\nI have attached your invoice PDF below.`;
-    const encodedText = encodeURIComponent(text);
-    
-    const waUrl = `https://wa.me/${phone}?text=${encodedText}`;
-    window.open(waUrl, '_blank');
+    await shareInvoiceViaWhatsApp(order);
   };
 
   const generateMockOrders = async () => {
@@ -317,7 +299,7 @@ export default function OrderList() {
                 filteredOrders.map((order, i) => (
                   <tr 
                     key={order.id || i} 
-                    onClick={() => navigate(`/admin/orders/${order.id}`)}
+                    onClick={() => order.id && navigate(`/admin/orders/${order.id}`)}
                     className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
                   >
                     <td className="p-4 text-center">
@@ -332,7 +314,19 @@ export default function OrderList() {
                           {order.customerAvatar || (order.customerName ? order.customerName.substring(0,2).toUpperCase() : 'CU')}
                         </div>
                         <div className="flex flex-col items-start">
-                          <span className="font-bold text-slate-300">{order.customerName}</span>
+                          <span 
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              const targetId = order.customerId || order.customerPhone || order.customerEmail || order.customerName || '';
+                              if (targetId) {
+                                navigate(`/admin/customers/${encodeURIComponent(targetId)}`);
+                              }
+                            }}
+                            title="View Customer Profile"
+                            className="font-bold text-slate-300 hover:text-blue-400 hover:underline cursor-pointer"
+                          >
+                            {order.customerName || 'Customer'}
+                          </span>
                           <button 
                             onClick={(e) => { e.stopPropagation(); handleWhatsApp(order); }}
                             className="text-[10px] text-[#25D366] hover:text-[#128C7E] flex items-center gap-1 font-bold mt-1 px-2 py-0.5 rounded-full bg-[#25D366]/10 border border-[#25D366]/20 transition-colors"

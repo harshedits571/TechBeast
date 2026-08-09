@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { doc, getDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { 
   ArrowLeft, 
@@ -16,16 +16,20 @@ import {
   MessageCircle,
   Download,
   Trash2,
-  Edit
+  Edit,
+  Mail
 } from 'lucide-react';
 import { FormSkeleton } from '../../components/ui/Skeleton';
-import { generateSingleInvoicePdf } from '../../utils/pdfGenerator';
+import { generateSingleInvoicePdf, shareInvoiceViaWhatsApp } from '../../utils/pdfGenerator';
+import SendEmailModal from '../../components/admin/SendEmailModal';
 
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -68,26 +72,9 @@ export default function OrderDetail() {
   const discount = Math.max(0, subTotal - (order.totalAmount || 0));
 
   const handleWhatsApp = async () => {
-    if (!order.customerPhone) {
-      alert("No phone number available for this customer.");
-      return;
-    }
-    
-    // 1. Trigger PDF Download
-    await generateSingleInvoicePdf(order);
-    
-    // 2. Open WhatsApp
-    // Clean phone number (remove spaces, etc., ensure country code if necessary - defaulting to India +91 if none exists for this specific use case, though best to just pass as is if they entered it)
-    let phone = order.customerPhone.replace(/[^0-9+]/g, '');
-    if (phone.length === 10 && !phone.startsWith('+')) {
-      phone = '+91' + phone; 
-    }
-    
-    const text = `Hi ${order.customerName || 'Customer'},\n\nThank you for your order at Tech Beast! Your order #${order.orderNumber || ''} is confirmed.\n\nTotal: ₹${Number(order.totalAmount || 0).toLocaleString()}\n\nI have attached your invoice PDF below.`;
-    const encodedText = encodeURIComponent(text);
-    
-    const waUrl = `https://wa.me/${phone}?text=${encodedText}`;
-    window.open(waUrl, '_blank');
+    setIsSharing(true);
+    await shareInvoiceViaWhatsApp(order);
+    setIsSharing(false);
   };
 
   const handleDeleteOrder = async () => {
@@ -97,29 +84,60 @@ export default function OrderDetail() {
         await deleteDoc(doc(db, 'orders', order.id));
         alert("Order deleted successfully!");
         navigate('/admin/orders');
-      } catch (error) {
-        console.error("Error deleting order:", error);
+      } catch (err) {
+        console.error("Error deleting order", err);
         alert("Failed to delete order.");
       }
     }
   };
 
+  const handleToggleFulfillment = async () => {
+    if (!order?.id) return;
+    try {
+      const newStatus = order.fulfillmentStatus === 'FULFILLED' ? 'UNFULFILLED' : 'FULFILLED';
+      await updateDoc(doc(db, 'orders', order.id), { fulfillmentStatus: newStatus });
+      setOrder({ ...order, fulfillmentStatus: newStatus });
+    } catch (error) {
+      console.error("Error updating fulfillment status:", error);
+      alert("Failed to update status");
+    }
+  };
+
+  const formatDate = (dateVal: any) => {
+    if (!dateVal) return 'N/A';
+    try {
+      let d: Date;
+      if (typeof dateVal === 'object' && dateVal.seconds) {
+        d = new Date(dateVal.seconds * 1000);
+      } else if (typeof dateVal === 'object' && typeof dateVal.toDate === 'function') {
+        d = dateVal.toDate();
+      } else {
+        d = new Date(dateVal);
+      }
+      if (isNaN(d.getTime())) return 'N/A';
+      return d.toLocaleDateString('en-US', { 
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+      });
+    } catch (err) {
+      return 'N/A';
+    }
+  };
+
   return (
-    <div className="max-w-5xl mx-auto pb-20 space-y-6">
-      <div className="flex flex-col lg:flex-row lg:items-center gap-6 mb-8">
-        <div className="flex items-start gap-4">
-          <Link to="/admin/orders" className="text-slate-500 hover:text-white transition-colors mt-1">
-            <ArrowLeft className="h-6 w-6" />
+    <div className="space-y-8 max-w-6xl mx-auto pb-20">
+      {/* Top Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-[#0d0d0e] p-6 rounded-2xl border border-white/10 shadow-xl">
+        <div className="flex items-center gap-4">
+          <Link to="/admin/orders" className="text-slate-400 hover:text-white transition-colors">
+            <ArrowLeft className="w-6 h-6" />
           </Link>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-3 break-all">
-              Order {order.orderNumber}
+              Order {order.orderNumber || ''}
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-1 flex items-center gap-2">
               <Calendar className="w-4 h-4 shrink-0" /> 
-              {new Date(order.createdAt).toLocaleDateString('en-US', { 
-                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' 
-              })}
+              {formatDate(order.createdAt)}
             </p>
           </div>
         </div>
@@ -127,10 +145,18 @@ export default function OrderDetail() {
         <div className="lg:ml-auto flex flex-wrap items-center gap-3">
           <button 
             onClick={handleWhatsApp}
-            title="Download PDF & Open WhatsApp"
+            disabled={isSharing}
+            title="Share PDF via WhatsApp"
             className="bg-[#25D366] hover:bg-[#128C7E] text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-lg shadow-[#25D366]/20 flex-1 sm:flex-none justify-center"
           >
-            <MessageCircle className="w-4 h-4 shrink-0" /> <span className="whitespace-nowrap">WhatsApp</span>
+            <MessageCircle className="w-4 h-4 shrink-0" /> <span className="whitespace-nowrap">{isSharing ? 'Sharing...' : 'WhatsApp'}</span>
+          </button>
+          <button 
+            onClick={() => setIsEmailModalOpen(true)}
+            title="Send Invoice via Email"
+            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-lg shadow-purple-600/20 flex-1 sm:flex-none justify-center"
+          >
+            <Mail className="w-4 h-4 shrink-0" /> <span className="whitespace-nowrap">Email Invoice</span>
           </button>
           {order.deliveryType === 'In-Store POS' && (
             <Link 
@@ -146,15 +172,19 @@ export default function OrderDetail() {
             title="Delete Invoice"
             className="flex items-center justify-center gap-2 bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-500/20 px-4 py-2 rounded-lg text-sm font-bold transition-colors flex-1 sm:flex-none"
           >
-            <Trash2 className="w-4 h-4 shrink-0" />
+            <Trash2 className="w-4 h-4 shrink-0" /> <span className="whitespace-nowrap">Delete</span>
           </button>
           
           <div className={`px-3 py-2 rounded-lg border text-xs font-bold uppercase tracking-widest flex items-center gap-2 w-full sm:w-auto justify-center mt-2 sm:mt-0 ${getStatusColor(order.paymentStatus)}`}>
             <CreditCard className="w-4 h-4 shrink-0" /> {order.paymentStatus}
           </div>
-          <div className={`px-3 py-2 rounded-lg border text-xs font-bold uppercase tracking-widest flex items-center gap-2 w-full sm:w-auto justify-center mt-2 sm:mt-0 ${getStatusColor(order.fulfillmentStatus)}`}>
+          <button 
+            onClick={handleToggleFulfillment}
+            className={`px-3 py-2 rounded-lg border text-xs font-bold uppercase tracking-widest flex items-center gap-2 w-full sm:w-auto justify-center mt-2 sm:mt-0 transition-colors cursor-pointer ${getStatusColor(order.fulfillmentStatus)} hover:opacity-80`}
+            title="Click to toggle fulfillment status"
+          >
             {getStatusIcon(order.fulfillmentStatus)} {order.fulfillmentStatus}
-          </div>
+          </button>
         </div>
       </div>
 
@@ -265,10 +295,16 @@ export default function OrderDetail() {
                     <MapPin className="w-3 h-3" /> Shipping Address
                   </p>
                   <div className="bg-white/5 rounded-xl p-4 text-sm text-slate-300">
-                    <p className="font-bold text-white">{order.shippingAddress.firstName} {order.shippingAddress.lastName}</p>
-                    <p className="mt-1">{order.shippingAddress.address}</p>
-                    {order.shippingAddress.apartment && <p>{order.shippingAddress.apartment}</p>}
-                    <p>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}</p>
+                    {typeof order.shippingAddress === 'string' ? (
+                      <p>{order.shippingAddress}</p>
+                    ) : (
+                      <>
+                        <p className="font-bold text-white">{order.shippingAddress.firstName} {order.shippingAddress.lastName}</p>
+                        <p className="mt-1">{order.shippingAddress.address}</p>
+                        {order.shippingAddress.apartment && <p>{order.shippingAddress.apartment}</p>}
+                        <p>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}</p>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
@@ -278,6 +314,10 @@ export default function OrderDetail() {
         </div>
         
       </div>
+
+      {isEmailModalOpen && (
+        <SendEmailModal order={order} onClose={() => setIsEmailModalOpen(false)} />
+      )}
     </div>
   );
 }

@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../../lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { FormSkeleton } from '../../components/ui/Skeleton';
-import { ArrowLeft, Send, Clock, User, Laptop, Save, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Send, Clock, User, Laptop, Save, AlertCircle, Printer, Plus, Trash2, FileText } from 'lucide-react';
+import RepairInvoiceModal from '../../components/admin/RepairInvoiceModal';
 
 export default function RepairDetail() {
   const { id } = useParams();
@@ -13,6 +14,10 @@ export default function RepairDetail() {
   const [noteInput, setNoteInput] = useState('');
   const [statusInput, setStatusInput] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemPrice, setNewItemPrice] = useState('');
+  const [newItemQty, setNewItemQty] = useState('1');
 
   useEffect(() => {
     const fetchTicket = async () => {
@@ -67,12 +72,57 @@ export default function RepairDetail() {
       const docRef = doc(db, 'repairs', id!);
       const updatedNotes = [...(ticket.internalNotes || []), newNote];
       await updateDoc(docRef, { internalNotes: updatedNotes });
-      
+
       setTicket((prev: any) => ({ ...prev, internalNotes: updatedNotes }));
       setNoteInput('');
     } catch (error) {
       console.error("Error adding note:", error);
       alert("Failed to add note.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAddPart = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newItemName.trim() || !newItemPrice) return;
+
+    setIsSaving(true);
+    const newPart = {
+      name: newItemName.trim(),
+      price: Number(newItemPrice),
+      qty: Number(newItemQty)
+    };
+
+    try {
+      const docRef = doc(db, 'repairs', id!);
+      const updatedParts = [...(ticket.parts || []), newPart];
+      await updateDoc(docRef, { parts: updatedParts });
+
+      setTicket((prev: any) => ({ ...prev, parts: updatedParts }));
+      setNewItemName('');
+      setNewItemPrice('');
+      setNewItemQty('1');
+    } catch (error) {
+      console.error("Error adding part:", error);
+      alert("Failed to add part.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRemovePart = async (index: number) => {
+    if (!window.confirm("Remove this item?")) return;
+    setIsSaving(true);
+    try {
+      const docRef = doc(db, 'repairs', id!);
+      const updatedParts = ticket.parts.filter((_: any, i: number) => i !== index);
+      await updateDoc(docRef, { parts: updatedParts });
+
+      setTicket((prev: any) => ({ ...prev, parts: updatedParts }));
+    } catch (error) {
+      console.error("Error removing part:", error);
+      alert("Failed to remove part.");
     } finally {
       setIsSaving(false);
     }
@@ -85,7 +135,8 @@ export default function RepairDetail() {
   if (!ticket) return null;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <>
+      <div className={`max-w-5xl mx-auto space-y-6 ${showInvoice ? 'print:hidden' : ''}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button onClick={() => navigate('/admin/repairs')} className="text-slate-500 hover:text-white transition-colors">
@@ -93,38 +144,47 @@ export default function RepairDetail() {
           </button>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-              Ticket <span className="text-blue-400 font-mono text-xl">{ticket.ticketNumber || `REP-${ticket.id.slice(0,4).toUpperCase()}`}</span>
+              Ticket <span className="text-blue-400 font-mono text-xl">{ticket.ticketNumber || `REP-${ticket.id.slice(0, 4).toUpperCase()}`}</span>
             </h1>
             <p className="text-sm text-slate-500 mt-1">Received on {new Date(ticket.createdAt).toLocaleDateString()}</p>
           </div>
         </div>
-        
-        {/* Quick Status Update */}
-        <div className="flex items-center gap-3 bg-[#0d0d0e] p-2 rounded-2xl border border-white/10 shadow-lg">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-3">Status:</span>
-          <select 
-            value={statusInput} 
-            onChange={(e) => handleStatusChange(e.target.value)}
-            disabled={isSaving}
-            className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white font-bold focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all cursor-pointer"
+
+        {/* Quick Status Update & Invoice */}
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setShowInvoice(true)}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg shadow-blue-900/20 uppercase tracking-wider"
           >
-            <option value="Pending" className="bg-[#0d0d0e]">Pending</option>
-            <option value="Diagnosing" className="bg-[#0d0d0e]">Diagnosing</option>
-            <option value="Waiting for Parts" className="bg-[#0d0d0e]">Waiting for Parts</option>
-            <option value="Waiting for Approval" className="bg-[#0d0d0e]">Waiting for Approval</option>
-            <option value="In Progress" className="bg-[#0d0d0e]">In Progress</option>
-            <option value="Quality Check" className="bg-[#0d0d0e]">Quality Check</option>
-            <option value="Ready for Delivery" className="bg-[#0d0d0e]">Ready for Delivery</option>
-            <option value="Completed" className="bg-[#0d0d0e]">Completed</option>
-          </select>
+            <Printer className="h-4 w-4" /> Print Invoice
+          </button>
+
+          <div className="flex items-center gap-3 bg-[#0d0d0e] p-2 rounded-2xl border border-white/10 shadow-lg">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-3">Status:</span>
+            <select
+              value={statusInput}
+              onChange={(e) => handleStatusChange(e.target.value)}
+              disabled={isSaving}
+              className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white font-bold focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all cursor-pointer"
+            >
+              <option value="Pending" className="bg-[#0d0d0e]">Pending</option>
+              <option value="Diagnosing" className="bg-[#0d0d0e]">Diagnosing</option>
+              <option value="Waiting for Parts" className="bg-[#0d0d0e]">Waiting for Parts</option>
+              <option value="Waiting for Approval" className="bg-[#0d0d0e]">Waiting for Approval</option>
+              <option value="In Progress" className="bg-[#0d0d0e]">In Progress</option>
+              <option value="Quality Check" className="bg-[#0d0d0e]">Quality Check</option>
+              <option value="Ready for Delivery" className="bg-[#0d0d0e]">Ready for Delivery</option>
+              <option value="Completed" className="bg-[#0d0d0e]">Completed</option>
+            </select>
+          </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+
         {/* Left Column: Details */}
         <div className="lg:col-span-2 space-y-6">
-          
+
           {/* Issue Section */}
           <div className="bg-[#0d0d0e] p-8 rounded-3xl border border-white/10 shadow-xl">
             <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
@@ -134,7 +194,7 @@ export default function RepairDetail() {
             <div className="bg-red-500/5 border border-red-500/10 p-5 rounded-2xl">
               <p className="text-slate-300 text-sm leading-relaxed">{ticket.issue}</p>
             </div>
-            
+
             {ticket.estimatedCost > 0 && (
               <div className="mt-6 flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Estimated Cost</span>
@@ -146,7 +206,7 @@ export default function RepairDetail() {
           {/* Device & Customer Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="bg-[#0d0d0e] p-6 rounded-3xl border border-white/10 shadow-xl">
-               <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4 pb-4 border-b border-white/5">
+              <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4 pb-4 border-b border-white/5">
                 <Laptop className="h-4 w-4 text-blue-500" />
                 Device Details
               </h2>
@@ -171,11 +231,21 @@ export default function RepairDetail() {
                     <div className="text-sm text-slate-300 italic">{ticket.cosmeticCondition}</div>
                   </div>
                 )}
+                {ticket.accessories && ticket.accessories.length > 0 && (
+                  <div>
+                    <div className="text-[10px] uppercase font-bold text-slate-500">Included Accessories</div>
+                    <div className="text-sm text-slate-300 flex flex-wrap gap-2 mt-1">
+                      {ticket.accessories.map((acc: string, idx: number) => (
+                        <span key={idx} className="bg-blue-500/10 border border-blue-500/20 text-blue-400 px-2 py-1 rounded text-xs font-medium">{acc}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="bg-[#0d0d0e] p-6 rounded-3xl border border-white/10 shadow-xl">
-               <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4 pb-4 border-b border-white/5">
+              <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4 pb-4 border-b border-white/5">
                 <User className="h-4 w-4 text-blue-500" />
                 Customer Details
               </h2>
@@ -197,6 +267,104 @@ export default function RepairDetail() {
               </div>
             </div>
           </div>
+
+          {/* Parts & Labor Invoicing */}
+          <div className="bg-[#0d0d0e] p-8 rounded-3xl border border-white/10 shadow-xl mt-6">
+            <div className="flex justify-between items-center mb-6 border-b border-white/5 pb-4">
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <FileText className="h-4 w-4 text-emerald-500" />
+                Parts & Labor / Invoice Items
+              </h2>
+            </div>
+
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left border-collapse mb-6">
+                <thead>
+                  <tr className="border-b border-white/10 text-[10px] uppercase tracking-widest text-slate-500 bg-white/5">
+                    <th className="p-3 font-bold rounded-tl-xl">Description</th>
+                    <th className="p-3 font-bold text-center">Qty</th>
+                    <th className="p-3 font-bold text-right">Price</th>
+                    <th className="p-3 font-bold text-right">Total</th>
+                    <th className="p-3 rounded-tr-xl"></th>
+                  </tr>
+                </thead>
+                <tbody className="text-sm">
+                  {(!ticket.parts || ticket.parts.length === 0) ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-500 italic text-xs">No parts or services added yet. Final cost will default to the estimated cost.</td>
+                    </tr>
+                  ) : (
+                    ticket.parts.map((part: any, idx: number) => (
+                      <tr key={idx} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="p-3 text-white font-medium">{part.name}</td>
+                        <td className="p-3 text-slate-300 text-center">{part.qty}</td>
+                        <td className="p-3 text-slate-300 text-right">₹{Number(part.price).toLocaleString()}</td>
+                        <td className="p-3 text-white font-bold text-right">₹{(Number(part.price) * Number(part.qty)).toLocaleString()}</td>
+                        <td className="p-3 text-right">
+                          <button onClick={() => handleRemovePart(idx)} className="text-red-500/70 hover:text-red-500 p-1 transition-colors">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <form onSubmit={handleAddPart} className="flex flex-col sm:flex-row gap-3 items-start bg-white/5 p-4 rounded-2xl border border-white/5">
+              <div className="flex-1 w-full">
+                <input
+                  type="text"
+                  required
+                  placeholder="Part or Service Description"
+                  value={newItemName}
+                  onChange={e => setNewItemName(e.target.value)}
+                  className="w-full bg-[#0a0a0b] border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div className="w-full sm:w-24">
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  placeholder="Qty"
+                  value={newItemQty}
+                  onChange={e => setNewItemQty(e.target.value)}
+                  className="w-full bg-[#0a0a0b] border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div className="w-full sm:w-32">
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  placeholder="Price"
+                  value={newItemPrice}
+                  onChange={e => setNewItemPrice(e.target.value)}
+                  className="w-full bg-[#0a0a0b] border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isSaving || !newItemName.trim() || !newItemPrice}
+                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl text-sm font-bold flex justify-center items-center gap-2 transition-colors disabled:opacity-50"
+              >
+                <Plus className="h-4 w-4" /> Add
+              </button>
+            </form>
+
+            <div className="mt-6 flex items-center justify-between p-6 bg-emerald-500/10 rounded-2xl border border-emerald-500/20">
+              <span className="text-xs font-bold text-emerald-500 uppercase tracking-widest">Final Total Cost</span>
+              <span className="text-3xl font-bold text-white tracking-tight">
+                ₹{
+                  ticket.parts && ticket.parts.length > 0
+                    ? ticket.parts.reduce((sum: number, p: any) => sum + (Number(p.price) * Number(p.qty)), 0).toLocaleString()
+                    : Number(ticket.estimatedCost || 0).toLocaleString()
+                }
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Right Column: Internal Notes Timeline */}
@@ -208,7 +376,7 @@ export default function RepairDetail() {
             </h2>
             <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-widest">Only visible to staff</p>
           </div>
-          
+
           {/* Notes List */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
             {(!ticket.internalNotes || ticket.internalNotes.length === 0) ? (
@@ -243,7 +411,7 @@ export default function RepairDetail() {
           {/* Add Note Input */}
           <div className="p-4 border-t border-white/5 bg-white/5 m-2 rounded-2xl">
             <form onSubmit={handleAddNote} className="flex flex-col gap-3">
-              <textarea 
+              <textarea
                 value={noteInput}
                 onChange={(e) => setNoteInput(e.target.value)}
                 placeholder="Type a new internal note... (e.g. Parts ordered, waiting for delivery)"
@@ -251,8 +419,8 @@ export default function RepairDetail() {
                 rows={3}
               />
               <div className="flex justify-end">
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   disabled={isSaving || !noteInput.trim()}
                   className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-5 py-2 rounded-full text-xs font-bold transition-all shadow-lg shadow-blue-900/20 flex items-center gap-2"
                 >
@@ -266,5 +434,10 @@ export default function RepairDetail() {
 
       </div>
     </div>
+
+    {showInvoice && (
+        <RepairInvoiceModal ticket={ticket} onClose={() => setShowInvoice(false)} />
+      )}
+    </>
   );
 }

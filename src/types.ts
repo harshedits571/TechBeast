@@ -9,6 +9,7 @@ export interface Product {
   category: ProductCategory;
   brand: string;
   model: string;
+  componentType?: string;
   
   // Specifications
   processor?: string;
@@ -16,6 +17,15 @@ export interface Product {
   storage?: string;
   graphics?: string;
   display?: string;
+  
+  // Component specific
+  cabinetFormFactor?: string;
+  cabinetFans?: string;
+  motherboardSocket?: string;
+  motherboardFormFactor?: string;
+  powerSupplyWattage?: string;
+  powerSupplyRating?: string;
+  rawSpecifications?: string;
   
   // Used items specific
   condition?: ProductCondition;

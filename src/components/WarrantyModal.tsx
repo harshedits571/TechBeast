@@ -6,9 +6,10 @@ interface WarrantyModalProps {
   onClose: () => void;
   isNew?: boolean;
   brandWarranty?: string;
+  isDesktopPart?: boolean;
 }
 
-export default function WarrantyModal({ isOpen, onClose, isNew, brandWarranty }: WarrantyModalProps) {
+export default function WarrantyModal({ isOpen, onClose, isNew, brandWarranty, isDesktopPart }: WarrantyModalProps) {
   if (!isOpen) return null;
 
   return (
@@ -33,7 +34,7 @@ export default function WarrantyModal({ isOpen, onClose, isNew, brandWarranty }:
                 {isNew ? 'Brand & TechBeast Warranty' : 'TechBeast Certified Warranty'}
               </h2>
               <p className="text-sm text-slate-500">
-                {isNew ? (brandWarranty || 'Brand Warranty') + ' + 1-Year Software Support' : 'Comprehensive 3-Month Protection Plan'}
+                {isNew ? (brandWarranty || 'Brand Warranty') + (isDesktopPart ? '' : ' + 1-Year Software Support') : 'Comprehensive 3-Month Protection Plan'}
               </p>
             </div>
           </div>
@@ -52,8 +53,11 @@ export default function WarrantyModal({ isOpen, onClose, isNew, brandWarranty }:
             {/* Introduction */}
             <p className="text-slate-600 leading-relaxed">
               {isNew 
-                ? `This new product is covered by the official brand warranty (${brandWarranty || 'Terms specified by brand'}). Hardware issues must be claimed directly at the brand's authorized service center. Additionally, TechBeast provides a complimentary 1-year warranty specifically for software-related issues.`
-                : `Every TechBeast certified used product goes through a rigorous testing process. We stand behind our quality with a comprehensive 3-month hardware warranty to ensure your complete peace of mind.`
+                ? (isDesktopPart 
+                  ? `This new component is covered by the official brand warranty (${brandWarranty || 'Terms specified by brand'}). For your convenience, you can visit the brand's service center directly, or simply bring the product to TechBeast and we will handle the hardware warranty claim with the brand on your behalf.` 
+                  : `This new laptop is covered by the official brand warranty (${brandWarranty || '1 year'}). Hardware issues can be claimed directly at the brand's authorized service center, or you can visit our store and we will handle the claim for you. Additionally, TechBeast provides a complimentary 1-year warranty specifically for all software-related issues.`
+                  )
+                : `Every TechBeast certified second-hand product goes through a rigorous testing process. We stand behind our quality with a comprehensive 3-month warranty that covers absolutely everything—including hardware and software—to ensure your complete peace of mind.`
               }
             </p>
 
@@ -72,23 +76,24 @@ export default function WarrantyModal({ isOpen, onClose, isNew, brandWarranty }:
                       <li className="flex gap-3 text-slate-600"><span className="text-emerald-500 mt-1">•</span><span className="leading-relaxed">Motherboard, Display, Keyboard, Battery, and internal component failures.</span></li>
                     </ul>
                   </div>
-                  <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl">
-                    <h4 className="font-bold text-blue-800 text-sm uppercase tracking-wider mb-2">By TechBeast (1-Year Software Support)</h4>
-                    <ul className="space-y-2">
-                      <li className="flex gap-3 text-slate-600"><span className="text-blue-500 mt-1">•</span><span className="leading-relaxed">Free Windows OS re-installation and corruption fixes.</span></li>
-                      <li className="flex gap-3 text-slate-600"><span className="text-blue-500 mt-1">•</span><span className="leading-relaxed">Driver updates, missing drivers, and BIOS flashing assistance.</span></li>
-                      <li className="flex gap-3 text-slate-600"><span className="text-blue-500 mt-1">•</span><span className="leading-relaxed">Basic software troubleshooting and configuration.</span></li>
-                    </ul>
-                  </div>
+                  {!isDesktopPart && (
+                    <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl">
+                      <h4 className="font-bold text-blue-800 text-sm uppercase tracking-wider mb-2">By TechBeast (1-Year Software Support)</h4>
+                      <ul className="space-y-2">
+                        <li className="flex gap-3 text-slate-600"><span className="text-blue-500 mt-1">•</span><span className="leading-relaxed">Free Windows OS re-installation and corruption fixes.</span></li>
+                        <li className="flex gap-3 text-slate-600"><span className="text-blue-500 mt-1">•</span><span className="leading-relaxed">Driver updates, missing drivers, and BIOS flashing assistance.</span></li>
+                        <li className="flex gap-3 text-slate-600"><span className="text-blue-500 mt-1">•</span><span className="leading-relaxed">Basic software troubleshooting and configuration.</span></li>
+                      </ul>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <ul className="space-y-3">
                   {[
-                    "Motherboard and internal component failures under normal use.",
-                    "Display screen malfunctions (excluding accidental cracks or bleeding).",
+                    "Any and all hardware issues including Motherboard, Display, and internal component failures.",
                     "Keyboard, trackpad, and internal ports failures.",
-                    "Battery issues (if battery health drops below 50% within the first 30 days).",
-                    "RAM and internal storage (SSD/HDD) read/write failures."
+                    "Battery and Charger issues.",
+                    "Any type of software issue, operating system crashes, or driver problems."
                   ].map((item, i) => (
                     <li key={i} className="flex gap-3 text-slate-600">
                       <span className="text-emerald-500 mt-1">•</span>
@@ -106,20 +111,62 @@ export default function WarrantyModal({ isOpen, onClose, isNew, brandWarranty }:
                 What is NOT Covered (Voiding Conditions)
               </h3>
               <ul className="space-y-3">
-                {[
-                  "Physical damage, drops, dents, or broken screens after delivery.",
-                  "Liquid damage, moisture, or spills on the device.",
-                  isNew ? "Hardware issues (These MUST be directed to the Brand Service Center, not TechBeast)." : "Software issues, operating system crashes, or virus/malware infections.",
-                  "Unauthorized repairs, opening the device chassis, or tampering with warranty seals.",
-                  "Power surges, electrical short circuits caused by faulty home wiring or third-party chargers."
-                ].map((item, i) => (
-                  <li key={i} className="flex gap-3 text-red-800/80">
+                <li className="flex gap-3 text-red-800/80">
+                  <span className="text-red-400 mt-1">•</span>
+                  <span className="leading-relaxed">Physical damage, drops, dents, or broken screens after delivery.</span>
+                </li>
+                <li className="flex gap-3 text-red-800/80">
+                  <span className="text-red-400 mt-1">•</span>
+                  <span className="leading-relaxed">Liquid damage, moisture, or spills on the device.</span>
+                </li>
+                {isNew && (
+                  <li className="flex gap-3 text-red-800/80">
                     <span className="text-red-400 mt-1">•</span>
-                    <span className="leading-relaxed">{item}</span>
+                    <span className="leading-relaxed">
+                      {isDesktopPart 
+                        ? "Software issues, operating system crashes, or virus/malware infections." 
+                        : "Software issues not covered by TechBeast Software Support (e.g., third-party malware infections)."}
+                    </span>
                   </li>
-                ))}
+                )}
+                <li className="flex gap-3 text-red-800/80">
+                  <span className="text-red-400 mt-1">•</span>
+                  <span className="leading-relaxed">Unauthorized repairs, opening the device chassis, or tampering with warranty seals.</span>
+                </li>
+                <li className="flex gap-3 text-red-800/80">
+                  <span className="text-red-400 mt-1">•</span>
+                  <span className="leading-relaxed">Power surges, electrical short circuits caused by faulty home wiring or third-party chargers.</span>
+                </li>
               </ul>
             </section>
+
+            {/* Extended Warranty Section */}
+            {!isNew && (
+              <section className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-5">
+                <h3 className="flex items-center gap-2 text-lg font-bold text-emerald-800 mb-4">
+                  <Shield className="h-5 w-5" />
+                  Extended Warranty Options (6 Months & 1 Year)
+                </h3>
+                <p className="text-slate-600 text-sm mb-4">
+                  After your standard 3-month comprehensive warranty expires, you can purchase an extended warranty to keep your device protected.
+                </p>
+                <div className="space-y-4">
+                  <div className="bg-white p-4 rounded-lg border border-emerald-100/50 shadow-sm">
+                    <h4 className="font-bold text-slate-800 mb-2 text-sm uppercase tracking-wider">How the Extended Warranty Works</h4>
+                    <ul className="space-y-2 text-sm">
+                      <li className="flex gap-3 text-slate-600">
+                        <span className="text-emerald-500 mt-0.5">•</span>
+                        <span className="leading-relaxed"><strong>Free Service & Labor:</strong> For the duration of the extended warranty, all service charges, diagnostic fees, and labor costs for any hardware or software issue are completely waived.</span>
+                      </li>
+                      <li className="flex gap-3 text-slate-600">
+                        <span className="text-emerald-500 mt-0.5">•</span>
+                        <span className="leading-relaxed"><strong>Component Cost Only:</strong> If a physical component (like a battery, RAM, or screen) is defective and needs to be replaced, you will only be charged for the wholesale cost of the replacement part. The installation service remains completely free.</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </section>
+            )}
 
             {/* Claim Process */}
             <section>

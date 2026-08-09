@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, ChevronDown } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { collection, addDoc, doc, getDoc, updateDoc, getDocs, query, where } from 'firebase/firestore';
 import ImageUpload from '../../components/admin/ImageUpload';
 import { FormSkeleton } from '../../components/ui/Skeleton';
 import { useSettings } from '../../contexts/SettingsContext';
+
+const PREDEFINED_BRANDS = ["Asus", "Dell", "HP", "Lenovo", "MSI", "Acer", "Antec", "Corsair", "Gigabyte"];
 
 export default function ProductForm() {
   const navigate = useNavigate();
@@ -20,9 +22,11 @@ export default function ProductForm() {
     brand: '',
     sku: '',
     category: 'Laptops',
+    componentType: '',
     condition: 'New',
     stock: 1,
     price: 0,
+    oldPrice: 0,
     status: 'In Stock',
     processor: '',
     ram: '',
@@ -41,8 +45,27 @@ export default function ProductForm() {
     os: '',
     color: '',
     brandWarranty: '',
+    cabinetFormFactor: '',
+    cabinetFans: '',
+    motherboardSocket: '',
+    motherboardFormFactor: '',
+    powerSupplyWattage: '',
+    powerSupplyRating: '',
     imageUrls: [] as string[],
   });
+
+  const [brandOpen, setBrandOpen] = useState(false);
+  const brandRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (brandRef.current && !brandRef.current.contains(event.target as Node)) {
+        setBrandOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -100,6 +123,7 @@ export default function ProductForm() {
         ...formData,
         stock: Number(formData.stock),
         price: Number(formData.price),
+        oldPrice: Number(formData.oldPrice) || 0,
       };
       
       if (id) {
@@ -121,6 +145,18 @@ export default function ProductForm() {
   if (loading) {
     return <FormSkeleton />;
   }
+
+  const isDesktop = formData.category === 'Desktops';
+  const isFullSystem = formData.category === 'Laptops' || (isDesktop && formData.componentType === 'Assembled PC');
+  const isRAM = isDesktop && formData.componentType === 'RAM';
+  const isProcessor = isDesktop && formData.componentType === 'Processor';
+  const isStorage = isDesktop && formData.componentType === 'Storage (SSD/HDD)';
+  const isGraphics = isDesktop && formData.componentType === 'Graphics Card';
+  const isCabinet = isDesktop && formData.componentType === 'Cabinet';
+  const isMotherboard = isDesktop && formData.componentType === 'Motherboard';
+  const isPowerSupply = isDesktop && formData.componentType === 'Power Supply';
+  
+  const showSpecsSection = isFullSystem || isRAM || isProcessor || isStorage || isGraphics || isCabinet || isMotherboard || isPowerSupply;
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -151,17 +187,44 @@ export default function ProductForm() {
             Product Title *
             <input required name="title" value={formData.title} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. MacBook Pro 16" />
           </label>
-          <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+          <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest relative" ref={brandRef}>
             Brand (Optional)
-            <select name="brand" value={formData.brand} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
-              <option value="" className="bg-[#0d0d0e]">Select Brand</option>
-              <option value="Asus" className="bg-[#0d0d0e]">Asus</option>
-              <option value="Dell" className="bg-[#0d0d0e]">Dell</option>
-              <option value="HP" className="bg-[#0d0d0e]">HP</option>
-              <option value="Lenovo" className="bg-[#0d0d0e]">Lenovo</option>
-              <option value="MSI" className="bg-[#0d0d0e]">MSI</option>
-              <option value="Acer" className="bg-[#0d0d0e]">Acer</option>
-            </select>
+            <div className="relative">
+              <input 
+                name="brand" 
+                value={formData.brand} 
+                onChange={handleChange} 
+                onFocus={() => setBrandOpen(true)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pr-10 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" 
+                placeholder="Select or type brand" 
+                autoComplete="off"
+              />
+              <button 
+                type="button"
+                onClick={() => setBrandOpen(!brandOpen)}
+                className="absolute right-0 top-0 h-full px-3 flex items-center justify-center text-slate-400 hover:text-white"
+              >
+                <ChevronDown className={`h-5 w-5 transition-transform ${brandOpen ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
+            
+            {brandOpen && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-[#1a1a1c] border border-white/10 rounded-xl overflow-hidden z-50 shadow-2xl max-h-48 overflow-y-auto">
+                {PREDEFINED_BRANDS.filter(b => b.toLowerCase().includes(formData.brand.toLowerCase())).map(b => (
+                  <button
+                    key={b}
+                    type="button"
+                    className="w-full text-left px-4 py-3 text-white hover:bg-blue-600 transition-colors normal-case tracking-normal font-normal"
+                    onClick={() => {
+                      setFormData({ ...formData, brand: b });
+                      setBrandOpen(false);
+                    }}
+                  >
+                    {b}
+                  </button>
+                ))}
+              </div>
+            )}
           </label>
         </div>
 
@@ -182,6 +245,24 @@ export default function ProductForm() {
               <option value="Accessories" className="bg-[#0d0d0e]">Accessories</option>
             </select>
           </label>
+          
+          {formData.category === 'Desktops' && (
+            <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest animate-in fade-in zoom-in duration-200">
+              Component Type
+              <select name="componentType" value={formData.componentType} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
+                <option value="" className="bg-[#0d0d0e]">Select Component Type</option>
+                <option value="Assembled PC" className="bg-[#0d0d0e]">Assembled PC</option>
+                <option value="RAM" className="bg-[#0d0d0e]">RAM</option>
+                <option value="Storage (SSD/HDD)" className="bg-[#0d0d0e]">Storage (SSD/HDD)</option>
+                <option value="Graphics Card" className="bg-[#0d0d0e]">Graphics Card</option>
+                <option value="Processor" className="bg-[#0d0d0e]">Processor</option>
+                <option value="Motherboard" className="bg-[#0d0d0e]">Motherboard</option>
+                <option value="Power Supply" className="bg-[#0d0d0e]">Power Supply</option>
+                <option value="Cabinet" className="bg-[#0d0d0e]">Cabinet</option>
+              </select>
+            </label>
+          )}
+
           <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
             Condition *
             <select required name="condition" value={formData.condition} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
@@ -200,9 +281,13 @@ export default function ProductForm() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
-            Price (₹) *
+            Original Price (₹)
+            <input name="oldPrice" value={formData.oldPrice} onChange={handleChange} type="number" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="0" />
+          </label>
+          <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+            Selling Price (₹) *
             <input required name="price" value={formData.price} onChange={handleChange} type="number" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" />
           </label>
           <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
@@ -218,11 +303,13 @@ export default function ProductForm() {
           </label>
         </div>
 
-        <div className="pt-6 border-t border-white/10">
-          <h3 className="text-lg font-bold text-white mb-6">Detailed Specifications (Optional)</h3>
-          
-          {/* Processor Group */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8 border-b border-white/10 pb-8">
+        {showSpecsSection && (
+          <div className="pt-6 border-t border-white/10">
+            <h3 className="text-lg font-bold text-white mb-6">Detailed Specifications (Optional)</h3>
+            
+            {/* Processor Group */}
+            {(isFullSystem || isProcessor) && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8 border-b border-white/10 pb-8">
             <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
               Processor Line
               <select name="processor" value={formData.processor} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
@@ -258,10 +345,12 @@ export default function ProductForm() {
               Processor Model
               <input name="processorModel" value={formData.processorModel || ''} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. 12500H" />
             </label>
-          </div>
+              </div>
+            )}
 
-          {/* RAM Group */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8 border-b border-white/10 pb-8">
+            {/* RAM Group */}
+            {(isFullSystem || isRAM) && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8 border-b border-white/10 pb-8">
             <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
               Memory (RAM)
               <select name="ram" value={formData.ram} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
@@ -292,14 +381,17 @@ export default function ProductForm() {
               RAM Frequency
               <input name="ramFreq" value={formData.ramFreq || ''} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. 4800MHz" />
             </label>
-          </div>
+              </div>
+            )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-            <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
-              Storage
-              <input name="storage" value={formData.storage} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" />
-            </label>
-            <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+            {/* Storage, GPU & System Specifics */}
+            {isFullSystem && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 border-b border-white/10 pb-8">
+                <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+                  Storage
+                  <input name="storage" value={formData.storage} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" />
+                </label>
+                <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
               Graphics (GPU)
               <input name="graphics" value={formData.graphics} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" />
             </label>
@@ -322,9 +414,96 @@ export default function ProductForm() {
             <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
               Color
               <input name="color" value={formData.color} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. Space Gray" />
-            </label>
+                </label>
+              </div>
+            )}
+
+            {/* Storage ONLY */}
+            {isStorage && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 border-b border-white/10 pb-8">
+                <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+                  Storage Capacity
+                  <input name="storage" value={formData.storage} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. 1TB" />
+                </label>
+                <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+                  Storage Type
+                  <input name="storageType" value={formData.storageType} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. NVMe PCIe 4.0" />
+                </label>
+              </div>
+            )}
+
+            {/* Graphics ONLY */}
+            {isGraphics && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 border-b border-white/10 pb-8">
+                <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+                  Graphics (GPU)
+                  <input name="graphics" value={formData.graphics} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. RTX 4070 12GB" />
+                </label>
+              </div>
+            )}
+
+            {/* Cabinet ONLY */}
+            {isCabinet && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 border-b border-white/10 pb-8">
+                <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+                  Form Factor
+                  <input name="cabinetFormFactor" value={formData.cabinetFormFactor || ''} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. ATX Mid Tower" />
+                </label>
+                <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+                  Included Fans
+                  <input name="cabinetFans" value={formData.cabinetFans || ''} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. 3x 120mm ARGB" />
+                </label>
+              </div>
+            )}
+
+            {/* Motherboard ONLY */}
+            {isMotherboard && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 border-b border-white/10 pb-8">
+                <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+                  CPU Socket
+                  <input name="motherboardSocket" value={formData.motherboardSocket || ''} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. LGA 1700, AM5" />
+                </label>
+                <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+                  Form Factor
+                  <input name="motherboardFormFactor" value={formData.motherboardFormFactor || ''} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. ATX, Micro-ATX" />
+                </label>
+              </div>
+            )}
+
+            {/* Power Supply ONLY */}
+            {isPowerSupply && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 border-b border-white/10 pb-8">
+                <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+                  Wattage
+                  <input name="powerSupplyWattage" value={formData.powerSupplyWattage || ''} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. 750W" />
+                </label>
+                <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+                  Efficiency Rating
+                  <input name="powerSupplyRating" value={formData.powerSupplyRating || ''} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. 80+ Gold" />
+                </label>
+              </div>
+            )}
+
+            {/* Raw Specifications (Optional, good for Desktops/Components) */}
+            <div className="mt-8">
+              <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest mb-2">
+                Raw Specifications (For easy copy-paste)
+                <span className="text-xs text-slate-500 normal-case tracking-normal font-normal">Paste text from manufacturer websites. Each line will be formatted as a neat bullet point. Ideal for Desktops and Components.</span>
+                <textarea 
+                  name="rawSpecifications" 
+                  value={formData.rawSpecifications || ''} 
+                  onChange={handleChange} 
+                  rows={8}
+                  className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal mt-2" 
+                  placeholder="Model: V240&#10;Form Factor: Mid Tower&#10;Motherboard: ATX | mATX" 
+                />
+              </label>
+            </div>
+
           </div>
-          <div className="mb-8">
+        )}
+
+        <div className="pt-6 border-t border-white/10">
             <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest mb-4">
               Included Free Accessories
             </label>
@@ -367,7 +546,6 @@ export default function ProductForm() {
               Additional Custom Accessories (Comma separated)
               <input name="accessories" value={formData.accessories} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. Custom Bag, Special Charger" />
             </label>
-          </div>
           <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
             Description
             <textarea name="description" value={formData.description} onChange={handleChange} rows={4} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal"></textarea>

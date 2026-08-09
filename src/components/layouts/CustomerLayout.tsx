@@ -130,7 +130,7 @@ export default function CustomerLayout() {
               {settings.storeName}
             </div>
             <p className="text-xs leading-relaxed text-slate-500 font-medium">
-              Premium computer retail and professional repair services. We provide top-quality new and used laptops, desktops, and expert technical support.
+              Hubli’s Ultimate Tech Destination for Gaming PCs, Laptops, Desktops, Upgrades & Repairs. Smart technology, honest pricing, and expert support. Built for Performance. Trusted by Hubli.
             </p>
           </div>
           <div>

@@ -6,8 +6,8 @@ import { saveAs } from 'file-saver';
 import html2canvas from 'html2canvas';
 
 export const generateBulkInvoices = async (
-  startDate: string, 
-  endDate: string, 
+  startDate: string,
+  endDate: string,
   filters: {
     paymentFilter: string;
     fulfillmentFilter: string;
@@ -30,7 +30,7 @@ export const generateBulkInvoices = async (
       where('createdAt', '>=', start.toISOString()),
       where('createdAt', '<=', end.toISOString())
     );
-    
+
     const snap = await getDocs(q);
     let orders = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
 
@@ -44,14 +44,14 @@ export const generateBulkInvoices = async (
 
       // Search filtering
       if (filters.searchTerm && !(
-        order.orderNumber?.toLowerCase().includes(filters.searchTerm.toLowerCase()) || 
+        order.orderNumber?.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
         order.customerName?.toLowerCase().includes(filters.searchTerm.toLowerCase())
       )) return false;
 
       // Dropdown filters
       if (filters.paymentFilter && order.paymentStatus?.toUpperCase() !== filters.paymentFilter.toUpperCase()) return false;
       if (filters.fulfillmentFilter && order.fulfillmentStatus?.toUpperCase() !== filters.fulfillmentFilter.toUpperCase()) return false;
-      
+
       // Type filtering (Offline POS vs Online)
       if (filters.typeFilter === 'OFFLINE' && order.deliveryType !== 'In-Store POS') return false;
       if (filters.typeFilter === 'ONLINE' && order.deliveryType === 'In-Store POS') return false;
@@ -68,7 +68,7 @@ export const generateBulkInvoices = async (
     onProgress(`Found ${orders.length} orders. Generating PDFs...`);
 
     const zip = new JSZip();
-    
+
     const container = document.createElement('div');
     container.style.position = 'absolute';
     container.style.top = '-9999px';
@@ -80,22 +80,24 @@ export const generateBulkInvoices = async (
     for (let i = 0; i < orders.length; i++) {
       const order = orders[i];
       onProgress(`Processing ${i + 1} of ${orders.length}...`);
-      
+
       const subTotal = order.items?.reduce((sum: number, item: any) => sum + Number(item.price || 0), 0) || order.totalAmount;
       const discountAmount = Math.max(0, subTotal - (order.totalAmount || 0));
-      
+
       let itemsHtml = '';
       if (order.items && order.items.length > 0) {
-        itemsHtml = order.items.map((item: any) => `
-          <tr style="border-bottom: 1px solid #e2e8f0; background: ${item.type === 'accessory' ? '#f8fafc' : 'transparent'};">
+        const regularItems = order.items.filter((item: any) => item.type !== 'accessory');
+        const accessories = order.items.filter((item: any) => item.type === 'accessory');
+        
+        let regularHtml = regularItems.map((item: any) => `
+          <tr style="border-bottom: 1px solid #e2e8f0; background: transparent;">
             <td style="padding: 6px 0;">
-              <p style="font-weight: bold; margin: 0; font-size: 14px; color: ${item.type === 'product' ? '#000' : '#334155'};">${item.name}</p>
+              <p style="font-weight: bold; margin: 0; font-size: 14px; color: #000;">${item.name}</p>
               <p style="font-size: 10px; color: #64748b; margin: 0;">
-                ${item.sku ? `SKU: ${item.sku}` : (item.type === 'product' ? 'Custom Item' : '')}
+                ${item.sku ? `SKU: ${item.sku}` : 'Custom Item'}
                 ${item.serialNumber ? ` | SN/IMEI: ${item.serialNumber}` : ''}
               </p>
               ${item.conditionNote ? `<p style="font-size: 9px; color: #d97706; margin: 2px 0 0 0;">Condition: ${item.conditionNote}</p>` : ''}
-              ${item.type === 'accessory' ? `<p style="font-size: 10px; color: #64748b; margin: 0;">Included Accessory</p>` : ''}
             </td>
             <td style="padding: 6px 0; text-align: center; font-size: 14px;">1</td>
             <td style="padding: 6px 0; text-align: right; font-weight: bold; font-size: 14px; color: ${item.price === 0 ? '#059669' : '#000'};">
@@ -103,6 +105,28 @@ export const generateBulkInvoices = async (
             </td>
           </tr>
         `).join('');
+
+        let accessoriesHtml = '';
+        if (accessories.length > 0) {
+          accessoriesHtml = `
+          <tr style="border-bottom: 1px solid #e2e8f0; background: #f8fafc;">
+            <td style="padding: 6px 0;">
+              <p style="font-weight: bold; margin: 0; font-size: 14px; color: #334155;">Complementary Accessories Combo</p>
+              <p style="font-size: 10px; color: #64748b; margin: 2px 0 0 0; line-height: 1.4;">
+                Includes: ${accessories.map((a: any) => a.name).join(', ')}
+              </p>
+              <p style="font-size: 9px; color: #94a3b8; margin: 2px 0 0 0;">Included Free Accessories</p>
+            </td>
+            <td style="padding: 6px 0; text-align: center; font-size: 14px;">1</td>
+            <td style="padding: 6px 0; text-align: right; font-weight: bold; font-size: 14px; color: #059669;">
+              FREE
+            </td>
+          </tr>
+          `;
+        }
+
+        itemsHtml = regularHtml + accessoriesHtml;
+
       } else {
         itemsHtml = `
           <tr style="border-bottom: 1px solid #e2e8f0;">
@@ -114,7 +138,7 @@ export const generateBulkInvoices = async (
       }
 
       container.innerHTML = `
-        <div style="padding: 40px; color: black; font-family: sans-serif; position: relative;">
+        <div style="padding: 40px; color: black; font-family: sans-serif; position: relative; min-height: 1131px; display: flex; flex-direction: column;">
           <div style="border-bottom: 2px solid #e2e8f0; padding-bottom: 16px; margin-bottom: 16px; display: flex; justify-content: space-between;">
             <div>
               <div style="font-size: 24px; font-weight: bold; display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
@@ -170,7 +194,7 @@ export const generateBulkInvoices = async (
             </div>
           </div>
 
-          <div style="margin-top: 60px; border-top: 1px solid #e2e8f0; padding-top: 16px; display: flex; justify-content: space-between; align-items: flex-end;">
+          <div style="margin-top: auto; border-top: 1px solid #e2e8f0; padding-top: 16px; display: flex; justify-content: space-between; align-items: flex-end;">
             <div style="flex: 1;">
               <h4 style="margin: 0 0 4px 0; font-size: 12px; font-weight: bold;">TERMS & CONDITIONS</h4>
               <ul style="margin: 0; padding-left: 16px; font-size: 9px; color: #64748b;">
@@ -194,17 +218,17 @@ export const generateBulkInvoices = async (
 
       const canvas = await html2canvas(container, { scale: 2, useCORS: true });
       const imgData = canvas.toDataURL('image/jpeg', 1.0);
-      
+
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      
+
       pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-      
+
       const safeName = (order.customerName || 'Customer').replace(/[^a-zA-Z0-9]/g, '_');
       const safeOrder = (order.orderNumber || `Order-${order.id}`).replace(/[^a-zA-Z0-9]/g, '_');
       const filename = `${safeOrder}_${safeName}.pdf`;
-      
+
       zip.file(filename, pdf.output('blob'));
     }
 
@@ -212,12 +236,12 @@ export const generateBulkInvoices = async (
 
     onProgress('Creating ZIP file...');
     const content = await zip.generateAsync({ type: 'blob' });
-    
+
     onProgress('Downloading...');
     saveAs(content, `Invoices_${startDate}_to_${endDate}.zip`);
-    
+
     onProgress('');
-    
+
   } catch (error) {
     console.error('Bulk PDF Error:', error);
     alert('An error occurred while generating PDFs. Check console for details.');
@@ -228,7 +252,7 @@ export const generateBulkInvoices = async (
 export const generateSingleInvoicePdf = async (order: any, onProgress?: (msg: string) => void) => {
   try {
     if (onProgress) onProgress('Generating PDF...');
-    
+
     const container = document.createElement('div');
     container.style.position = 'absolute';
     container.style.top = '-9999px';
@@ -239,7 +263,7 @@ export const generateSingleInvoicePdf = async (order: any, onProgress?: (msg: st
 
     const subTotal = order.items?.reduce((sum: number, item: any) => sum + Number(item.price || 0), 0) || order.totalAmount;
     const discountAmount = Math.max(0, subTotal - (order.totalAmount || 0));
-    
+
     let itemsHtml = '';
     if (order.items && order.items.length > 0) {
       itemsHtml = order.items.map((item: any) => `
@@ -270,7 +294,7 @@ export const generateSingleInvoicePdf = async (order: any, onProgress?: (msg: st
     }
 
     container.innerHTML = `
-      <div style="padding: 40px; color: black; font-family: sans-serif; position: relative;">
+      <div style="padding: 40px; color: black; font-family: sans-serif; position: relative; min-height: 1131px; display: flex; flex-direction: column;">
         <div style="border-bottom: 2px solid #e2e8f0; padding-bottom: 16px; margin-bottom: 16px; display: flex; justify-content: space-between;">
           <div>
             <div style="font-size: 24px; font-weight: bold; display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
@@ -326,7 +350,7 @@ export const generateSingleInvoicePdf = async (order: any, onProgress?: (msg: st
           </div>
         </div>
 
-        <div style="margin-top: 60px; border-top: 1px solid #e2e8f0; padding-top: 16px; display: flex; justify-content: space-between; align-items: flex-end;">
+        <div style="margin-top: auto; border-top: 1px solid #e2e8f0; padding-top: 16px; display: flex; justify-content: space-between; align-items: flex-end;">
           <div style="flex: 1;">
             <h4 style="margin: 0 0 4px 0; font-size: 12px; font-weight: bold;">TERMS & CONDITIONS</h4>
             <ul style="margin: 0; padding-left: 16px; font-size: 9px; color: #64748b;">
@@ -350,27 +374,229 @@ export const generateSingleInvoicePdf = async (order: any, onProgress?: (msg: st
 
     const canvas = await html2canvas(container, { scale: 2, useCORS: true });
     const imgData = canvas.toDataURL('image/jpeg', 1.0);
-    
+
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-    
+
     pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-    
+
     const safeName = (order.customerName || 'Customer').replace(/[^a-zA-Z0-9]/g, '_');
     const safeOrder = (order.orderNumber || `Order-${order.id}`).replace(/[^a-zA-Z0-9]/g, '_');
     const filename = `${safeOrder}_${safeName}.pdf`;
-    
+
     pdf.save(filename);
 
     document.body.removeChild(container);
     if (onProgress) onProgress('');
     return true;
-    
+
   } catch (error) {
     console.error('Single PDF Error:', error);
     alert('An error occurred while generating PDF.');
     if (onProgress) onProgress('');
     return false;
+  }
+};
+
+export const getInvoicePdfData = async (order: any, onProgress?: (msg: string) => void) => {
+  try {
+    if (onProgress) onProgress('Generating PDF...');
+
+    const container = document.createElement('div');
+    container.style.position = 'absolute';
+    container.style.top = '-9999px';
+    container.style.left = '-9999px';
+    container.style.width = '800px';
+    container.style.backgroundColor = 'white';
+    document.body.appendChild(container);
+
+    const subTotal = order.items?.reduce((sum: number, item: any) => sum + Number(item.price || 0), 0) || order.totalAmount;
+    const discountAmount = Math.max(0, subTotal - (order.totalAmount || 0));
+
+    let itemsHtml = '';
+    if (order.items && order.items.length > 0) {
+      const regularItems = order.items.filter((item: any) => item.type !== 'accessory');
+      const accessories = order.items.filter((item: any) => item.type === 'accessory');
+      
+      let regularHtml = regularItems.map((item: any) => `
+        <tr style="border-bottom: 1px solid #e2e8f0; background: transparent;">
+          <td style="padding: 6px 0;">
+            <p style="font-weight: bold; margin: 0; font-size: 14px; color: #000;">${item.name}</p>
+            <p style="font-size: 10px; color: #64748b; margin: 0;">
+              ${item.sku ? `SKU: ${item.sku}` : 'Custom Item'}
+              ${item.serialNumber ? ` | SN/IMEI: ${item.serialNumber}` : ''}
+            </p>
+            ${item.conditionNote ? `<p style="font-size: 9px; color: #d97706; margin: 2px 0 0 0;">Condition: ${item.conditionNote}</p>` : ''}
+          </td>
+          <td style="padding: 6px 0; text-align: center; font-size: 14px;">1</td>
+          <td style="padding: 6px 0; text-align: right; font-weight: bold; font-size: 14px; color: ${item.price === 0 ? '#059669' : '#000'};">
+            ${item.price === 0 ? 'FREE' : `₹${Number(item.price).toLocaleString()}`}
+          </td>
+        </tr>
+      `).join('');
+
+      let accessoriesHtml = '';
+      if (accessories.length > 0) {
+        accessoriesHtml = `
+        <tr style="border-bottom: 1px solid #e2e8f0; background: #f8fafc;">
+          <td style="padding: 6px 0;">
+            <p style="font-weight: bold; margin: 0; font-size: 14px; color: #334155;">Complementary Accessories Combo</p>
+            <p style="font-size: 10px; color: #64748b; margin: 2px 0 0 0; line-height: 1.4;">
+              Includes: ${accessories.map((a: any) => a.name).join(', ')}
+            </p>
+            <p style="font-size: 9px; color: #94a3b8; margin: 2px 0 0 0;">Included Free Accessories</p>
+          </td>
+          <td style="padding: 6px 0; text-align: center; font-size: 14px;">1</td>
+          <td style="padding: 6px 0; text-align: right; font-weight: bold; font-size: 14px; color: #059669;">
+            FREE
+          </td>
+        </tr>
+        `;
+      }
+
+      itemsHtml = regularHtml + accessoriesHtml;
+    } else {
+      itemsHtml = `
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+          <td style="padding: 6px 0; font-weight: bold; font-size: 14px;">Offline POS Sale</td>
+          <td style="padding: 6px 0; text-align: center; font-size: 14px;">1</td>
+          <td style="padding: 6px 0; text-align: right; font-weight: bold; font-size: 14px;">₹${Number(order.totalAmount || 0).toLocaleString()}</td>
+        </tr>
+      `;
+    }
+
+    container.innerHTML = `
+      <div style="padding: 40px; color: black; font-family: sans-serif; position: relative; min-height: 1131px; display: flex; flex-direction: column;">
+        <div style="border-bottom: 2px solid #e2e8f0; padding-bottom: 16px; margin-bottom: 16px; display: flex; justify-content: space-between;">
+          <div>
+            <div style="font-size: 24px; font-weight: bold; display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+              <img src="/logo2.jpeg" alt="Logo" style="height: 32px; object-fit: contain; border-radius: 4px;" />
+              Tech Beast
+            </div>
+            <p style="margin: 0; font-size: 12px; color: #64748b;">Ground Floor, Shinde Complex, No.183 C Block, Hubballi, Karnataka 580029</p>
+            <p style="margin: 0; font-size: 12px; color: #64748b;">+91 95352 25266 | techbeasthubli@gmail.com</p>
+          </div>
+          <div style="text-align: right;">
+            <h2 style="margin: 0 0 8px 0; font-size: 32px; color: #cbd5e1; letter-spacing: 2px;">Proforma Invoice</h2>
+            <p style="margin: 0; font-size: 12px; font-weight: bold;">Invoice No: ${order.orderNumber}</p>
+            <p style="margin: 0; font-size: 12px; color: #64748b;">Date: ${order.createdAt ? new Date(order.createdAt).toLocaleDateString() : '-'}</p>
+            ${order.paymentMethod ? `<p style="margin: 4px 0 0 0; font-size: 12px; font-weight: bold; color: #059669; background: #ecfdf5; display: inline-block; padding: 2px 8px; border-radius: 4px;">Paid via ${order.paymentMethod}</p>` : ''}
+          </div>
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <h3 style="margin: 0 0 4px 0; font-size: 12px; color: #94a3b8; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">Bill To</h3>
+          <p style="margin: 0; font-weight: bold; font-size: 16px;">${order.customerName}</p>
+          <p style="margin: 0; font-size: 12px; color: #475569;">Phone: ${order.customerPhone}</p>
+          ${order.customerEmail ? `<p style="margin: 0; font-size: 12px; color: #475569;">Email: ${order.customerEmail}</p>` : ''}
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
+          <thead>
+            <tr style="border-bottom: 2px solid #0f172a;">
+              <th style="padding: 4px 0; text-align: left; font-size: 12px; text-transform: uppercase;">Description</th>
+              <th style="padding: 4px 0; text-align: center; font-size: 12px; text-transform: uppercase;">Qty</th>
+              <th style="padding: 4px 0; text-align: right; font-size: 12px; text-transform: uppercase;">Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHtml}
+          </tbody>
+        </table>
+
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 24px;">
+          <div style="width: 200px;">
+            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; color: #475569;">
+              <span>Subtotal:</span>
+              <span>₹${subTotal.toLocaleString()}</span>
+            </div>
+            ${discountAmount > 0 ? `
+              <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; color: #059669;">
+                <span>Discount:</span>
+                <span>-₹${discountAmount.toLocaleString()}</span>
+              </div>
+            ` : ''}
+            <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 16px; border-top: 2px solid #0f172a; padding-top: 4px;">
+              <span>Total:</span>
+              <span>₹${Number(order.totalAmount || 0).toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: auto; padding-top: 16px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: flex-end;">
+          <div style="flex: 1;">
+            <h4 style="margin: 0 0 4px 0; font-size: 10px; text-transform: uppercase; color: #475569;">Terms & Conditions</h4>
+            <ul style="margin: 0; padding-left: 12px; font-size: 9px; color: #64748b; line-height: 1.3;">
+              <li>All second-hand electronics come with a standard 3-month warranty.</li>
+              <li>Extended warranty (if purchased) covers internal hardware failures and OS/software issues only.</li>
+              <li>Physical damage, liquid damage, and short circuits are not covered under warranty.</li>
+              <li>Accessories (chargers, battery) are covered under warranty.</li>
+              <li>Goods once sold cannot be returned or exchanged.</li>
+            </ul>
+          </div>
+          <div style="width: 160px; text-align: center;">
+            <div style="height: 40px; border-bottom: 1px solid #94a3b8; margin-bottom: 4px;"></div>
+            <p style="margin: 0; font-size: 12px; font-weight: bold;">Authorized Signature</p>
+            <p style="margin: 0; font-size: 10px; color: #64748b;">Tech Beast</p>
+          </div>
+        </div>
+      </div>
+    `;
+
+    await new Promise(resolve => setTimeout(resolve, 50));
+    const canvas = await html2canvas(container, { scale: 2, useCORS: true });
+    const imgData = canvas.toDataURL('image/jpeg', 1.0);
+
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+
+    const safeName = (order.customerName || 'Customer').replace(/[^a-zA-Z0-9]/g, '_');
+    const safeOrder = (order.orderNumber || `Order-${order.id}`).replace(/[^a-zA-Z0-9]/g, '_');
+    const filename = `${safeOrder}_${safeName}.pdf`;
+
+    document.body.removeChild(container);
+    if (onProgress) onProgress('');
+
+    const blob = pdf.output('blob');
+    const dataUri = pdf.output('datauristring');
+
+    return { pdf, filename, blob, dataUri };
+  } catch (error) {
+    console.error('PDF Data Error:', error);
+    if (onProgress) onProgress('');
+    throw error;
+  }
+};
+
+export const shareInvoiceViaWhatsApp = async (order: any, onProgress?: (msg: string) => void) => {
+  if (!order.customerPhone) {
+    alert("No phone number available for this customer.");
+    return;
+  }
+
+  try {
+    const { pdf, filename } = await getInvoicePdfData(order, onProgress);
+
+    // Clean phone number (format for WhatsApp wa.me link e.g. 919535225266)
+    let phone = order.customerPhone.replace(/[^0-9]/g, '');
+    if (phone.length === 10) {
+      phone = '91' + phone;
+    }
+
+    const text = `Hi ${order.customerName || 'Customer'},\n\nThank you for choosing Tech Beast Hubli! 🙏\nHere is your official invoice #${order.orderNumber || ''}.\n\nTotal Amount: ₹${Number(order.totalAmount || 0).toLocaleString()}\nPayment Method: ${order.paymentMethod || 'Paid'}\n\nWe appreciate your business! Feel free to contact us for any assistance.\nTech Beast Hubli | +91 95352 25266`;
+
+    // 1. Download PDF invoice directly to Downloads
+    pdf.save(filename);
+
+    // 2. Directly open WhatsApp chat window for THIS exact customer phone number
+    const encodedText = encodeURIComponent(text);
+    const waUrl = `https://wa.me/${phone}?text=${encodedText}`;
+    window.open(waUrl, '_blank');
+  } catch (err) {
+    console.error("WhatsApp share error:", err);
+    alert("Failed to prepare WhatsApp invoice.");
   }
 };

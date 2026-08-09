@@ -43,9 +43,17 @@ export default function AdminDashboard() {
   const totalRevenue = completedRepairs.reduce((sum, r) => sum + (Number(r.estimatedCost) || 0), 0);
 
   const lowStockItems = inventory.filter(i => Number(i.quantity) <= 5);
-  const totalInventoryValue = inventory.reduce((sum, i) => sum + (Number(i.quantity || 0) * Number(i.costPrice || 0)), 0);
+  
+  // POS Sales Revenue: Offline POS sales ONLY (excluding online inquiries)
+  const posOrders = orders.filter(o => {
+    const isPOS = o.deliveryType === 'In-Store POS' || 
+                  (o.orderNumber && (o.orderNumber.startsWith('INV-') || o.orderNumber.startsWith('POS')));
+    const isNotInquiry = o.deliveryType !== 'Inquiry' && !o.isInquiry;
+    return isPOS && isNotInquiry;
+  });
+  const posSalesRevenue = posOrders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
 
-  // Generate chart data for the last 7 days
+  // Generate chart data for the last 7 days (POS Sales Only)
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
@@ -54,10 +62,10 @@ export default function AdminDashboard() {
 
   const revenueData = last7Days.map(date => {
     const dateStr = date.toDateString();
-    const dayOrders = orders.filter(o => {
+    const dayOrders = posOrders.filter(o => {
       if (!o.createdAt) return false;
       const oDate = new Date(o.createdAt);
-      return oDate.toDateString() === dateStr && (o.paymentStatus === 'PAID' || o.paymentStatus === 'COMPLETE');
+      return oDate.toDateString() === dateStr;
     });
     const total = dayOrders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
     return {
@@ -96,9 +104,9 @@ export default function AdminDashboard() {
           </div>
         </div>
         <div className="bg-white/5 rounded-2xl p-5 border border-white/10 flex flex-col justify-between">
-          <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Total Inventory Cost</span>
+          <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">POS Sales Revenue</span>
           <div className="flex items-end gap-2 mt-4 lg:mt-0">
-            <span className="text-2xl font-bold text-white">₹{totalInventoryValue.toLocaleString('en-IN')}</span>
+            <span className="text-2xl font-bold text-emerald-400">₹{posSalesRevenue.toLocaleString('en-IN')}</span>
           </div>
         </div>
       </div>

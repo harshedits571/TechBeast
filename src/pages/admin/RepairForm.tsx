@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Save, X, Printer, User, Laptop, Wrench, FileText } from 'lucide-react';
 import { db } from '../../lib/firebase';
-import { collection, addDoc, runTransaction, doc } from 'firebase/firestore';
+import { collection, addDoc, doc, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { FormSkeleton } from '../../components/ui/Skeleton';
 import { useAdmin } from '../../contexts/AdminContext';
 
@@ -68,18 +68,23 @@ export default function RepairForm() {
   };
 
   const generateTicketNumber = async () => {
-    const counterRef = doc(db, 'counters', 'repairTickets');
-    const newSeq = await runTransaction(db, async (transaction) => {
-      const counterDoc = await transaction.get(counterRef);
-      if (!counterDoc.exists()) {
-        transaction.set(counterRef, { seq: 1 });
-        return 1;
+    let newSeq = 1;
+    try {
+      const snap = await getDocs(query(collection(db, 'repairs'), orderBy('createdAt', 'desc'), limit(1)));
+      if (!snap.empty) {
+        const lastTicket = snap.docs[0].data();
+        if (lastTicket.ticketNumber) {
+          const parts = lastTicket.ticketNumber.split('-');
+          if (parts.length === 3) {
+            const numPart = parseInt(parts[2], 10);
+            if (!isNaN(numPart)) newSeq = numPart + 1;
+          }
+        }
       }
-      const seq = (counterDoc.data().seq || 0) + 1;
-      transaction.update(counterRef, { seq });
-      return seq;
-    });
-
+    } catch (err) {
+      console.warn("Could not fetch last ticket for sequential ID, using fallback", err);
+      newSeq = Math.floor(Math.random() * 9000) + 1000;
+    }
     const date = new Date();
     return `REP-${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}-${newSeq.toString().padStart(4, '0')}`;
   };

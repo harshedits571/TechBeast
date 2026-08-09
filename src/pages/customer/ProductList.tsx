@@ -4,6 +4,7 @@ import { Filter, ChevronDown, Check, Star, X, Search } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { CardGridSkeleton } from '../../components/ui/Skeleton';
+import SEO from '../../components/ui/SEO';
 
 function normalizeBrand(brand: string) {
   if (!brand) return 'Unknown';
@@ -25,6 +26,7 @@ export default function ProductList() {
   const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
   const [selectedGens, setSelectedGens] = useState<string[]>([]);
   const [selectedRamTypes, setSelectedRamTypes] = useState<string[]>([]);
+  const [selectedComponentTypes, setSelectedComponentTypes] = useState<string[]>([]);
   const [inStockOnly, setInStockOnly] = useState<boolean>(false);
   const [minPrice, setMinPrice] = useState<string>('');
   const [maxPrice, setMaxPrice] = useState<string>('');
@@ -57,6 +59,7 @@ export default function ProductList() {
 
   const availableGens = Array.from(new Set(products.map(p => p.processorGen))).filter(Boolean).sort();
   const availableRamTypes = Array.from(new Set(products.map(p => p.ramType))).filter(Boolean).sort();
+  const availableComponentTypes = Array.from(new Set(products.map(p => p.componentType))).filter(Boolean).sort();
 
   const displayedProducts = products.filter(p => {
     // Search Query
@@ -84,6 +87,9 @@ export default function ProductList() {
     // RAM Type Filter
     if (selectedRamTypes.length > 0 && (!p.ramType || !selectedRamTypes.includes(p.ramType))) return false;
 
+    // Component Type Filter
+    if (selectedComponentTypes.length > 0 && (!p.componentType || !selectedComponentTypes.includes(p.componentType))) return false;
+
     // In Stock Only Filter
     if (inStockOnly && (!p.stock || p.stock <= 0)) return false;
     
@@ -102,6 +108,10 @@ export default function ProductList() {
 
   return (
     <div className="bg-slate-50 min-h-screen text-slate-800 font-sans pb-20">
+      <SEO 
+        title={`${categoryFilter ? categoryFilter : 'All Products'} - Tech Beast Hubli`}
+        description={`Explore our wide range of ${categoryFilter ? categoryFilter : 'second hand laptops, desktops, and accessories'} at Tech Beast Hubli. Get premium quality at the best prices.`}
+      />
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
           
@@ -110,20 +120,59 @@ export default function ProductList() {
             <div className="text-lg text-slate-500 mb-6">Filters</div>
             
             <div className="space-y-6">
+              {/* COMPONENT TYPE Filter (Only for Desktops) */}
+              {categoryFilter === 'Desktops' && availableComponentTypes.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between cursor-pointer text-sm font-bold text-slate-700 mb-3 uppercase">
+                    <span>Component Type</span>
+                    <ChevronDown className="h-4 w-4 rotate-180 text-slate-400" />
+                  </div>
+                  <ul className="space-y-2">
+                    {availableComponentTypes.map((type: any) => {
+                      const count = products.filter(p => {
+                        if (categoryFilter && p.category !== categoryFilter) return false;
+                        return p.componentType === type;
+                      }).length;
+                      
+                      if (count === 0) return null;
+                      return (
+                        <li key={type} className="flex items-center justify-between group">
+                          <label className="flex items-center cursor-pointer text-sm text-slate-600 group-hover:text-blue-600">
+                            <input
+                              type="checkbox"
+                              checked={selectedComponentTypes.includes(type)}
+                              onChange={(e) => {
+                                if (e.target.checked) setSelectedComponentTypes([...selectedComponentTypes, type]);
+                                else setSelectedComponentTypes(selectedComponentTypes.filter(t => t !== type));
+                              }}
+                              className="mr-3 h-4 w-4 rounded-sm border-slate-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            {type}
+                          </label>
+                          <span className="text-xs text-slate-400">({count})</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+
               {/* BRAND Filter */}
-              <div>
+              <div className={categoryFilter === 'Desktops' && availableComponentTypes.length > 0 ? "border-t border-slate-100 pt-4" : ""}>
                 <div className="flex items-center justify-between cursor-pointer text-sm font-bold text-slate-700 mb-3 uppercase">
                   <span>Brand</span>
                   <ChevronDown className="h-4 w-4 rotate-180 text-slate-400" />
                 </div>
                 <ul className="space-y-2">
-                  {['Asus', 'Dell', 'HP', 'Lenovo', 'MSI', 'Acer'].map((brand) => {
+                  {availableBrands.map((brand: any) => {
                     const count = products.filter(p => {
+                      if (categoryFilter && p.category !== categoryFilter) return false;
                       let b = p.brand;
                       if (!b && p.title) b = p.title.split(' ')[0];
                       return normalizeBrand(b) === brand;
                     }).length;
                     
+                    if (count === 0) return null;
                     return (
                       <li key={brand} className="flex items-center justify-between group">
                         <label className="flex items-center cursor-pointer text-sm text-slate-600 group-hover:text-blue-600">
@@ -174,22 +223,31 @@ export default function ProductList() {
                     <ChevronDown className="h-4 w-4 rotate-180 text-slate-400" />
                   </div>
                   <ul className="space-y-2">
-                    {availableGens.map((gen: any) => (
-                      <li key={gen} className="flex items-center justify-between group">
-                        <label className="flex items-center cursor-pointer text-sm text-slate-600 group-hover:text-blue-600">
-                          <input
-                            type="checkbox"
-                            checked={selectedGens.includes(gen)}
-                            onChange={(e) => {
-                              if (e.target.checked) setSelectedGens([...selectedGens, gen]);
-                              else setSelectedGens(selectedGens.filter(g => g !== gen));
-                            }}
-                            className="mr-3 h-4 w-4 rounded-sm border-slate-300 text-blue-600 focus:ring-blue-500"
-                          />
-                          {gen}
-                        </label>
-                      </li>
-                    ))}
+                    {availableGens.map((gen: any) => {
+                      const count = products.filter(p => {
+                        if (categoryFilter && p.category !== categoryFilter) return false;
+                        return p.processorGen === gen;
+                      }).length;
+                      
+                      if (count === 0) return null;
+                      return (
+                        <li key={gen} className="flex items-center justify-between group">
+                          <label className="flex items-center cursor-pointer text-sm text-slate-600 group-hover:text-blue-600">
+                            <input
+                              type="checkbox"
+                              checked={selectedGens.includes(gen)}
+                              onChange={(e) => {
+                                if (e.target.checked) setSelectedGens([...selectedGens, gen]);
+                                else setSelectedGens(selectedGens.filter(g => g !== gen));
+                              }}
+                              className="mr-3 h-4 w-4 rounded-sm border-slate-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            {gen}
+                          </label>
+                          <span className="text-xs text-slate-400">({count})</span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               )}
@@ -202,22 +260,31 @@ export default function ProductList() {
                     <ChevronDown className="h-4 w-4 rotate-180 text-slate-400" />
                   </div>
                   <ul className="space-y-2">
-                    {availableRamTypes.map((rt: any) => (
-                      <li key={rt} className="flex items-center justify-between group">
-                        <label className="flex items-center cursor-pointer text-sm text-slate-600 group-hover:text-blue-600">
-                          <input
-                            type="checkbox"
-                            checked={selectedRamTypes.includes(rt)}
-                            onChange={(e) => {
-                              if (e.target.checked) setSelectedRamTypes([...selectedRamTypes, rt]);
-                              else setSelectedRamTypes(selectedRamTypes.filter(r => r !== rt));
-                            }}
-                            className="mr-3 h-4 w-4 rounded-sm border-slate-300 text-blue-600 focus:ring-blue-500"
-                          />
-                          {rt}
-                        </label>
-                      </li>
-                    ))}
+                    {availableRamTypes.map((rt: any) => {
+                      const count = products.filter(p => {
+                        if (categoryFilter && p.category !== categoryFilter) return false;
+                        return p.ramType === rt;
+                      }).length;
+
+                      if (count === 0) return null;
+                      return (
+                        <li key={rt} className="flex items-center justify-between group">
+                          <label className="flex items-center cursor-pointer text-sm text-slate-600 group-hover:text-blue-600">
+                            <input
+                              type="checkbox"
+                              checked={selectedRamTypes.includes(rt)}
+                              onChange={(e) => {
+                                if (e.target.checked) setSelectedRamTypes([...selectedRamTypes, rt]);
+                                else setSelectedRamTypes(selectedRamTypes.filter(r => r !== rt));
+                              }}
+                              className="mr-3 h-4 w-4 rounded-sm border-slate-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            {rt}
+                          </label>
+                          <span className="text-xs text-slate-400">({count})</span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               )}

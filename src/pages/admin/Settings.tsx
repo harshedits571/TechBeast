@@ -206,12 +206,42 @@ export default function Settings() {
             <div className="grid grid-cols-1 gap-8">
               <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
                 Bank Offer Text (Global)
-                <input required name="bankOfferText" value={formData.bankOfferText} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. 7.5% Instant Discount Up To Rs.2000/- with HDFC Bank" />
+                <input name="bankOfferText" value={formData.bankOfferText} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. 7.5% Instant Discount Up To Rs.2000/- with HDFC Bank" />
               </label>
               <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
                 Default Warranty Text
                 <input required name="warrantyText" value={formData.warrantyText} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. 6 Months TechBeast Certified Warranty" />
               </label>
+            </div>
+
+            {/* Direct Gmail App Password Email Integration */}
+            <div className="bg-white/5 border border-white/10 p-6 rounded-2xl space-y-4">
+              <h3 className="text-sm font-bold text-white uppercase tracking-widest flex items-center gap-2">
+                Direct Gmail Sending (Google App Password & Anti-Spam Verified)
+              </h3>
+              <p className="text-xs text-slate-400">
+                Send Proforma Invoice PDFs directly from your official Gmail (<code className="text-blue-400">techbeasthubli@gmail.com</code>) straight to customer inboxes with zero spam risk.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="flex flex-col gap-2 text-xs text-slate-400 font-bold uppercase tracking-widest">
+                  Gmail Address
+                  <input name="smtpEmail" value={formData.smtpEmail || formData.contactEmail || ''} onChange={handleChange} type="email" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case font-normal" placeholder="e.g. techbeasthubli@gmail.com" />
+                </label>
+                <label className="flex flex-col gap-2 text-xs text-slate-400 font-bold uppercase tracking-widest">
+                  Google App Security Password (16-Digit Code)
+                  <input name="smtpAppPassword" value={formData.smtpAppPassword || ''} onChange={handleChange} type="password" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case font-normal font-mono" placeholder="e.g. abcd efgh ijkl mnop" />
+                </label>
+              </div>
+
+              <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300 space-y-2">
+                <p className="font-bold text-blue-400">🔑 How to get your Google App Password in 1 minute:</p>
+                <ol className="list-decimal list-inside space-y-1 text-slate-300">
+                  <li>Go to your Google Account (<strong>myaccount.google.com</strong>) ➔ <strong>Security</strong>.</li>
+                  <li>Ensure <strong>2-Step Verification</strong> is ON.</li>
+                  <li>Search for <strong>App passwords</strong>, select Mail, and click <strong>Create</strong>.</li>
+                  <li>Paste the generated 16-character code into the Security Password box above!</li>
+                </ol>
+              </div>
             </div>
           </div>
         )}

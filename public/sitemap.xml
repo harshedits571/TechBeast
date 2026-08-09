@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- Core pages -->
+  <url>
+    <loc>https://www.techbeasthubli.in/</loc>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://www.techbeasthubli.in/products</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.techbeasthubli.in/checkout</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <!-- 
+    Dynamic routes like /products/:id should ideally be generated dynamically 
+    using a server-side script or a build step that queries your database. 
+    You can use tools like 'vite-plugin-sitemap' to build static routes.
+  -->
+</urlset>

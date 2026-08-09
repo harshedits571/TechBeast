@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Heart, Share2, Check, ShieldCheck, Truck, RotateCcw, Cpu, HardDrive, Monitor, Battery, Gift, Star } from 'lucide-react';
 import { db } from '../../lib/firebase';
-import { doc, getDoc, collection, getDocs, addDoc, query, orderBy } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, addDoc, query, orderBy, updateDoc, increment } from 'firebase/firestore';
 import { useCart } from '../../contexts/CartContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import WarrantyModal from '../../components/WarrantyModal';
 import { DetailSkeleton } from '../../components/ui/Skeleton';
+import SEO from '../../components/ui/SEO';
 
 export default function ProductDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('specs');
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -26,13 +28,35 @@ export default function ProductDetail() {
   const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
     const fetchProduct = async () => {
       if (!id) return;
       try {
         const docRef = doc(db, "products", id);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          setProduct({ id: docSnap.id, ...docSnap.data() });
+          const productData = docSnap.data();
+          const currentViews = productData.views || 0;
+          
+          const viewedProducts = JSON.parse(localStorage.getItem('viewedProducts') || '[]');
+          
+          if (!viewedProducts.includes(id)) {
+            // First time viewing for this user
+            setProduct({ id: docSnap.id, ...productData, views: currentViews + 1 });
+            
+            // Save to localStorage
+            viewedProducts.push(id);
+            localStorage.setItem('viewedProducts', JSON.stringify(viewedProducts));
+            
+            // Update in Firestore
+            updateDoc(docRef, {
+              views: increment(1)
+            }).catch(e => console.error("Error updating views:", e));
+          } else {
+            // Already viewed by this user
+            setProduct({ id: docSnap.id, ...productData, views: currentViews });
+          }
+          
         } else {
           console.error("No such product!");
         }
@@ -105,146 +129,418 @@ export default function ProductDetail() {
   const discountAmount = isDiscounted ? (product.oldPrice - product.price) : 0;
   const discountPercent = isDiscounted ? Math.round((discountAmount / product.oldPrice) * 100) : 0;
 
-  const specs = {
-    'Weight': '2.5 kg',
-    'Dimensions': '40.4 x 30.75 x 3.2 cm',
+  const isDesktop = product.category === 'Desktops';
+  const isFullSystem = product.category === 'Laptops' || (isDesktop && product.componentType === 'Assembled PC');
+  const isRAM = isDesktop && product.componentType === 'RAM';
+  const isProcessor = isDesktop && product.componentType === 'Processor';
+  const isStorage = isDesktop && product.componentType === 'Storage (SSD/HDD)';
+  const isGraphics = isDesktop && product.componentType === 'Graphics Card';
+  const isCabinet = isDesktop && product.componentType === 'Cabinet';
+  const isMotherboard = isDesktop && product.componentType === 'Motherboard';
+  const isPowerSupply = isDesktop && product.componentType === 'Power Supply';
+
+  const specs: Record<string, string> = {
     'Brand': product.brand || (product.title ? product.title.split(' ')[0] : 'Unknown'),
-    'Processor': [product.processor, product.processorGen !== 'N/A' ? product.processorGen : '', product.processorModel].filter(Boolean).join(' ') || 'Not Specified',
-    'RAM Size': [product.ram, product.ramFreq].filter(Boolean).join(' ') || 'Not Specified',
-    'SSD Storage': product.storage || 'Not Specified',
-    'GPU': product.graphics || 'Not Specified',
-    'Screen Size': product.displayType || 'Not Specified',
-    'Operating System': product.os || 'Not Specified',
-    'Battery': '4-Cell 90WHr',
     'Model Number': product.modelNumber || 'Not Specified',
   };
 
+  if (product.brandWarranty) {
+    specs['Brand Warranty'] = product.brandWarranty;
+  }
+
+  if (isFullSystem || isProcessor) {
+    specs['Processor'] = [product.processor, product.processorGen !== 'N/A' ? product.processorGen : '', product.processorModel].filter(Boolean).join(' ') || 'Not Specified';
+  }
+  if (isFullSystem || isRAM) {
+    specs['Memory (RAM)'] = [product.ram, product.ramType, product.ramFreq].filter(Boolean).join(' ') || 'Not Specified';
+  }
+  if (isFullSystem) {
+    specs['Storage'] = [product.storage, product.storageType].filter(Boolean).join(' ') || 'Not Specified';
+    specs['Graphics (GPU)'] = product.graphics || 'Not Specified';
+    specs['Display'] = product.displayType || 'Not Specified';
+    specs['Operating System'] = product.os || 'Not Specified';
+  }
+  if (isStorage) {
+    specs['Storage Capacity'] = product.storage || 'Not Specified';
+    specs['Storage Type'] = product.storageType || 'Not Specified';
+  }
+  if (isGraphics) {
+    specs['Graphics (GPU)'] = product.graphics || 'Not Specified';
+  }
+  if (isCabinet) {
+    specs['Form Factor'] = product.cabinetFormFactor || 'Not Specified';
+    specs['Included Fans'] = product.cabinetFans || 'Not Specified';
+  }
+  if (isMotherboard) {
+    specs['CPU Socket'] = product.motherboardSocket || 'Not Specified';
+    specs['Form Factor'] = product.motherboardFormFactor || 'Not Specified';
+  }
+  if (isPowerSupply) {
+    specs['Wattage'] = product.powerSupplyWattage || 'Not Specified';
+    specs['Efficiency Rating'] = product.powerSupplyRating || 'Not Specified';
+  }
+
+  const productSchema = {
+    "@context": "https://schema.org/",
+    "@type": "Product",
+    "name": product.title,
+    "image": product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls : ["https://www.techbeasthubli.in/logo.png"],
+    "description": product.description || `Buy ${product.title} at Tech Beast Hubli. Best second hand laptop store in Hubli.`,
+    "sku": product.sku || product.id,
+    "mpn": product.modelNumber || undefined,
+    "brand": {
+      "@type": "Brand",
+      "name": product.brand || "Unknown"
+    },
+    "offers": {
+      "@type": "Offer",
+      "url": `https://www.techbeasthubli.in/products/${product.id}`,
+      "priceCurrency": "INR",
+      "price": product.price,
+      "priceValidUntil": new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
+      "itemCondition": product.condition === 'New' ? "https://schema.org/NewCondition" : "https://schema.org/UsedCondition",
+      "availability": product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      "seller": {
+        "@type": "Organization",
+        "name": "Tech Beast Hubli"
+      }
+    },
+    "aggregateRating": reviews.length > 0 ? {
+      "@type": "AggregateRating",
+      "ratingValue": (reviews.reduce((acc, curr) => acc + curr.rating, 0) / reviews.length).toFixed(1),
+      "reviewCount": reviews.length
+    } : undefined
+  };
+
+  const handleBuyNow = () => {
+    if (!product || product.stock <= 0) return;
+    addToCart({
+      id: product.id,
+      title: product.title,
+      price: Number(product.price),
+      quantity: quantity,
+      image: product.imageUrls?.[0],
+      stock: product.stock
+    });
+    navigate('/checkout');
+  };
+
   return (
-    <div className="bg-white min-h-screen text-slate-800 font-sans pb-20">
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="bg-[#f8f9fa] min-h-screen text-slate-800 font-sans pb-20">
+      <SEO 
+        title={`${product.title} - Tech Beast Hubli`} 
+        description={product.description ? product.description.substring(0, 155) : `Buy ${product.title} - Premium Second Hand Laptops & Computer Repairs in Hubli`}
+        schema={productSchema}
+        ogImage={product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : undefined}
+      />
+      
+      {/* Breadcrumb - Optional */}
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-4 text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+        <a href="/" className="hover:text-blue-600 transition-colors">Home</a>
+        <span>/</span>
+        <a href="/products" className="hover:text-blue-600 transition-colors">{product.category}</a>
+        <span>/</span>
+        <span className="text-slate-800">{product.title}</span>
+      </div>
+
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pb-8">
 
         {/* Top Product Section */}
-        <div className="flex flex-col lg:flex-row gap-12">
+        <div className="flex flex-col lg:grid lg:grid-cols-[1fr_450px] gap-8 items-start">
+            
+          {/* 1. Image Gallery Card (Top Left) */}
+          <div className="order-1 lg:col-start-1 lg:row-start-1 bg-white rounded-3xl border border-slate-200 p-4 sm:p-8 shadow-sm relative w-full">
+              {isDiscounted && (
+                <div className="absolute top-8 left-8 bg-red-600 text-white text-xs font-bold px-4 py-1.5 rounded-full z-10 shadow-sm">
+                  SALE
+                </div>
+              )}
+              
+              {/* Main Image */}
+              <div className="w-full aspect-[4/3] sm:aspect-video bg-[#f8f9fa] rounded-2xl flex items-center justify-center relative mb-6 overflow-hidden">
+                <button className="absolute top-4 right-4 bg-white border border-slate-200 rounded-full p-2 text-slate-500 hover:text-blue-600 shadow-sm z-10 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" /></svg>
+                </button>
 
-          {/* Left Column - Images */}
-          <div className="w-full lg:w-[45%] flex gap-4 h-[500px]">
-            {/* Thumbnails */}
-            <div className="flex flex-col gap-3 overflow-y-auto custom-scrollbar pr-2 w-20">
-              {product.imageUrls && product.imageUrls.length > 0 ? (
-                product.imageUrls.map((url: string, index: number) => (
+                {product.imageUrls && product.imageUrls.length > 0 ? (
+                  <img
+                    src={product.imageUrls[mainImageIndex]}
+                    alt={product.title}
+                    className="w-full h-full object-contain p-8 mix-blend-multiply transition-opacity duration-300"
+                  />
+                ) : (
+                  <div className="w-4/5 h-4/5 flex flex-col items-center justify-center relative opacity-50">
+                     <span className="text-slate-400 font-bold text-2xl z-10">No Image Available</span>
+                  </div>
+                )}
+              </div>
+              
+              {/* Thumbnails Row */}
+              <div className="flex gap-4 overflow-x-auto custom-scrollbar pb-2">
+                {product.imageUrls && product.imageUrls.length > 0 && product.imageUrls.map((url: string, index: number) => (
                   <div
                     key={index}
                     onClick={() => setMainImageIndex(index)}
-                    className={`w-full aspect-square border ${mainImageIndex === index ? 'border-blue-600' : 'border-slate-200'} rounded-sm flex items-center justify-center cursor-pointer hover:border-blue-400 transition-colors bg-white relative overflow-hidden`}
+                    className={`shrink-0 w-20 sm:w-24 aspect-square border-2 ${mainImageIndex === index ? 'border-red-500' : 'border-slate-100'} rounded-xl flex items-center justify-center cursor-pointer hover:border-red-400 transition-colors bg-white overflow-hidden p-2`}
                   >
-                    <img src={url} alt={`Thumbnail ${index + 1}`} className="w-full h-full object-cover" />
+                    <img src={url} alt={`Thumbnail ${index + 1}`} className="w-full h-full object-contain mix-blend-multiply" />
                   </div>
-                ))
-              ) : (
-                [1, 2, 3, 4].map((i) => (
-                  <div key={i} className={`w-full aspect-square border ${i === 1 ? 'border-blue-600' : 'border-slate-200'} rounded-sm flex items-center justify-center cursor-pointer hover:border-blue-400 transition-colors bg-slate-50 relative`}>
-                    <div className="w-3/4 h-3/4 bg-slate-800 rounded-sm flex items-center justify-center border border-slate-900">
-                      <span className="text-[8px] text-white/30">IMG {i}</span>
-                    </div>
-                  </div>
-                ))
-              )}
+                ))}
+              </div>
             </div>
 
-            {/* Main Image */}
-            <div className="flex-1 border border-slate-200 rounded-sm relative bg-white flex items-center justify-center group overflow-hidden">
-              <button className="absolute top-4 right-4 bg-white border border-slate-200 rounded-full p-2 text-slate-500 hover:text-blue-600 shadow-sm z-10 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" /></svg>
-              </button>
 
-              {product.imageUrls && product.imageUrls.length > 0 ? (
-                <img
-                  src={product.imageUrls[mainImageIndex]}
-                  alt={product.title}
-                  className="w-full h-full object-contain p-4"
-                />
-              ) : (
-                <div className="w-4/5 h-4/5 flex flex-col items-center justify-center relative">
-                  <div className="w-full h-full bg-slate-900 rounded-t-lg border-8 border-black relative overflow-hidden flex items-center justify-center shadow-2xl">
-                    <div className="absolute inset-0 bg-gradient-to-r from-red-500/20 via-orange-500/20 to-yellow-500/20"></div>
-                    <div className="absolute inset-0 flex items-center justify-center opacity-30">
-                      <div className="w-1/2 h-1/2 border-2 border-red-500 transform rotate-45"></div>
+
+          {/* 3. Information Tabs Card (Bottom Left) */}
+          <div className="order-3 lg:col-start-1 lg:row-start-2 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden w-full">
+              <div className="flex border-b border-slate-100 px-6 sm:px-8 bg-slate-50/50">
+                <nav className="flex space-x-6 sm:space-x-10 overflow-x-auto custom-scrollbar">
+                  <button
+                    onClick={() => setActiveTab('specs')}
+                    className={`py-5 text-[11px] font-bold uppercase tracking-widest transition-colors border-b-2 whitespace-nowrap ${activeTab === 'specs'
+                      ? 'border-red-600 text-red-600'
+                      : 'border-transparent text-slate-500 hover:text-slate-800'
+                      }`}
+                  >
+                    Overview
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('shipping')}
+                    className={`py-5 text-[11px] font-bold uppercase tracking-widest transition-colors border-b-2 whitespace-nowrap ${activeTab === 'shipping' 
+                      ? 'border-red-600 text-red-600' 
+                      : 'border-transparent text-slate-500 hover:text-slate-800'
+                      }`}
+                  >
+                    Specs & Shipping
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('faqs')}
+                    className={`py-5 text-[11px] font-bold uppercase tracking-widest transition-colors border-b-2 whitespace-nowrap flex items-center gap-2 ${activeTab === 'faqs' 
+                      ? 'border-red-600 text-red-600' 
+                      : 'border-transparent text-slate-500 hover:text-slate-800'
+                      }`}
+                  >
+                    Q&A <span className="bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-full text-[9px]">4</span>
+                  </button>
+                </nav>
+              </div>
+
+              <div className="p-6 sm:p-8">
+                {activeTab === 'specs' && (
+                  <div className="prose prose-sm prose-slate max-w-none text-slate-600 text-[13px] leading-relaxed">
+                    <h4 className="font-bold text-slate-900 text-xs uppercase tracking-widest mb-4">Product Details</h4>
+                    <ul className="list-disc pl-4 space-y-2 marker:text-slate-300">
+                       <li>Premium Build Quality</li>
+                       <li>High Performance Components</li>
+                       <li>Tested by TechBeast Certified Technicians</li>
+                       <li>Secure Packaging & Dispatch</li>
+                    </ul>
+                    
+                    <h4 className="font-bold text-slate-900 text-xs uppercase tracking-widest mt-8 mb-4">Specifications</h4>
+                    <div className="flex flex-col gap-1.5">
+                      {Object.entries(specs).map(([key, value]) => (
+                        value !== 'Not Specified' && (
+                          <div key={key} className="flex border-b border-slate-50 pb-1">
+                            <div className="w-[140px] text-xs font-semibold text-slate-500">{key}</div>
+                            <div className="flex-1 text-xs text-slate-800">{value}</div>
+                          </div>
+                        )
+                      ))}
                     </div>
-                    <span className="text-white/40 font-bold text-4xl z-10">MSI</span>
-                  </div>
-                  <div className="w-[110%] h-4 bg-slate-800 rounded-b-2xl shadow-xl border-t border-slate-600 relative overflow-hidden">
-                    <div className="absolute top-0 w-full h-[1px] bg-gradient-to-r from-red-500 via-green-500 to-blue-500"></div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
 
-          {/* Right Column - Product Info */}
-          <div className="flex-1 w-full lg:w-[55%]">
-            <div className="mb-4">
-              <span className={`inline-block px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full mb-3 shadow-sm ${product.condition === 'New'
-                ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                : 'bg-amber-100 text-amber-700 border border-amber-200'
-                }`}>
-                {product.condition === 'New' ? 'Condition: Brand New' : 'Condition: Second Hand / Used'}
-              </span>
-              <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2 leading-tight">
+                    {product.rawSpecifications && (
+                      <div className="mt-8">
+                        <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                          {product.rawSpecifications.split('\n').filter(line => line.trim()).map((line: string, idx: number) => {
+                            const isEven = idx % 2 === 0;
+                            const formattedLine = line.trim().replace(/^-/, '').trim();
+                            
+                            if (formattedLine.includes(':')) {
+                              const [key, ...rest] = formattedLine.split(':');
+                              const value = rest.join(':').trim();
+                              
+                              return (
+                                <div key={idx} className={`flex flex-col sm:flex-row px-5 py-3.5 ${isEven ? 'bg-[#f8f9fa]' : 'bg-white'}`}>
+                                  <div className="w-full sm:w-[200px] shrink-0 text-[13px] font-semibold text-slate-600">{key.trim()}</div>
+                                  <div className="w-full sm:flex-1 text-[13px] text-slate-800 mt-1 sm:mt-0">{value}</div>
+                                </div>
+                              );
+                            }
+                            
+                            return (
+                              <div key={idx} className={`px-5 py-3.5 ${isEven ? 'bg-[#f8f9fa]' : 'bg-white'}`}>
+                                <div className="text-[13px] font-bold text-slate-800 uppercase tracking-widest">{formattedLine}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === 'shipping' && (
+                  <div className="prose prose-sm text-slate-600 text-[13px] leading-relaxed">
+                    <h4 className="font-bold text-slate-900 text-xs uppercase tracking-widest mb-4">In-Store Pickup</h4>
+                    <p className="mb-6">Available immediately during store hours for items in stock. Reserve online and pay at the store.</p>
+
+                    <h4 className="font-bold text-slate-900 text-xs uppercase tracking-widest mb-4">Return Policy</h4>
+                    <p>Used items come with a 7-day return window if the device is defective. The item must be returned in the exact condition it was purchased with all included accessories.</p>
+                  </div>
+                )}
+
+
+
+                {activeTab === 'faqs' && (
+                  <div>
+                    <div className="space-y-4">
+                      <div className="bg-[#f8f9fa] rounded-2xl p-5 border border-slate-100">
+                        <p className="font-bold text-slate-800 text-sm mb-2 flex items-start gap-2">
+                          <span className="text-red-500 font-black">Q:</span> Does this product come with a warranty?
+                        </p>
+                        <p className="text-[13px] text-slate-600 ml-6 leading-relaxed">
+                          Yes, all our refurbished products come with a minimum warranty covering hardware defects. New products have 1 year warranty.
+                        </p>
+                      </div>
+                      <div className="bg-[#f8f9fa] rounded-2xl p-5 border border-slate-100">
+                        <p className="font-bold text-slate-800 text-sm mb-2 flex items-start gap-2">
+                          <span className="text-red-500 font-black">Q:</span> What condition is this device in?
+                        </p>
+                        <p className="text-[13px] text-slate-600 ml-6 leading-relaxed">
+                          Our products are fully tested and professionally refurbished. The specific cosmetic condition is listed in the product specifications above.
+                        </p>
+                      </div>
+                      <div className="bg-[#f8f9fa] rounded-2xl p-5 border border-slate-100">
+                        <p className="font-bold text-slate-800 text-sm mb-2 flex items-start gap-2">
+                          <span className="text-red-500 font-black">Q:</span> Can I return the product if I don't like it?
+                        </p>
+                        <p className="text-[13px] text-slate-600 ml-6 leading-relaxed">
+                          We offer a 7-day return policy for defective devices. Please refer to our Shipping & Return tab for more detailed information.
+                        </p>
+                      </div>
+                      <div className="bg-[#f8f9fa] rounded-2xl p-5 border border-slate-100">
+                        <p className="font-bold text-slate-800 text-sm mb-2 flex items-start gap-2">
+                          <span className="text-red-500 font-black">Q:</span> Do you offer EMI options?
+                        </p>
+                        <p className="text-[13px] text-slate-600 ml-6 leading-relaxed">
+                          Yes, we support EMI options on most major credit cards. You can see the full EMI details at the checkout page.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          {/* 2. Right Column - Product Info (Middle on mobile, Right on Desktop) */}
+          <div className="order-2 lg:col-start-2 lg:row-start-1 lg:row-span-2 flex flex-col gap-6 w-full">
+            
+            {/* Header Card */}
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm relative">
+              <div className="flex items-center justify-between mb-4">
+                <span className={`inline-block px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-sm shadow-sm ${product.condition === 'New'
+                  ? 'bg-red-500 text-white'
+                  : 'bg-amber-500 text-white'
+                  }`}>
+                  {product.category || 'Product'} {product.componentType && `(${product.componentType})`}
+                </span>
+                <button className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors uppercase tracking-widest">
+                  <Share2 className="h-4 w-4" /> Share
+                </button>
+              </div>
+              
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-2 leading-tight tracking-tight">
                 {product.title}
               </h1>
-
-              {/* Rating */}
-              <div className="flex items-center gap-2 mb-4">
-                <div className="flex text-blue-800">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Star key={i} className={`h-3 w-3 ${i <= 4 ? 'fill-current' : 'fill-slate-200 text-slate-200'}`} />
-                  ))}
-                </div>
-                <span className="text-xs text-slate-500">2 reviews</span>
+              
+              <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">
+                SKU: {product.sku || 'N/A'}
               </div>
 
+
+            </div>
+
+            {/* Pricing & Actions Card */}
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm flex flex-col gap-6">
+              
               {/* Pricing */}
-              <div className="flex items-baseline gap-3 mb-1">
-                <span className="text-2xl font-semibold text-blue-700">₹ {Number(product.price).toLocaleString('en-IN')}</span>
-                {product.oldPrice && (
-                  <span className="text-sm text-slate-400 line-through">₹ {Number(product.oldPrice).toLocaleString('en-IN')}</span>
-                )}
-              </div>
-              {isDiscounted && (
-                <div className="text-xs text-emerald-500 mb-4">
-                  Discount: ₹ {discountAmount.toLocaleString('en-IN')} ({discountPercent}%)
+              <div>
+                <div className="flex items-baseline gap-3 mb-1">
+                  <span className="text-3xl font-extrabold text-slate-900">₹{Number(product.price).toLocaleString('en-IN')}</span>
+                  {product.oldPrice && (
+                    <span className="text-sm font-bold text-slate-400 line-through">₹{Number(product.oldPrice).toLocaleString('en-IN')}</span>
+                  )}
+                  {isDiscounted && (
+                    <span className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-1 rounded-sm ml-2 tracking-widest uppercase">
+                      Save Extra
+                    </span>
+                  )}
                 </div>
-              )}
-
-              {/* View Count */}
-              <div className="flex items-center gap-2 text-xs text-slate-600 mb-6">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-900"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
-                <span className="font-semibold text-slate-800">20</span> people are viewing this right now
               </div>
 
-              {/* Call Banner - Dynamic from Settings */}
-              {settings.supportPhone && (
-                <div className="bg-[#f0f7ff] border-l-2 border-blue-500 p-3 mb-6 text-sm text-slate-600 flex items-center">
-                  Call <a href={`tel:${settings.supportPhone}`} className="text-blue-600 font-semibold mx-1 underline">{settings.supportPhone}</a> for more details and quick response.
+              {/* Stock Status & Availability */}
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Availability</div>
+                <div className={`text-xs font-bold flex items-center gap-1.5 ${product.stock > 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                  <div className={`w-2 h-2 rounded-full ${product.stock > 0 ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                  {product.stock > 0 ? 'IN STOCK' : 'OUT OF STOCK'}
                 </div>
-              )}
+              </div>
+
+              {/* Add to Cart Actions */}
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <div className={`flex items-center border-2 border-slate-200 rounded-xl bg-white px-4 py-3 sm:py-3.5 w-full sm:w-32 justify-between ${product.stock <= 0 ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="text-slate-500 hover:text-black font-bold focus:outline-none">-</button>
+                  <span className="text-sm font-bold text-slate-800">{quantity.toString().padStart(2, '0')}</span>
+                  <button onClick={() => setQuantity(Math.min(product.stock, quantity + 1))} className="text-slate-500 hover:text-black font-bold focus:outline-none">+</button>
+                </div>
+                <button
+                  onClick={() => addToCart({
+                    id: product.id,
+                    title: product.title,
+                    price: Number(product.price),
+                    quantity: quantity,
+                    image: product.imageUrls?.[0],
+                    stock: product.stock
+                  })}
+                  disabled={product.stock <= 0}
+                  className={`flex-1 w-full text-slate-900 border-2 border-slate-900 text-sm font-bold py-3 sm:py-3.5 px-6 rounded-xl transition-colors flex items-center justify-center uppercase tracking-widest ${product.stock > 0 ? 'hover:bg-slate-50' : 'bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed'}`}
+                >
+                  {product.stock > 0 ? 'Add to cart' : 'Out of stock'}
+                </button>
+              </div>
+              <button
+                onClick={handleBuyNow}
+                disabled={product.stock <= 0}
+                className={`w-full text-white text-sm font-bold py-3.5 px-6 rounded-xl transition-colors flex items-center justify-center uppercase tracking-widest ${product.stock > 0 ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-400 cursor-not-allowed hidden'}`}
+              >
+                Buy it Now
+              </button>
 
               {/* Warranty Links */}
-              <div className="space-y-2 mb-6">
-                <div className="text-xs text-slate-600">
-                  Warranty : {product.condition === 'New'
-                    ? <span className="font-semibold text-slate-800">{product.brandWarranty || 'Standard Brand Warranty'} by {product.brand || 'Brand'} Service Center + 1-Year TechBeast Software Support</span>
-                    : <span className="font-semibold text-slate-800">{settings.warrantyText || '3 Months TechBeast Certified Warranty'}</span>
-                  } <button onClick={() => setIsWarrantyModalOpen(true)} className="text-blue-600 font-bold hover:underline bg-transparent border-none p-0 cursor-pointer ml-1">Know More</button>
-                </div>
-                <div className="text-xs text-slate-600">
-                  Nearest Service Center : <a href="#" className="text-blue-600 hover:underline">Find Here</a>
+              <div className="space-y-3 pt-4 border-t border-slate-100">
+                <div className="text-xs font-medium text-slate-600 flex flex-col gap-1">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Warranty Protection</span>
+                  <span>
+                    {product.condition === 'New'
+                      ? <span className="font-bold text-slate-800">
+                          {product.brandWarranty || '1 Year'} by {product.brand || 'Brand'} Service Center
+                          {isFullSystem && ' + 1-Year TechBeast Software Support'}
+                        </span>
+                      : <span className="font-bold text-slate-800">{settings.warrantyText || '3 Months TechBeast Certified Warranty'}</span>
+                    } 
+                    <button onClick={() => setIsWarrantyModalOpen(true)} className="text-blue-600 font-bold hover:underline bg-transparent border-none p-0 cursor-pointer ml-1">Know More</button>
+                  </span>
                 </div>
                 {product.condition !== 'New' && (
-                  <div className="text-xs text-slate-600">
-                    Extended Warranty – <a href="#" className="text-blue-600 hover:underline">Secure It Now</a>
+                  <div className="text-xs font-medium text-slate-600">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1">Upgrade Options</span>
+                    Extended Warranty – <button onClick={() => setIsWarrantyModalOpen(true)} className="text-blue-600 font-bold hover:underline">Secure It Now</button>
                   </div>
                 )}
+                <div className="text-xs font-medium text-slate-600 pt-2">
+                  Nearest Service Center : <a href="#" className="text-blue-600 font-bold hover:underline">Find Here</a>
+                </div>
               </div>
 
               {/* Free Accessories Highlight */}
@@ -257,14 +553,14 @@ export default function ProductDetail() {
                 if (allAccessories.length === 0) return null;
 
                 return (
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-6 relative overflow-hidden shadow-sm">
+                  <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 relative overflow-hidden shadow-sm mt-2">
                     <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-100 rounded-bl-full -z-0 opacity-50"></div>
                     <div className="relative z-10">
                       <div className="flex items-center gap-2 mb-3">
-                        <div className="bg-emerald-500 text-white p-1.5 rounded-full shadow-sm">
-                          <Gift className="w-4 h-4" />
+                        <div className="bg-emerald-500 text-white p-1 rounded-full shadow-sm">
+                          <Gift className="w-3 h-3" />
                         </div>
-                        <h3 className="font-bold text-emerald-800 text-sm tracking-wide">FREE ACCESSORIES INCLUDED!</h3>
+                        <h3 className="font-bold text-emerald-800 text-[10px] uppercase tracking-widest">FREE ACCESSORIES INCLUDED!</h3>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {allAccessories.map((accessory: string, idx: number) => {
@@ -273,10 +569,10 @@ export default function ProductDetail() {
                             <span
                               key={idx}
                               onClick={() => hasImage && setSelectedAccessoryImage(accessoryImages[accessory])}
-                              className={`bg-white border border-emerald-200 text-emerald-700 text-[10px] font-bold px-3 py-1.5 rounded-full shadow-sm flex items-center gap-1.5 uppercase tracking-wider ${hasImage ? 'cursor-pointer hover:bg-emerald-50 transition-colors' : ''}`}
+                              className={`bg-white border border-emerald-200 text-emerald-700 text-[9px] font-bold px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1 uppercase tracking-widest ${hasImage ? 'cursor-pointer hover:bg-emerald-50 transition-colors' : ''}`}
                               title={hasImage ? "Click to view image" : ""}
                             >
-                              <Check className="w-3 h-3 stroke-[3]" />
+                              <Check className="w-2.5 h-2.5 stroke-[3]" />
                               {accessory}
                             </span>
                           );
@@ -286,273 +582,18 @@ export default function ProductDetail() {
                   </div>
                 );
               })()}
-
-              {/* Bank Offer Banner - Dynamic from Settings */}
-              {settings.bankOfferText && (
-                <div className="border border-blue-900 rounded-sm p-4 mb-6 relative">
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white px-2">
-                    <div className="flex items-center gap-2">
-                      <div className="bg-blue-900 text-white text-xs font-bold px-2 py-0.5 rounded-sm">BANK OFFER</div>
-                    </div>
-                  </div>
-                  <div className="text-center text-sm text-blue-900 font-bold mt-2">
-                    {settings.bankOfferText}
-                  </div>
-                  <div className="text-[8px] text-right text-red-600 mt-2">T & C Apply*</div>
-                </div>
-              )}
-
-              {/* Stock Progress */}
-              <div className="mb-6">
-                {product.stock > 0 ? (
-                  <>
-                    <div className="text-xs text-slate-600 mb-2">Hurry Up! Only <span className="text-red-500 font-semibold">Few</span> Left in Stock!</div>
-                    <div className="w-full h-1 bg-slate-200 rounded-full overflow-hidden">
-                      <div className="w-[15%] h-full bg-red-600 rounded-full"></div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-sm font-bold text-red-600 mb-2">Out of stock</div>
-                )}
-              </div>
-
-              {/* Add to Cart Actions */}
-              <div className="flex items-center gap-4 mb-6 border-b border-slate-200 pb-6">
-                <div className={`flex items-center border border-slate-300 rounded-full bg-white px-4 py-2 w-28 justify-between ${product.stock <= 0 ? 'opacity-50 pointer-events-none' : ''}`}>
-                  <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="text-slate-500 hover:text-black focus:outline-none">-</button>
-                  <span className="text-sm font-semibold text-slate-800">{quantity.toString().padStart(2, '0')}</span>
-                  <button onClick={() => setQuantity(Math.min(product.stock, quantity + 1))} className="text-slate-500 hover:text-black focus:outline-none">+</button>
-                </div>
-                <button
-                  onClick={() => addToCart({
-                    id: product.id,
-                    title: product.title,
-                    price: Number(product.price),
-                    quantity: quantity,
-                    image: product.imageUrls?.[0],
-                    stock: product.stock
-                  })}
-                  disabled={product.stock <= 0}
-                  className={`flex-1 text-white text-sm font-bold py-3 px-6 rounded-full transition-colors flex items-center justify-center uppercase tracking-wider ${product.stock > 0 ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-400 cursor-not-allowed'}`}
-                >
-                  {product.stock > 0 ? 'Add to cart' : 'Out of stock'}
-                </button>
-              </div>
-
-              {/* Secondary Actions */}
-              <div className="flex items-center justify-between text-xs text-slate-500 mb-8 font-semibold">
-                <div className="flex items-center gap-6">
-                  <button className="flex items-center gap-1.5 hover:text-blue-600">
-                    <Heart className="h-4 w-4" /> ADD WISHLIST
-                  </button>
-                  <button className="flex items-center gap-1.5 hover:text-blue-600">
-                    <RotateCcw className="h-4 w-4" /> ADD COMPARE
-                  </button>
-                </div>
-                <button className="flex items-center gap-1.5 hover:text-blue-600">
-                  <Share2 className="h-4 w-4" /> Share
-                </button>
-              </div>
-
-              {/* Dispatch & Meta */}
-              <div className="border-t border-slate-200 pt-6 space-y-3">
-                {settings.estimatedDispatch && (
-                  <div className="flex items-center gap-2 text-sm text-slate-700">
-                    <Truck className="h-4 w-4 text-slate-500" />
-                    Estimated Dispatch: <span className="font-semibold text-slate-900">{settings.estimatedDispatch}</span>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-[120px_1fr] gap-2 text-xs pt-4">
-                  <div className="text-slate-500">Availability:</div>
-                  <div className={`${product.stock > 0 ? 'text-emerald-500' : 'text-red-500'} font-semibold`}>
-                    {product.stock > 0 ? 'In Stock' : 'Out of Stock'}
-                  </div>
-
-                  <div className="text-slate-500">SKU:</div>
-                  <div className="text-slate-700">{product.sku || 'N/A'}</div>
-
-                  <div className="text-slate-500">Vendor:</div>
-                  <div className="text-slate-700">{product.brand || 'TechBeast'}</div>
-
-                  <div className="text-slate-500">Model Number:</div>
-                  <div className="text-slate-700">{product.modelNumber || 'N/A'}</div>
-                </div>
-              </div>
-
-              {/* Payment Icons Mock */}
-              <div className="flex items-center justify-end gap-2 mt-8 opacity-70">
-                <div className="h-6 w-10 bg-blue-800 rounded-sm text-[8px] text-white flex items-center justify-center font-bold">VISA</div>
-                <div className="h-6 w-10 bg-sky-500 rounded-sm text-[8px] text-white flex items-center justify-center font-bold">AMEX</div>
-                <div className="h-6 w-10 bg-black rounded-sm text-[8px] text-white flex items-center justify-center font-bold">Pay</div>
-                <div className="h-6 w-10 bg-orange-500 rounded-sm text-[8px] text-white flex items-center justify-center font-bold">DISC</div>
-              </div>
-
             </div>
+            
           </div>
         </div>
-
-        {/* Tabs Section */}
-        <div className="mt-16">
-          <div className="flex justify-center border-b border-slate-200">
-              <nav className="flex space-x-12">
-                <button
-                  onClick={() => setActiveTab('specs')}
-                  className={`py-4 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 ${activeTab === 'specs'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                    }`}
-                >
-                  Description
-                </button>
-                <button
-                  onClick={() => setActiveTab('shipping')}
-                  className={`py-4 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 ${activeTab === 'shipping' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'
-                    }`}
-                >
-                  Shipping & Return
-                </button>
-                <button
-                  onClick={() => setActiveTab('reviews')}
-                  className={`py-4 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 ${activeTab === 'reviews' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'
-                    }`}
-                >
-                  Reviews ({reviews.length})
-                </button>
-                <button
-                  onClick={() => setActiveTab('faqs')}
-                  className={`py-4 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 ${activeTab === 'faqs' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'
-                    }`}
-                >
-                  FAQs
-                </button>
-              </nav>
-            </div>
-
-            <div className="py-12">
-              {activeTab === 'specs' && (
-                <div className="max-w-4xl mx-auto">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest mb-6">Additional Information</h3>
-
-                  <div className="flex flex-col gap-2">
-                    {Object.entries(specs).map(([key, value]) => (
-                      value !== 'Not Specified' && (
-                        <div key={key} className="flex bg-[#f8f9fa] rounded-[4px] p-3">
-                          <div className="w-[180px] text-xs font-semibold text-slate-600 pl-2">{key}</div>
-                          <div className="flex-1 text-xs text-slate-800">{value}</div>
-                        </div>
-                      )
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'shipping' && (
-                <div className="max-w-4xl mx-auto prose prose-sm text-slate-600">
-                  <h4 className="font-bold text-slate-900 text-xs uppercase tracking-widest mb-4">In-Store Pickup</h4>
-                  <p className="mb-8">Available immediately during store hours for items in stock. Reserve online and pay at the store.</p>
-
-                  <h4 className="font-bold text-slate-900 text-xs uppercase tracking-widest mb-4">Return Policy</h4>
-                  <p>Used items come with a 7-day return window if the device is defective. The item must be returned in the exact condition it was purchased with all included accessories.</p>
-                </div>
-              )}
-
-              {activeTab === 'reviews' && (
-                <div className="max-w-4xl mx-auto">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest mb-6">Customer Reviews</h3>
-                  <form onSubmit={handleReviewSubmit} className="mb-10 bg-slate-50 p-6 rounded-lg border border-slate-200">
-                    <h4 className="font-bold text-slate-800 mb-4">Write a Review</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <input required type="text" placeholder="Your Name" value={reviewForm.name} onChange={e => setReviewForm({ ...reviewForm, name: e.target.value })} className="w-full bg-white border border-slate-200 rounded px-4 py-2 text-sm focus:outline-none focus:border-blue-500" />
-                      <select value={reviewForm.rating} onChange={e => setReviewForm({ ...reviewForm, rating: Number(e.target.value) })} className="w-full bg-white border border-slate-200 rounded px-4 py-2 text-sm focus:outline-none focus:border-blue-500">
-                        <option value={5}>5 Stars - Excellent</option>
-                        <option value={4}>4 Stars - Very Good</option>
-                        <option value={3}>3 Stars - Good</option>
-                        <option value={2}>2 Stars - Fair</option>
-                        <option value={1}>1 Star - Poor</option>
-                      </select>
-                    </div>
-                    <textarea required placeholder="Your Review" rows={4} value={reviewForm.comment} onChange={e => setReviewForm({ ...reviewForm, comment: e.target.value })} className="w-full bg-white border border-slate-200 rounded px-4 py-2 text-sm focus:outline-none focus:border-blue-500 mb-4"></textarea>
-                    <button type="submit" disabled={submittingReview} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded text-sm transition-colors">{submittingReview ? 'Submitting...' : 'Submit Review'}</button>
-                  </form>
-                  <div className="space-y-6">
-                    {reviews.length === 0 ? <p className="text-sm text-slate-500">No reviews yet. Be the first to review this product!</p> : reviews.map(review => (
-                      <div key={review.id} className="border-b border-slate-100 pb-6">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="flex text-blue-800">
-                            {[1, 2, 3, 4, 5].map(i => <Star key={i} className={`h-4 w-4 ${i <= review.rating ? 'fill-current' : 'fill-slate-200 text-slate-200'}`} />)}
-                          </div>
-                          <span className="font-bold text-slate-800 text-sm">{review.name}</span>
-                          <span className="text-xs text-slate-400">• {new Date(review.createdAt).toLocaleDateString()}</span>
-                        </div>
-                        <p className="text-sm text-slate-600">{review.comment}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'faqs' && (
-                <div className="max-w-4xl mx-auto">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest mb-6">Frequently Asked Questions</h3>
-                  <div className="space-y-4">
-                    <div className="bg-[#f8f9fa] rounded p-5 border border-slate-100">
-                      <p className="font-bold text-slate-800 text-sm mb-3 flex items-start gap-2">
-                        <span className="text-blue-600">Q:</span> Does this product come with a warranty?
-                      </p>
-                      <p className="text-sm text-slate-600 ml-6">
-                        <span className="font-bold text-slate-700 mr-2">A:</span>
-                        Yes, all our refurbished products come with a minimum 6-month warranty covering hardware defects.
-                      </p>
-                    </div>
-                    <div className="bg-[#f8f9fa] rounded p-5 border border-slate-100">
-                      <p className="font-bold text-slate-800 text-sm mb-3 flex items-start gap-2">
-                        <span className="text-blue-600">Q:</span> What condition is this device in?
-                      </p>
-                      <p className="text-sm text-slate-600 ml-6">
-                        <span className="font-bold text-slate-700 mr-2">A:</span>
-                        Our products are fully tested and professionally refurbished. The specific cosmetic condition is listed in the product specifications above.
-                      </p>
-                    </div>
-                    <div className="bg-[#f8f9fa] rounded p-5 border border-slate-100">
-                      <p className="font-bold text-slate-800 text-sm mb-3 flex items-start gap-2">
-                        <span className="text-blue-600">Q:</span> Can I return the product if I don't like it?
-                      </p>
-                      <p className="text-sm text-slate-600 ml-6">
-                        <span className="font-bold text-slate-700 mr-2">A:</span>
-                        We offer a 7-day return policy for defective devices. Please refer to our Shipping & Return tab for more detailed information.
-                      </p>
-                    </div>
-                    <div className="bg-[#f8f9fa] rounded p-5 border border-slate-100">
-                      <p className="font-bold text-slate-800 text-sm mb-3 flex items-start gap-2">
-                        <span className="text-blue-600">Q:</span> Do you offer EMI options?
-                      </p>
-                      <p className="text-sm text-slate-600 ml-6">
-                        <span className="font-bold text-slate-700 mr-2">A:</span>
-                        Yes, we support EMI options on most major credit cards. You can see the full EMI details at the checkout page.
-                      </p>
-                    </div>
-                    <div className="bg-[#f8f9fa] rounded p-5 border border-slate-100">
-                      <p className="font-bold text-slate-800 text-sm mb-3 flex items-start gap-2">
-                        <span className="text-blue-600">Q:</span> Is the original charger included?
-                      </p>
-                      <p className="text-sm text-slate-600 ml-6">
-                        <span className="font-bold text-slate-700 mr-2">A:</span>
-                        Yes, a compatible or original power adapter is included with all laptop and smartphone purchases.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+      </div>
 
         <WarrantyModal
           isOpen={isWarrantyModalOpen}
           onClose={() => setIsWarrantyModalOpen(false)}
           isNew={product?.condition === 'New'}
           brandWarranty={product?.brandWarranty}
+          isDesktopPart={!isFullSystem}
         />
 
         {/* Accessory Image Modal */}

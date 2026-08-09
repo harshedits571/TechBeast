@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import CustomerLayout from './components/layouts/CustomerLayout';
 import AdminLayout from './components/layouts/AdminLayout';
 import Home from './pages/customer/Home';
@@ -11,6 +12,7 @@ import ProductList from './pages/customer/ProductList';
 import ProductDetail from './pages/customer/ProductDetail';
 import Checkout from './pages/customer/Checkout';
 import CheckoutSuccess from './pages/customer/CheckoutSuccess';
+import Services from './pages/customer/Services';
 import LegalPage from './pages/customer/LegalPage';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminProductsList from './pages/admin/ProductsList';
@@ -32,15 +34,27 @@ import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Login from './pages/admin/Login';
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <SettingsProvider>
         <BrowserRouter>
+          <ScrollToTop />
           <Routes>
             {/* Customer Routes */}
           <Route path="/" element={<CustomerLayout />}>
             <Route index element={<Home />} />
+            <Route path="services" element={<Services />} />
             <Route path="products" element={<ProductList />} />
             <Route path="products/:id" element={<ProductDetail />} />
             <Route path="checkout" element={<Checkout />} />

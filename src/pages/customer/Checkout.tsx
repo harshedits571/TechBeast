@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useCart } from '../../contexts/CartContext';
 import { db } from '../../lib/firebase';
-import { collection, addDoc, updateDoc, doc, increment, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, increment, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
 import { ShoppingBag, MapPin, CreditCard, AlertCircle, Loader2, User } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -39,7 +39,22 @@ export default function Checkout() {
 
     try {
       const now = new Date().toISOString();
-      const orderNumber = `ORD-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+      
+      let nextNum = 1001;
+      try {
+        const ordersSnap = await getDocs(query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(1)));
+        if (!ordersSnap.empty) {
+          const lastOrder = ordersSnap.docs[0].data();
+          if (lastOrder.orderNumber && lastOrder.orderNumber.startsWith('ORD-')) {
+            const numPart = parseInt(lastOrder.orderNumber.replace('ORD-', ''), 10);
+            if (!isNaN(numPart)) nextNum = numPart + 1;
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch last order for sequential ID, using fallback", err);
+        nextNum = Math.floor(Math.random() * 900000) + 100000;
+      }
+      const orderNumber = `ORD-${nextNum}`;
 
       // 1. Create Order
       const orderData = {
@@ -47,7 +62,15 @@ export default function Checkout() {
         customerName: formData.name,
         customerPhone: formData.phone,
         customerEmail: formData.email,
-        shippingAddress: `${formData.address}, ${formData.city} - ${formData.pincode}`,
+        shippingAddress: {
+          firstName: formData.name.split(' ')[0] || formData.name,
+          lastName: formData.name.split(' ').slice(1).join(' ') || '',
+          address: formData.address,
+          city: formData.city,
+          state: '',
+          zipCode: formData.pincode,
+          apartment: ''
+        },
         totalAmount: totalPrice,
         paymentStatus: formData.paymentMethod === 'COD' ? 'PENDING' : 'PAID',
         fulfillmentStatus: 'UNFULFILLED',

@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, getDocs, addDoc, updateDoc, doc, query, where, increment, runTransaction, getDoc } from 'firebase/firestore';
-import { ShoppingBag, Printer, ArrowLeft, Package, User, CheckCircle2, Gift, ShieldCheck } from 'lucide-react';
+import { ShoppingBag, Printer, ArrowLeft, Package, User, CheckCircle2, Gift, ShieldCheck, Mail, Send, MessageCircle } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { FormSkeleton } from '../../components/ui/Skeleton';
 import { useAdmin } from '../../contexts/AdminContext';
+import { useSettings } from '../../contexts/SettingsContext';
+import SendEmailModal from '../../components/admin/SendEmailModal';
+import { shareInvoiceViaWhatsApp } from '../../utils/pdfGenerator';
 
 export default function OfflineSale() {
   const { id } = useParams<{ id: string }>();
@@ -14,7 +17,13 @@ export default function OfflineSale() {
   const [orderId, setOrderId] = useState('');
   const [invoiceDate, setInvoiceDate] = useState('');
 
+  const [showEmailConfirmPrompt, setShowEmailConfirmPrompt] = useState(false);
+  const [showSendEmailModal, setShowSendEmailModal] = useState(false);
+
   const { productsState, inventoryState, customersState } = useAdmin();
+  const { settings } = useSettings();
+  const accessoryCombos = settings?.accessoryCombos || [];
+
   const isLoading = productsState.loading || inventoryState.loading || customersState.loading;
 
   const products = productsState.data.filter((p: any) => p.stock > 0);
@@ -321,6 +330,9 @@ export default function OfflineSale() {
 
       setInvoiceDate(now);
       setInvoiceGenerated(true);
+      if (customerEmail && customerEmail.trim()) {
+        setShowEmailConfirmPrompt(true);
+      }
     } catch (error: any) {
       console.error("Error processing checkout:", error);
       alert(`Failed to process sale. ${error?.message || "Unknown error"}`);
@@ -329,8 +341,27 @@ export default function OfflineSale() {
     }
   };
 
+  const getCurrentItems = () => [
+    ...selectedProducts.map(p => ({ name: p.title, price: p.price, sku: p.sku, serialNumber: p.serialNumber, conditionNote: p.conditionNote, type: 'product' })),
+    ...selectedAccessoriesData.map(a => ({ name: a.name, price: 0, type: 'accessory' }))
+  ];
+
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleWhatsApp = async () => {
+    const orderObj = {
+      orderNumber: orderId,
+      customerName,
+      customerPhone,
+      customerEmail,
+      totalAmount: total,
+      paymentMethod,
+      items: getCurrentItems(),
+      createdAt: invoiceDate || new Date().toISOString()
+    };
+    await shareInvoiceViaWhatsApp(orderObj);
   };
 
   if (isLoading) {
@@ -340,12 +371,28 @@ export default function OfflineSale() {
   // --- INVOICE VIEW (PRINTABLE) ---
   if (invoiceGenerated) {
     return (
-      <div className="bg-white min-h-screen print:min-h-0 text-black p-8 max-w-4xl mx-auto shadow-2xl relative print:shadow-none print:p-0 print:m-0">
-        <div className="absolute top-8 right-8 print:hidden">
-          <button onClick={handlePrint} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-full font-bold flex items-center gap-2">
+      <div className="bg-white min-h-screen print:min-h-[95vh] print:flex print:flex-col text-black p-8 max-w-4xl mx-auto shadow-2xl relative print:shadow-none print:p-0 print:m-0">
+        
+        {/* Controls - Hidden on Print */}
+        <div className="absolute top-8 right-8 print:hidden flex items-center gap-2">
+          {customerEmail && (
+            <button 
+              onClick={() => setShowSendEmailModal(true)} 
+              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-full font-bold text-sm flex items-center gap-2 shadow-md transition-colors"
+            >
+              <Mail className="h-4 w-4" /> Email Invoice
+            </button>
+          )}
+          <button 
+            onClick={handleWhatsApp} 
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-full font-bold text-sm flex items-center gap-2 shadow-md transition-colors"
+          >
+            <MessageCircle className="h-4 w-4" /> WhatsApp
+          </button>
+          <button onClick={handlePrint} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-full font-bold text-sm flex items-center gap-2 shadow-md transition-colors">
             <Printer className="h-4 w-4" /> Print Invoice
           </button>
-          <button onClick={() => window.location.reload()} className="mt-4 block text-center text-sm text-blue-600 hover:underline w-full">
+          <button onClick={() => window.location.reload()} className="text-sm text-blue-600 hover:underline px-3 py-2">
             New Sale
           </button>
         </div>
@@ -361,7 +408,7 @@ export default function OfflineSale() {
             <p className="text-sm text-slate-500">+91-9248071734 |techbeasthubli@gmail.com</p>
           </div>
           <div className="text-right">
-            <h2 className="text-4xl font-bold text-slate-200 tracking-widest mb-4">Proforma Invoice</h2>
+            <h2 className="text-2xl print:text-xl font-bold text-slate-200 tracking-widest mb-4">Proforma Invoice</h2>
             <p className="text-sm font-bold text-slate-700">Invoice No: {orderId}</p>
             <p className="text-sm text-slate-500">Date: {new Date(invoiceDate).toLocaleDateString()}</p>
             <p className="text-sm font-bold text-emerald-600 mt-2 bg-emerald-50 inline-block px-2 py-1 rounded">Paid via {paymentMethod}</p>
@@ -442,7 +489,7 @@ export default function OfflineSale() {
           </div>
         </div>
 
-        <div className="mt-16 print:mt-4 border-t border-slate-200 pt-8 print:pt-4 flex flex-col md:flex-row print:flex-row justify-between items-end gap-8 print:gap-4">
+        <div className="mt-16 print:mt-auto border-t border-slate-200 pt-8 print:pt-4 flex flex-col md:flex-row print:flex-row justify-between items-end gap-8 print:gap-4">
           <div className="flex-1">
             <h4 className="text-sm print:text-xs font-bold text-slate-700 mb-2 print:mb-1 uppercase tracking-wider">Terms & Conditions</h4>
             <ul className="text-xs print:text-[9px] text-slate-500 list-disc pl-4 space-y-1 print:space-y-0 text-left">
@@ -460,6 +507,60 @@ export default function OfflineSale() {
             <p className="text-xs print:text-[10px] text-slate-500">Tech Beast</p>
           </div>
         </div>
+
+        {/* Automatic Confirmation Prompt when Customer Email exists */}
+        {showEmailConfirmPrompt && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:hidden">
+            <div className="bg-[#0d0d0e] border border-white/10 rounded-2xl w-full max-w-md p-6 text-white shadow-2xl space-y-5 animate-fade-in text-center">
+              <div className="w-14 h-14 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-full flex items-center justify-center mx-auto">
+                <Mail className="w-7 h-7" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Send Proforma Invoice via Email?</h3>
+                <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                  Customer email detected: <strong className="text-blue-400">{customerEmail}</strong>.<br />
+                  Would you like to send Proforma Invoice <strong>#{orderId}</strong> to this email?
+                </p>
+              </div>
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEmailConfirmPrompt(false)}
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-white/10 text-slate-300 hover:bg-white/5 font-bold text-sm transition-colors"
+                >
+                  No, Skip
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEmailConfirmPrompt(false);
+                    setShowSendEmailModal(true);
+                  }}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-lg shadow-blue-900/30 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Send className="w-4 h-4" /> Yes, Send Email
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Send Email Modal */}
+        {showSendEmailModal && (
+          <SendEmailModal
+            order={{
+              orderNumber: orderId,
+              customerName,
+              customerPhone,
+              customerEmail,
+              totalAmount: total,
+              paymentMethod,
+              items: getCurrentItems(),
+              createdAt: invoiceDate || new Date().toISOString()
+            }}
+            onClose={() => setShowSendEmailModal(false)}
+          />
+        )}
       </div>
     );
   }
@@ -643,6 +744,36 @@ export default function OfflineSale() {
             <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400 mb-6 flex items-center gap-2">
               <Gift className="h-4 w-4 text-amber-500" /> Included Free Accessories
             </h2>
+
+            {accessoryCombos.length > 0 && (
+              <div className="mb-6">
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Apply Accessory Combo</label>
+                <select 
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!val) return;
+                    const combo = accessoryCombos.find((c: any) => c.id === val);
+                    if (combo && combo.items) {
+                      const matchingIds = inventoryState.data
+                        .filter((invItem: any) => combo.items.includes(invItem.id) || combo.items.includes(invItem.name))
+                        .map((invItem: any) => invItem.id);
+
+                      setSelectedAccessories(prev => Array.from(new Set([...prev, ...matchingIds])));
+                    }
+                    e.target.value = "";
+                  }}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500 cursor-pointer"
+                >
+                  <option value="" className="bg-[#0d0d0e]">-- Select a Combo to apply --</option>
+                  {accessoryCombos.map((combo: any) => (
+                    <option key={combo.id} value={combo.id} className="bg-[#0d0d0e]">
+                      {combo.name} ({combo.items?.length || 0} items)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <p className="text-xs text-slate-500 mb-4">Select items to give for free. They will be deducted from inventory.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-64 overflow-y-auto custom-scrollbar pr-2">
               {inventory.map(item => (

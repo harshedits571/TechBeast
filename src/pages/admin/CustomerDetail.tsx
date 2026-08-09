@@ -23,50 +23,116 @@ export default function CustomerDetail() {
     }
   }, [id]);
 
-  const fetchCustomerData = async (customerId: string) => {
-    setLoading(true);
+  const safeFormatDate = (dateVal: any) => {
+    if (!dateVal) return '-';
     try {
-      // 1. Fetch Customer
-      const docRef = doc(db, 'customers', customerId);
+      let d: Date;
+      if (typeof dateVal === 'object' && dateVal.seconds) {
+        d = new Date(dateVal.seconds * 1000);
+      } else if (typeof dateVal === 'object' && typeof dateVal.toDate === 'function') {
+        d = dateVal.toDate();
+      } else {
+        d = new Date(dateVal);
+      }
+      if (isNaN(d.getTime())) return '-';
+      return format(d, 'MMM d, yyyy');
+    } catch (err) {
+      return '-';
+    }
+  };
+
+  const fetchCustomerData = async (rawId: string) => {
+    setLoading(true);
+    const targetId = decodeURIComponent(rawId || '').trim();
+
+    let custData: any = null;
+    let fetchedRepairs: any[] = [];
+    let fetchedOrders: any[] = [];
+
+    // 1. Try Direct Doc ID in 'customers'
+    try {
+      const docRef = doc(db, 'customers', targetId);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
-        const custData = { id: docSnap.id, ...docSnap.data() } as any;
-        setCustomer(custData);
-        
-        // 2. Fetch Repairs associated with this customer by Phone or Email
-        // If they have phone, search by phone
-        if (custData.phone) {
-          const repairsQuery = query(collection(db, 'repairs'), where('customerPhone', '==', custData.phone));
-          const repairsSnap = await getDocs(repairsQuery);
-          setRepairs(repairsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        } else if (custData.email) {
-          const repairsQuery = query(collection(db, 'repairs'), where('customerEmail', '==', custData.email));
-          const repairsSnap = await getDocs(repairsQuery);
-          setRepairs(repairsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        }
-
-        // 3. Fetch Orders
-        if (custData.phone) {
-          const ordersQuery = query(collection(db, 'orders'), where('customerPhone', '==', custData.phone));
-          const ordersSnap = await getDocs(ordersQuery);
-          setOrders(ordersSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        } else if (custData.email) {
-          const ordersQuery = query(collection(db, 'orders'), where('customerEmail', '==', custData.email));
-          const ordersSnap = await getDocs(ordersQuery);
-          setOrders(ordersSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        } else {
-          setOrders([]);
-        }
-        
-      } else {
-        alert('Customer not found');
-        navigate('/admin/customers');
+        custData = { id: docSnap.id, ...docSnap.data() };
       }
-    } catch (error) {
-      console.error("Error fetching CRM data:", error);
-    } finally {
-      setLoading(false);
+    } catch (e) {
+      console.log("Not a direct doc ID", e);
     }
+
+    // 2. Query 'customers' by Phone, Email, or Name
+    if (!custData) {
+      try {
+        const queries = [
+          query(collection(db, 'customers'), where('phone', '==', targetId)),
+          query(collection(db, 'customers'), where('email', '==', targetId)),
+          query(collection(db, 'customers'), where('name', '==', targetId))
+        ];
+
+        for (const q of queries) {
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            custData = { id: snap.docs[0].id, ...snap.docs[0].data() };
+            break;
+          }
+        }
+      } catch (e) {
+        console.log("Failed querying customers", e);
+      }
+    }
+
+    const searchPhone = custData?.phone || (targetId.match(/^[0-9+]{8,}$/) ? targetId : '');
+    const searchEmail = custData?.email || (targetId.includes('@') ? targetId : '');
+    const searchName = custData?.name || targetId;
+
+    // 3. Safely Fetch Repairs
+    try {
+      const repairsSnap = await getDocs(collection(db, 'repairs'));
+      fetchedRepairs = repairsSnap.docs
+        .map(d => ({ id: d.id, ...d.data() } as any))
+        .filter(r => 
+          (searchPhone && r.customerPhone === searchPhone) ||
+          (searchEmail && r.customerEmail?.toLowerCase() === searchEmail.toLowerCase()) ||
+          (searchName && r.customerName?.toLowerCase() === searchName.toLowerCase())
+        );
+    } catch (e) {
+      console.log("Error fetching repairs for CRM", e);
+    }
+
+    // 4. Safely Fetch Orders
+    try {
+      const ordersSnap = await getDocs(collection(db, 'orders'));
+      fetchedOrders = ordersSnap.docs
+        .map(d => ({ id: d.id, ...d.data() } as any))
+        .filter(o => 
+          (searchPhone && o.customerPhone === searchPhone) ||
+          (searchEmail && o.customerEmail?.toLowerCase() === searchEmail.toLowerCase()) ||
+          (searchName && o.customerName?.toLowerCase() === searchName.toLowerCase())
+        );
+    } catch (e) {
+      console.log("Error fetching orders for CRM", e);
+    }
+
+    // 5. Always ensure custData exists!
+    if (!custData) {
+      const firstOrder = fetchedOrders[0];
+      const firstRepair = fetchedRepairs[0];
+
+      custData = {
+        id: targetId,
+        name: searchName || firstOrder?.customerName || firstRepair?.customerName || 'Customer',
+        phone: searchPhone || firstOrder?.customerPhone || firstRepair?.customerPhone || '',
+        email: searchEmail || firstOrder?.customerEmail || firstRepair?.customerEmail || '',
+        address: firstOrder?.shippingAddress?.address || firstOrder?.customerAddress || '',
+        city: firstOrder?.shippingAddress?.city || '',
+        notes: []
+      };
+    }
+
+    setCustomer(custData);
+    setRepairs(fetchedRepairs);
+    setOrders(fetchedOrders);
+    setLoading(false);
   };
 
   const handleAddNote = async (e: React.FormEvent) => {
@@ -98,7 +164,17 @@ export default function CustomerDetail() {
     return <FormSkeleton />;
   }
 
-  if (!customer) return null;
+  if (!customer) {
+    return (
+      <div className="p-8 text-center text-white bg-[#0d0d0e] rounded-2xl border border-white/10 max-w-xl mx-auto mt-12 space-y-4">
+        <h2 className="text-xl font-bold">Customer Profile Not Found</h2>
+        <p className="text-sm text-slate-400">Could not find record for this customer.</p>
+        <button onClick={() => navigate('/admin/orders')} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl text-sm font-bold">
+          Back to Orders
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -251,7 +327,7 @@ export default function CustomerDetail() {
                     repairs.map(repair => (
                       <tr key={repair.id} onClick={() => navigate(`/admin/repairs/${repair.id}`)} className="border-t border-white/5 hover:bg-white/5 transition-colors cursor-pointer">
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="font-mono text-xs font-bold text-blue-400">REP-{repair.id.slice(0,4).toUpperCase()}</span>
+                          <span className="font-mono text-xs font-bold text-blue-400">{repair.ticketNumber || `REP-${repair.id.slice(0,4).toUpperCase()}`}</span>
                         </td>
                         <td className="px-6 py-4">
                           <div className="font-bold text-slate-200">{repair.deviceType} {repair.brand}</div>
@@ -270,7 +346,7 @@ export default function CustomerDetail() {
                           ₹{Number(repair.estimatedCost || 0).toLocaleString('en-IN')}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-xs text-slate-500">
-                          {repair.createdAt ? format(new Date(repair.createdAt), 'MMM d, yyyy') : '-'}
+                          {safeFormatDate(repair.createdAt)}
                         </td>
                       </tr>
                     ))
@@ -320,7 +396,7 @@ export default function CustomerDetail() {
                           <span className="px-2 py-1 text-[10px] font-bold rounded-md border bg-blue-500/10 text-blue-500 border-blue-500/20">{order.fulfillmentStatus || 'FULFILLED'}</span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-xs text-slate-500">
-                          {order.createdAt ? format(new Date(order.createdAt), 'MMM d, yyyy') : '-'}
+                          {safeFormatDate(order.createdAt)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
                           <button onClick={() => setSelectedInvoice(order)} className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors inline-block">
