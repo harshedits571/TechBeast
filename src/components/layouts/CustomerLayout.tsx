@@ -32,6 +32,14 @@ export default function CustomerLayout() {
             {/* Desktop Nav */}
             <nav className="hidden lg:flex items-center space-x-4 xl:space-x-8 text-xs font-bold uppercase tracking-wider">
               <Link to="/" className="text-slate-600 hover:text-red-600 transition-colors">Home</Link>
+              <Link to="/custom-pc" className="text-red-600 hover:text-red-700 transition-colors flex items-center gap-1">
+                <span>Custom PC</span>
+                <span className="bg-red-600 text-white text-[9px] px-1.5 py-0.5 rounded font-black tracking-normal uppercase">Build</span>
+              </Link>
+              <Link to="/prebuilt-pc" className="text-purple-700 hover:text-purple-800 transition-colors flex items-center gap-1">
+                <span>Prebuilt PCs</span>
+                <span className="bg-purple-700 text-white text-[9px] px-1.5 py-0.5 rounded font-black tracking-normal uppercase">Rigs</span>
+              </Link>
               <Link to="/products?category=Laptops" className="text-slate-600 hover:text-red-600 transition-colors">Laptops</Link>
               <Link to="/products?category=Desktops" className="text-slate-600 hover:text-red-600 transition-colors">Desktops</Link>
               <Link to="/products?category=Accessories" className="text-slate-600 hover:text-red-600 transition-colors">Accessories</Link>
@@ -161,8 +169,9 @@ export default function CustomerLayout() {
             </ul>
           </div>
           <div>
-            <h3 className="text-xs text-slate-900 font-bold uppercase tracking-widest mb-4">Legal</h3>
+            <h3 className="text-xs text-slate-900 font-bold uppercase tracking-widest mb-4">Legal & Links</h3>
             <ul className="space-y-3 text-sm">
+              <li><Link to="/sitemap" className="hover:text-purple-600 transition-colors font-bold text-purple-700">Site Map</Link></li>
               <li><Link to="/legal/privacy-policy" className="hover:text-blue-600 transition-colors">Privacy Policy</Link></li>
               <li><Link to="/legal/terms-and-conditions" className="hover:text-blue-600 transition-colors">Terms & Conditions</Link></li>
               <li><Link to="/legal/refund-policy" className="hover:text-blue-600 transition-colors">Refund & Return Policy</Link></li>

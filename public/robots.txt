@@ -1,4 +1,7 @@
 User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /admin/*
+Disallow: /checkout/success
 
-Sitemap: https://www.techbeasthubli.in/sitemap.xml
+Sitemap: https://techbeasthubli.com/sitemap.xml

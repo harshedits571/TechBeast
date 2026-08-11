@@ -196,6 +196,48 @@ export default function Home() {
         </section>
       )}
 
+      {/* CUSTOM PC BUILDER SHOWCASE BANNER */}
+      <section className="py-16 bg-slate-50 text-slate-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white border border-slate-200 rounded-3xl p-8 sm:p-12 relative overflow-hidden shadow-lg flex flex-col lg:flex-row items-center justify-between gap-8">
+            <div className="max-w-xl space-y-4 text-center lg:text-left z-10">
+              <span className="bg-red-50 text-red-700 border border-red-200 text-xs px-3 py-1 rounded-full font-bold uppercase tracking-widest inline-flex items-center gap-1.5">
+                <Cpu className="w-4 h-4 text-red-600" /> Live PC Configurator
+              </span>
+              <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 leading-tight">
+                Build Your Own Custom Gaming PC
+              </h2>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Choose Intel or AMD, select your processor, and our system automatically filters compatible motherboards, RAM, and power supplies in real-time!
+              </p>
+
+              <div className="pt-4 flex flex-wrap items-center justify-center lg:justify-start gap-4">
+                <Link 
+                  to="/custom-pc/builder?platform=intel" 
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all shadow-md shadow-blue-500/20"
+                >
+                  Configure Intel PC <ArrowRight className="w-4 h-4" />
+                </Link>
+                <Link 
+                  to="/custom-pc/builder?platform=amd" 
+                  className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all shadow-md shadow-red-500/20"
+                >
+                  Configure AMD PC <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            </div>
+
+            <div className="relative w-full max-w-sm aspect-[4/3] flex items-center justify-center">
+              <img 
+                src="https://images.unsplash.com/photo-1587202372775-e229f172b9d7?auto=format&fit=crop&w=600&q=80" 
+                alt="Custom PC Build"
+                className="w-full h-full object-contain rounded-2xl drop-shadow-md hover:scale-105 transition-transform duration-500"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* 4. BEST SELLERS */}
       {bestSellers.length > 0 && (
         <section className="py-16 bg-slate-50">

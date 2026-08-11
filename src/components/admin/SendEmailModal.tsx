@@ -57,7 +57,23 @@ export default function SendEmailModal({ order, onClose }: SendEmailModalProps) 
           })
         });
 
-        const resData = await response.json();
+        const contentType = response.headers.get('content-type') || '';
+        let resData: any = {};
+
+        if (contentType.includes('application/json')) {
+          resData = await response.json();
+        } else {
+          // If deployed on a static frontend host without serverless functions
+          pdf.save(filename);
+          const mailtoUrl = `mailto:${encodeURIComponent(customerEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
+          window.open(mailtoUrl, '_blank');
+
+          setStatusMsg({
+            type: 'info',
+            text: 'PDF invoice downloaded! Mail client opened. (Host is static frontend; for 1-click background sending deploy on Vercel/Netlify).'
+          });
+          return;
+        }
 
         if (response.ok && resData.success) {
           setStatusMsg({ type: 'success', text: `Email sent successfully directly from ${smtpEmail}! (Inbox Guaranteed)` });

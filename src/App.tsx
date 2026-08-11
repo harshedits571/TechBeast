@@ -13,7 +13,12 @@ import ProductDetail from './pages/customer/ProductDetail';
 import Checkout from './pages/customer/Checkout';
 import CheckoutSuccess from './pages/customer/CheckoutSuccess';
 import Services from './pages/customer/Services';
+import CustomPC from './pages/customer/CustomPC';
+import CustomPCBuilder from './pages/customer/CustomPCBuilder';
+import PrebuiltPCs from './pages/customer/PrebuiltPCs';
+import PrebuiltPCDetail from './pages/customer/PrebuiltPCDetail';
 import LegalPage from './pages/customer/LegalPage';
+import SitemapPage from './pages/customer/SitemapPage';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminProductsList from './pages/admin/ProductsList';
 import AdminRepairsList from './pages/admin/RepairsList';
@@ -27,6 +32,8 @@ import CustomerDetail from './pages/admin/CustomerDetail';
 import ProductForm from './pages/admin/ProductForm';
 import OrderList from './pages/admin/OrderList';
 import OrderDetail from './pages/admin/OrderDetail';
+import PrebuiltsList from './pages/admin/PrebuiltsList';
+import PrebuiltForm from './pages/admin/PrebuiltForm';
 import Settings from './pages/admin/Settings';
 import OfflineSale from './pages/admin/OfflineSale';
 import { SettingsProvider } from './contexts/SettingsContext';
@@ -55,11 +62,16 @@ export default function App() {
           <Route path="/" element={<CustomerLayout />}>
             <Route index element={<Home />} />
             <Route path="services" element={<Services />} />
+            <Route path="custom-pc" element={<CustomPC />} />
+            <Route path="custom-pc/builder" element={<CustomPCBuilder />} />
+            <Route path="prebuilt-pc" element={<PrebuiltPCs />} />
+            <Route path="prebuilt-pc/:id" element={<PrebuiltPCDetail />} />
             <Route path="products" element={<ProductList />} />
             <Route path="products/:id" element={<ProductDetail />} />
             <Route path="checkout" element={<Checkout />} />
             <Route path="checkout/success" element={<CheckoutSuccess />} />
             <Route path="legal/:policyId" element={<LegalPage />} />
+            <Route path="sitemap" element={<SitemapPage />} />
           </Route>
 
             {/* Admin Routes */}
@@ -73,6 +85,9 @@ export default function App() {
               <Route path="products" element={<AdminProductsList />} />
               <Route path="products/new" element={<ProductForm />} />
               <Route path="products/edit/:id" element={<ProductForm />} />
+              <Route path="prebuilt-pcs" element={<PrebuiltsList />} />
+              <Route path="prebuilt-pcs/new" element={<PrebuiltForm />} />
+              <Route path="prebuilt-pcs/edit/:id" element={<PrebuiltForm />} />
               <Route path="repairs" element={<AdminRepairsList />} />
               <Route path="repairs/new" element={<RepairForm />} />
               <Route path="repairs/:id" element={<RepairDetail />} />

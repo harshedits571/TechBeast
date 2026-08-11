@@ -12,7 +12,10 @@ export default function ProductsList() {
   const { data: products, loading, pageSize, setPageSize, currentPage, setCurrentPage, hasNextPage, setCursors } = productsState;
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+
+  const categories = ['All', 'Laptops', 'Desktops', 'Accessories', 'Spare Parts', 'Components', 'Pre-built PC'];
 
   const handleDelete = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this product? This will also delete its images from Cloudinary.")) {
@@ -43,10 +46,12 @@ export default function ProductsList() {
     }
   };
 
-  const filteredProducts = products.filter(p =>
-    p.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = products.filter(p => {
+    const matchesSearch = p.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.sku?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
 
   return (
     <div className="space-y-6">
@@ -63,28 +68,55 @@ export default function ProductsList() {
 
       <div className="bg-[#0d0d0e] rounded-3xl border border-white/10 flex flex-col overflow-hidden shadow-2xl">
         {/* Toolbar */}
-        <div className="p-6 border-b border-white/5 flex items-center gap-4">
-          <div className="relative flex-1 max-w-md">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-slate-500" />
+        <div className="p-6 border-b border-white/5 space-y-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <div className="relative flex-1 max-w-md">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-slate-500" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search products by title, SKU..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="bg-white/5 border border-white/10 rounded-full py-2 pl-10 pr-4 text-sm w-full focus:outline-none focus:ring-1 focus:ring-blue-500 text-white placeholder-slate-500"
+              />
             </div>
-            <input
-              type="text"
-              placeholder="Search products by title, SKU..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="bg-white/5 border border-white/10 rounded-full py-2 pl-10 pr-4 text-sm w-full focus:outline-none focus:ring-1 focus:ring-blue-500 text-white placeholder-slate-500"
-            />
+            <div className="flex gap-2">
+              <button onClick={() => exportToCsv('products.csv', products)} className="flex items-center gap-2 px-4 py-2 border border-white/10 rounded-full text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-white transition-colors uppercase tracking-widest">
+                <Download className="h-4 w-4" />
+                Export
+              </button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => exportToCsv('products.csv', products)} className="flex items-center gap-2 px-4 py-2 border border-white/10 rounded-full text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-white transition-colors uppercase tracking-widest">
-              <Download className="h-4 w-4" />
-              Export
-            </button>
-            <button className="flex items-center gap-2 px-4 py-2 border border-white/10 rounded-full text-xs font-bold text-slate-300 hover:bg-white/5 hover:text-white transition-colors uppercase tracking-widest">
-              <Filter className="h-4 w-4" />
-              Filters
-            </button>
+
+          {/* Category Tabs */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-2 scrollbar-none border-t border-white/5">
+            {categories.map(cat => {
+              const count = cat === 'All' 
+                ? products.length 
+                : products.filter(p => p.category === cat).length;
+              const isActive = selectedCategory === cat;
+
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 uppercase tracking-wider ${
+                    isActive 
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' 
+                      : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white border border-white/5'
+                  }`}
+                >
+                  <span>{cat}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-extrabold ${
+                    isActive ? 'bg-white/20 text-white' : 'bg-white/10 text-slate-400'
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 

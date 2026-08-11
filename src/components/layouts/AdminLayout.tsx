@@ -30,6 +30,7 @@ export default function AdminLayout() {
     { name: 'Offline POS', href: '/admin/offline-sale', icon: ShoppingBag },
     { name: 'Orders', href: '/admin/orders', icon: ClipboardList },
     { name: 'Products', href: '/admin/products', icon: Package },
+    { name: 'Prebuilt PCs', href: '/admin/prebuilt-pcs', icon: MonitorSmartphone },
     { name: 'Repairs', href: '/admin/repairs', icon: Wrench },
     { name: 'Inventory', href: '/admin/inventory', icon: ShoppingCart },
     { name: 'Customers', href: '/admin/customers', icon: Users },

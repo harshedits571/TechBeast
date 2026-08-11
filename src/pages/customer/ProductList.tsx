@@ -70,6 +70,9 @@ export default function ProductList() {
       if (!matchesTitle && !matchesSku) return false;
     }
 
+    // Exclude Prebuilt PCs from standard store listings (they have dedicated /prebuilt-pc page)
+    if ((p.isPrebuilt || p.category === 'Pre-built PC') && categoryFilter !== 'Pre-built PC') return false;
+
     // Category Filter
     if (categoryFilter && p.category !== categoryFilter) return false;
     

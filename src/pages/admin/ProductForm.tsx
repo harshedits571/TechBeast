@@ -38,6 +38,8 @@ export default function ProductForm() {
     modelNumber: '',
     processorGen: '',
     processorModel: '',
+    cpuPlatform: '',
+    cpuSocket: '',
     ramType: '',
     ramFreq: '',
     storageType: '',
@@ -343,7 +345,25 @@ export default function ProductForm() {
             </label>
             <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
               Processor Model
-              <input name="processorModel" value={formData.processorModel || ''} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. 12500H" />
+              <input name="processorModel" value={formData.processorModel || ''} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. 14600K / 7800X3D" />
+            </label>
+            <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+              CPU Platform
+              <select name="cpuPlatform" value={formData.cpuPlatform || ''} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
+                <option value="" className="bg-[#0d0d0e]">Auto-Detect / Any</option>
+                <option value="Intel" className="bg-[#0d0d0e]">Intel</option>
+                <option value="AMD" className="bg-[#0d0d0e]">AMD</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+              CPU Socket
+              <select name="cpuSocket" value={formData.cpuSocket || ''} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
+                <option value="" className="bg-[#0d0d0e]">Auto-Detect Socket</option>
+                <option value="LGA1700" className="bg-[#0d0d0e]">LGA1700 (Intel 12/13/14th Gen)</option>
+                <option value="LGA1851" className="bg-[#0d0d0e]">LGA1851 (Intel Core Ultra)</option>
+                <option value="AM5" className="bg-[#0d0d0e]">AM5 (AMD Ryzen 7000/8000/9000)</option>
+                <option value="AM4" className="bg-[#0d0d0e]">AM4 (AMD Ryzen 3000/5000)</option>
+              </select>
             </label>
               </div>
             )}

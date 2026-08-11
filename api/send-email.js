@@ -38,7 +38,7 @@ export default async function handler(req, res) {
 
     await transporter.sendMail(mailOptions);
     return res.status(200).json({ success: true, message: 'Email sent successfully via Gmail SMTP' });
-  } catch (err: any) {
+  } catch (err) {
     console.error('Vercel API Send Email Error:', err);
     return res.status(500).json({ error: err.message || 'Failed to send email via Gmail SMTP.' });
   }
