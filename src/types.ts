@@ -1,6 +1,6 @@
 export type ProductStatus = 'In Stock' | 'Out of Stock' | 'Reserved';
 export type ProductCondition = 'New' | 'Used - Like New' | 'Used - Good' | 'Used - Fair';
-export type ProductCategory = 'Laptops' | 'Desktops' | 'Accessories' | 'Spare Parts' | 'Components';
+export type ProductCategory = 'Laptops' | 'New Laptops' | 'Used Laptops' | 'Prebuilt PC' | 'Accessories' | 'Spare Parts' | 'Components';
 
 export interface Product {
   id: string;

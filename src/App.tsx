@@ -30,6 +30,7 @@ import CustomerList from './pages/admin/CustomerList';
 import CustomerDetail from './pages/admin/CustomerDetail';
 
 import ProductForm from './pages/admin/ProductForm';
+import CustomPCRequests from './pages/admin/CustomPCRequests';
 import OrderList from './pages/admin/OrderList';
 import OrderDetail from './pages/admin/OrderDetail';
 import PrebuiltsList from './pages/admin/PrebuiltsList';
@@ -88,6 +89,7 @@ export default function App() {
               <Route path="prebuilt-pcs" element={<PrebuiltsList />} />
               <Route path="prebuilt-pcs/new" element={<PrebuiltForm />} />
               <Route path="prebuilt-pcs/edit/:id" element={<PrebuiltForm />} />
+              <Route path="custom-pc-requests" element={<CustomPCRequests />} />
               <Route path="repairs" element={<AdminRepairsList />} />
               <Route path="repairs/new" element={<RepairForm />} />
               <Route path="repairs/:id" element={<RepairDetail />} />

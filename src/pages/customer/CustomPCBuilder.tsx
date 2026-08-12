@@ -1,10 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { 
-  MessageCircle, 
-  ShieldCheck, 
-  Cpu, 
-  Sparkles, 
+import {
+  MessageCircle,
+  ShieldCheck,
+  Cpu,
+  Sparkles,
   ArrowLeft,
   Building2,
   AlertCircle,
@@ -14,8 +14,9 @@ import {
   HardDrive
 } from 'lucide-react';
 import { db } from '../../lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, addDoc, query, limit } from 'firebase/firestore';
 import { useSettings } from '../../contexts/SettingsContext';
+import { useAuth } from '../../contexts/AuthContext';
 import SEO from '../../components/ui/SEO';
 
 interface ComponentOption {
@@ -26,7 +27,7 @@ interface ComponentOption {
   brand?: string;
   socket?: string; // 'LGA1700' | 'LGA1851' | 'AM5' | 'AM4'
   cpuPlatform?: 'Intel' | 'AMD';
-  ramType?: 'DDR4' | 'DDR5';
+  ramType?: 'DDR3' | 'DDR4' | 'DDR5';
   inStock?: boolean;
   modelNumber?: string;
   specsSummary?: string;
@@ -38,16 +39,27 @@ export default function CustomPCBuilder() {
   const platform = searchParams.get('platform') === 'amd' ? 'amd' : 'intel';
 
   const { settings } = useSettings();
+  const { user } = useAuth();
 
   const [dbProducts, setDbProducts] = useState<ComponentOption[]>([]);
   const [dbInventory, setDbInventory] = useState<ComponentOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      if (user.displayName && !customerName) setCustomerName(user.displayName);
+      if (user.phoneNumber && !customerPhone) setCustomerPhone(user.phoneNumber);
+    }
+  }, [user]);
 
   // Fetch real products & inventory from Firestore Admin database
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const prodSnap = await getDocs(collection(db, "products"));
+        const prodSnap = await getDocs(query(collection(db, "products"), limit(100)));
         const prodList: ComponentOption[] = prodSnap.docs.map(doc => {
           const data = doc.data();
           const name = data.title || data.name || 'Unnamed Product';
@@ -65,7 +77,7 @@ export default function CustomPCBuilder() {
           };
         });
 
-        const invSnap = await getDocs(collection(db, "inventory"));
+        const invSnap = await getDocs(query(collection(db, "inventory"), limit(100)));
         const invList: ComponentOption[] = invSnap.docs.map(doc => {
           const data = doc.data();
           const name = data.name || 'Unnamed Item';
@@ -125,16 +137,28 @@ export default function CustomPCBuilder() {
   function inferSocket(name: string): string {
     const upper = name.toUpperCase();
     if (upper.includes('ULTRA') || upper.includes('Z890') || upper.includes('B860') || upper.includes('LGA1851')) return 'LGA1851';
-    if (upper.includes('14TH') || upper.includes('13TH') || upper.includes('12TH') || upper.includes('LGA1700') || upper.includes('B760') || upper.includes('Z790') || upper.includes('H610') || upper.includes('14600') || upper.includes('13400') || upper.includes('14700') || upper.includes('14900')) return 'LGA1700';
+    if (upper.includes('14TH') || upper.includes('13TH') || upper.includes('12TH') || upper.includes('LGA1700') || upper.includes('B760') || upper.includes('Z790') || upper.includes('H610') || upper.includes('14600') || upper.includes('13400') || upper.includes('14700') || upper.includes('14900') || upper.includes('12400')) return 'LGA1700';
+    if (upper.includes('10TH') || upper.includes('11TH') || upper.includes('LGA1200') || upper.includes('H410') || upper.includes('H510') || upper.includes('B460') || upper.includes('B560') || upper.includes('Z490') || upper.includes('Z590') || upper.includes('10400') || upper.includes('11400')) return 'LGA1200';
+    if (upper.includes('6TH') || upper.includes('7TH') || upper.includes('8TH') || upper.includes('9TH') || upper.includes('LGA1151') || upper.includes('H110') || upper.includes('B250') || upper.includes('H310') || upper.includes('B365') || upper.includes('6500') || upper.includes('7400') || upper.includes('8400') || upper.includes('9400')) return 'LGA1151';
+    if (upper.includes('4TH') || upper.includes('LGA1150') || upper.includes('H81') || upper.includes('B85') || upper.includes('Z97') || upper.includes('4460') || upper.includes('4770') || upper.includes('4790')) return 'LGA1150';
+    if (upper.includes('2ND') || upper.includes('3RD') || upper.includes('LGA1155') || upper.includes('H61') || upper.includes('X61') || upper.includes('B75') || upper.includes('Z77') || upper.includes('3470') || upper.includes('3770') || upper.includes('2100') || upper.includes('3220')) return 'LGA1155';
     if (upper.includes('AM5') || upper.includes('7000') || upper.includes('8000') || upper.includes('9000') || upper.includes('7800X3D') || upper.includes('7600') || upper.includes('7700') || upper.includes('7900') || upper.includes('B650') || upper.includes('X670') || upper.includes('B850')) return 'AM5';
     if (upper.includes('AM4') || upper.includes('5000') || upper.includes('3000') || upper.includes('5600') || upper.includes('B550') || upper.includes('A520') || upper.includes('X570')) return 'AM4';
+    if (upper.includes('AM3') || upper.includes('FX-')) return 'AM3/AM3+';
     return platform === 'intel' ? 'LGA1700' : 'AM5';
   }
 
-  function inferRamType(name: string): 'DDR4' | 'DDR5' {
+  function inferRamType(name: string): 'DDR3' | 'DDR4' | 'DDR5' {
     const upper = name.toUpperCase();
+    if (upper.includes('DDR3')) return 'DDR3';
     if (upper.includes('DDR4')) return 'DDR4';
-    return 'DDR5';
+    if (upper.includes('DDR5')) return 'DDR5';
+
+    if (upper.includes('H61') || upper.includes('X61') || upper.includes('B75') || upper.includes('H81') || upper.includes('B85') || upper.includes('LGA1155') || upper.includes('LGA1150')) return 'DDR3';
+    if (upper.includes('H110') || upper.includes('B250') || upper.includes('H310') || upper.includes('B365') || upper.includes('H410') || upper.includes('H510') || upper.includes('B460') || upper.includes('B560') || upper.includes('B450') || upper.includes('B550') || upper.includes('LGA1151') || upper.includes('LGA1200') || upper.includes('AM4')) return 'DDR4';
+    if (upper.includes('B650') || upper.includes('X670') || upper.includes('Z890') || upper.includes('LGA1851') || upper.includes('AM5')) return 'DDR5';
+
+    return 'DDR4';
   }
 
   // Combine store products & inventory
@@ -259,17 +283,57 @@ export default function CustomPCBuilder() {
   const finalPrice = Math.max(0, subTotal - discountAmount);
   const emiPerMonth = Math.round(finalPrice / 24);
 
-  // Send WhatsApp Quote
-  const handleWhatsAppQuote = () => {
+  // Open modal to capture Customer Name & Phone Number
+  const triggerWhatsAppQuote = () => {
+    setShowModal(true);
+  };
+
+  const handleFinalSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setShowModal(false);
+
+    const cName = customerName || user?.displayName || user?.email?.split('@')[0] || 'Store Customer';
+    const cPhone = customerPhone || 'N/A';
+
+    // 1. Save to Firestore
+    try {
+      await addDoc(collection(db, 'custom_pc_requests'), {
+        customerName: cName,
+        customerPhone: cPhone,
+        platform: platform.toUpperCase(),
+        subTotal,
+        discountAmount,
+        finalPrice,
+        status: 'Pending',
+        createdAt: new Date().toISOString(),
+        components: {
+          ...(selectedCPU && !selectedCPU.id.startsWith('none-') && { cpu: { name: selectedCPU.name, price: selectedCPU.price } }),
+          ...(selectedMB && !selectedMB.id.startsWith('none-') && { motherboard: { name: selectedMB.name, price: selectedMB.price } }),
+          ...(selectedCooler && !selectedCooler.id.startsWith('none-') && { cooler: { name: selectedCooler.name, price: selectedCooler.price } }),
+          ...(selectedRAM && !selectedRAM.id.startsWith('none-') && { ram: { name: selectedRAM.name, price: selectedRAM.price, qty: ramQty } }),
+          ...(selectedGPU && !selectedGPU.id.startsWith('none-') && { gpu: { name: selectedGPU.name, price: selectedGPU.price } }),
+          ...(selectedSSD && !selectedSSD.id.startsWith('none-') && { ssd: { name: selectedSSD.name, price: selectedSSD.price } }),
+          ...(selectedSecStorage && !selectedSecStorage.id.startsWith('none-') && { secStorage: { name: selectedSecStorage.name, price: selectedSecStorage.price } }),
+          ...(selectedPSU && !selectedPSU.id.startsWith('none-') && { psu: { name: selectedPSU.name, price: selectedPSU.price } }),
+          ...(selectedCase && !selectedCase.id.startsWith('none-') && { cabinet: { name: selectedCase.name, price: selectedCase.price } }),
+        }
+      });
+    } catch (err) {
+      console.error("Error saving custom pc request:", err);
+    }
+
+    // 2. Open WhatsApp
     const storePhone = settings?.contactPhone || '+919535225266';
     const cleanPhone = storePhone.replace(/[^0-9]/g, '');
 
     const quoteMsg = [
       `*CUSTOM PC BUILD QUOTATION - TECH BEAST HUBLI*`,
+      `*Customer Name:* ${cName}`,
+      `*Phone Number:* ${cPhone}`,
       `*Platform:* ${platform.toUpperCase()} Custom Rig`,
       ``,
       selectedCPU?.price ? `• *Processor:* ${selectedCPU.name} (Socket ${selectedCPU.socket || 'Verified'}) — ₹${selectedCPU.price.toLocaleString('en-IN')}` : '',
-      selectedMB?.price ? `• *Motherboard:* ${selectedMB.name} (${selectedMB.ramType || 'DDR5'}) — ₹${selectedMB.price.toLocaleString('en-IN')}` : '',
+      selectedMB?.price ? `• *Motherboard:* ${selectedMB.name} (${selectedMB.ramType || 'DDR4'}) — ₹${selectedMB.price.toLocaleString('en-IN')}` : '',
       selectedCooler?.price ? `• *Cooler:* ${selectedCooler.name} — ₹${selectedCooler.price.toLocaleString('en-IN')}` : '',
       selectedRAM?.price ? `• *RAM:* ${selectedRAM.name} x${ramQty} — ₹${(selectedRAM.price * ramQty).toLocaleString('en-IN')}` : '',
       selectedGPU?.price ? `• *Graphics Card:* ${selectedGPU.name} — ₹${selectedGPU.price.toLocaleString('en-IN')}` : '',
@@ -289,31 +353,31 @@ export default function CustomPCBuilder() {
 
   return (
     <div className="bg-slate-50 text-slate-800 min-h-screen py-8 px-4 sm:px-6 lg:px-8">
-      <SEO 
+      <SEO
         title={`${platform.toUpperCase()} Custom PC Builder - Tech Beast Hubli`}
         description="Configure your custom PC with store inventory items, live itemized prices, and store quotations."
       />
 
       <div className="max-w-7xl mx-auto space-y-6">
-        
+
         {/* Navigation & Header */}
         <div className="flex items-center justify-between border-b border-slate-200 pb-4 bg-white p-4 rounded-2xl shadow-sm">
-          <button 
+          <button
             onClick={() => navigate('/custom-pc')}
             className="text-slate-600 hover:text-slate-900 flex items-center gap-2 text-xs font-bold uppercase tracking-wider transition-colors"
           >
             <ArrowLeft className="w-4 h-4" /> Back to Platform Choice
           </button>
-          
+
           <div className="flex items-center gap-3">
             <span className="text-xs text-slate-500 uppercase tracking-widest font-bold hidden sm:inline">Selected Platform:</span>
-            <button 
+            <button
               onClick={() => navigate('/custom-pc/builder?platform=intel')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${platform === 'intel' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
             >
               Intel Build
             </button>
-            <button 
+            <button
               onClick={() => navigate('/custom-pc/builder?platform=amd')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${platform === 'amd' ? 'bg-red-600 text-white shadow-md shadow-red-500/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
             >
@@ -333,23 +397,22 @@ export default function CustomPCBuilder() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          
+
           {/* --- LEFT COLUMN: LIVE BUILD SUMMARY & PREVIEW --- */}
           <div className="lg:col-span-4 bg-white border border-slate-200 rounded-3xl p-6 space-y-6 sticky top-24 shadow-md">
-            
+
             {/* PC Rig Image */}
             <div className="relative bg-slate-100 border border-slate-200 rounded-2xl p-4 flex items-center justify-center overflow-hidden">
-              <img 
-                src={platform === 'intel' 
+              <img
+                src={platform === 'intel'
                   ? "https://images.unsplash.com/photo-1587202372775-e229f172b9d7?auto=format&fit=crop&w=600&q=80"
-                  : "https://images.unsplash.com/photo-1591799264318-7e6ef8ddb7ea?auto=format&fit=crop&w=600&q=80"} 
+                  : "https://images.unsplash.com/photo-1591799264318-7e6ef8ddb7ea?auto=format&fit=crop&w=600&q=80"}
                 alt="Custom PC Build Preview"
                 className="w-full max-h-56 object-contain rounded-xl"
               />
-              
-              <div className={`absolute top-3 left-3 px-3 py-1 rounded-xl text-[10px] font-bold uppercase tracking-widest border shadow-sm ${
-                platform === 'intel' ? 'bg-blue-600 text-white border-blue-400/30' : 'bg-red-600 text-white border-red-400/30'
-              }`}>
+
+              <div className={`absolute top-3 left-3 px-3 py-1 rounded-xl text-[10px] font-bold uppercase tracking-widest border shadow-sm ${platform === 'intel' ? 'bg-blue-600 text-white border-blue-400/30' : 'bg-red-600 text-white border-red-400/30'
+                }`}>
                 {platform === 'intel' ? 'Intel Rig' : 'AMD Ryzen Rig'}
               </div>
             </div>
@@ -357,7 +420,7 @@ export default function CustomPCBuilder() {
             {/* Price Calculation Box */}
             <div className="space-y-3">
               <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400 block">Inclusive Of All Taxes</span>
-              
+
               <div className="flex items-baseline gap-3">
                 <span className="text-sm text-slate-400 line-through">₹{subTotal.toLocaleString('en-IN')}</span>
                 <span className="text-3xl font-extrabold text-slate-900">₹{finalPrice.toLocaleString('en-IN')}</span>
@@ -395,8 +458,8 @@ export default function CustomPCBuilder() {
 
             {/* Actions: Primary Store Quotation */}
             <div className="space-y-3 pt-2">
-              <button 
-                onClick={handleWhatsAppQuote}
+              <button
+                onClick={triggerWhatsAppQuote}
                 className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white py-3.5 px-4 rounded-2xl font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-600/20"
               >
                 <MessageCircle className="w-5 h-5" /> Get WhatsApp PC Quotation
@@ -416,12 +479,12 @@ export default function CustomPCBuilder() {
 
           {/* --- RIGHT COLUMN: COMPONENT SELECTION GRID --- */}
           <div className="lg:col-span-8 space-y-5">
-            
+
             <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-6 shadow-sm">
-              
+
               <div className="flex items-center justify-between border-b border-slate-200 pb-4">
                 <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                  <Cpu className="w-5 h-5 text-blue-600" /> 
+                  <Cpu className="w-5 h-5 text-blue-600" />
                   {platform === 'intel' ? 'Intel Custom PC Configurator' : 'AMD Custom PC Configurator'}
                 </h2>
                 <span className="text-xs text-slate-500 font-medium">Sourced from Admin Store Inventory</span>
@@ -456,15 +519,14 @@ export default function CustomPCBuilder() {
                   <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase tracking-widest">
                     <span className="flex items-center gap-2">
                       Processor (CPU) *
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        platform === 'intel' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'
-                      }`}>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${platform === 'intel' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'
+                        }`}>
                         {platform.toUpperCase()} ONLY
                       </span>
                     </span>
                     {selectedCPU?.socket && <span className="text-blue-600 font-mono text-[11px]">Socket: {selectedCPU.socket}</span>}
                   </div>
-                  <select 
+                  <select
                     value={selectedCPU?.id || ''}
                     onChange={(e) => {
                       const item = cpus.find(c => c.id === e.target.value);
@@ -484,12 +546,12 @@ export default function CustomPCBuilder() {
                 <div className="bg-slate-50 border border-blue-200 rounded-2xl p-4 space-y-2">
                   <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase tracking-widest">
                     <span className="flex items-center gap-2">
-                      Motherboard * 
+                      Motherboard *
                       {selectedCPU?.socket && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px]">Auto-Matched ({selectedCPU.socket})</span>}
                     </span>
                     {selectedMB?.ramType && <span className="text-emerald-600 font-mono text-[11px]">{selectedMB.ramType}</span>}
                   </div>
-                  <select 
+                  <select
                     value={selectedMB?.id || ''}
                     onChange={(e) => {
                       const item = motherboards.find(m => m.id === e.target.value);
@@ -511,7 +573,7 @@ export default function CustomPCBuilder() {
                     <span>CPU Cooler</span>
                     <span className="text-slate-400 text-[11px]">Air / Liquid ARGB</span>
                   </div>
-                  <select 
+                  <select
                     value={selectedCooler?.id || ''}
                     onChange={(e) => {
                       const item = coolers.find(c => c.id === e.target.value);
@@ -530,11 +592,11 @@ export default function CustomPCBuilder() {
                 {/* 6. RAM & QUANTITY */}
                 <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
                   <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase tracking-widest">
-                    <span>RAM ({selectedMB?.ramType || 'DDR5'}) *</span>
+                    <span>RAM ({selectedMB?.ramType || 'DDR4'}) *</span>
                     <span className="text-slate-400 text-[11px]">Quantity</span>
                   </div>
                   <div className="flex gap-3">
-                    <select 
+                    <select
                       value={selectedRAM?.id || ''}
                       onChange={(e) => {
                         const item = rams.find(r => r.id === e.target.value);
@@ -549,7 +611,7 @@ export default function CustomPCBuilder() {
                       ))}
                     </select>
 
-                    <select 
+                    <select
                       value={ramQty}
                       onChange={(e) => setRamQty(Number(e.target.value))}
                       className="w-24 bg-white border border-slate-300 rounded-xl p-3 text-sm text-slate-900 font-bold focus:outline-none focus:border-blue-600 transition-colors text-center"
@@ -567,7 +629,7 @@ export default function CustomPCBuilder() {
                     <span>Graphics Card (GPU)</span>
                     <span className="text-slate-400 text-[11px]">NVIDIA / AMD</span>
                   </div>
-                  <select 
+                  <select
                     value={selectedGPU?.id || ''}
                     onChange={(e) => {
                       const item = gpus.find(g => g.id === e.target.value);
@@ -589,7 +651,7 @@ export default function CustomPCBuilder() {
                     <span>Primary Storage for OS (SSD) *</span>
                     <span className="text-slate-400 text-[11px]">M.2 NVMe</span>
                   </div>
-                  <select 
+                  <select
                     value={selectedSSD?.id || ''}
                     onChange={(e) => {
                       const item = ssds.find(s => s.id === e.target.value);
@@ -611,7 +673,7 @@ export default function CustomPCBuilder() {
                     <span>Secondary Storage (HDD / SSD)</span>
                     <span className="text-slate-400 text-[11px]">Optional</span>
                   </div>
-                  <select 
+                  <select
                     value={selectedSecStorage?.id || ''}
                     onChange={(e) => {
                       const item = secStorages.find(s => s.id === e.target.value);
@@ -633,7 +695,7 @@ export default function CustomPCBuilder() {
                     <span>Power Supply (PSU) *</span>
                     <span className="text-amber-600 text-[11px] font-mono font-bold">Recommended: 650W+</span>
                   </div>
-                  <select 
+                  <select
                     value={selectedPSU?.id || ''}
                     onChange={(e) => {
                       const item = psus.find(p => p.id === e.target.value);
@@ -655,7 +717,7 @@ export default function CustomPCBuilder() {
                     <span>PC Cabinet / Case *</span>
                     <span className="text-slate-400 text-[11px]">Tempered Glass</span>
                   </div>
-                  <select 
+                  <select
                     value={selectedCase?.id || ''}
                     onChange={(e) => {
                       const item = cases.find(c => c.id === e.target.value);
@@ -676,8 +738,61 @@ export default function CustomPCBuilder() {
 
           </div>
 
-        </div>
+          {showModal && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl relative">
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="absolute top-4 right-4 text-slate-400 hover:text-slate-900"
+                >
+                  <ArrowLeft className="w-5 h-5 rotate-180" />
+                </button>
 
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2.5 bg-emerald-100 text-emerald-600 rounded-2xl">
+                    <MessageCircle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-extrabold text-slate-900">Get Store Quotation</h3>
+                    <p className="text-xs text-slate-500">Enter your details so we can save your configuration and open WhatsApp.</p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleFinalSubmit} className="space-y-4 mt-6">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Your Name *</label>
+                    <input
+                      required
+                      type="text"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 focus:outline-none focus:border-blue-500 text-sm font-medium"
+                      placeholder="e.g. Rahul Sharma"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Mobile / WhatsApp Number *</label>
+                    <input
+                      required
+                      type="tel"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 focus:outline-none focus:border-blue-500 text-sm font-medium"
+                      placeholder="e.g. 9876543210"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white py-3.5 px-4 rounded-xl font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all mt-6 shadow-lg shadow-emerald-600/20"
+                  >
+                    <MessageCircle className="w-5 h-5" /> Continue to WhatsApp
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+        </div>
       </div>
     </div>
   );

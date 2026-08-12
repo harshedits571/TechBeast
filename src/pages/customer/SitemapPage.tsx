@@ -44,7 +44,8 @@ export default function SitemapPage() {
       title: "Product Categories",
       icon: ShoppingBag,
       links: [
-        { name: "Gaming & Professional Laptops", path: "/products?category=Laptops", desc: "ASUS, MSI, HP, Lenovo & Dell Laptops" },
+        { name: "New Laptops", path: "/products?category=Laptops&condition=New", desc: "Brand new ASUS, MSI, HP, Lenovo & Dell Laptops" },
+        { name: "Used Laptops", path: "/products?category=Laptops&condition=Used", desc: "Certified pre-owned & refurbished laptops with warranty" },
         { name: "Desktop Computers", path: "/products?category=Desktops", desc: "High-performance assembled desktop PCs" },
         { name: "PC Components & Accessories", path: "/products?category=Accessories", desc: "Monitors, keyboards, mice, RAM & SSDs" },
       ]

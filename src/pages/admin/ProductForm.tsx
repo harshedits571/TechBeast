@@ -21,7 +21,7 @@ export default function ProductForm() {
     title: '',
     brand: '',
     sku: '',
-    category: 'Laptops',
+    category: 'New Laptops',
     componentType: '',
     condition: 'New',
     stock: 1,
@@ -103,7 +103,20 @@ export default function ProductForm() {
   }, [id]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    const newFormData = { ...formData, [name]: value };
+
+    if (name === 'category') {
+      if (value === 'New Laptops') {
+        newFormData.condition = 'New';
+      } else if (value === 'Used Laptops' && newFormData.condition === 'New') {
+        newFormData.condition = 'Used';
+      } else if (value === 'Custom PCs') {
+        newFormData.condition = 'New';
+      }
+    }
+
+    setFormData(newFormData);
   };
 
   const handleAccessoryCheck = (accName: string, checked: boolean) => {
@@ -148,8 +161,8 @@ export default function ProductForm() {
     return <FormSkeleton />;
   }
 
-  const isDesktop = formData.category === 'Desktops';
-  const isFullSystem = formData.category === 'Laptops' || (isDesktop && formData.componentType === 'Assembled PC');
+  const isDesktop = formData.category === 'Desktops' || formData.category === 'Prebuilt PC' || formData.category === 'Components';
+  const isFullSystem = formData.category === 'Laptops' || formData.category === 'New Laptops' || formData.category === 'Used Laptops' || formData.category === 'Desktops' || formData.category === 'Prebuilt PC' || (isDesktop && formData.componentType === 'Assembled PC');
   const isRAM = isDesktop && formData.componentType === 'RAM';
   const isProcessor = isDesktop && formData.componentType === 'Processor';
   const isStorage = isDesktop && formData.componentType === 'Storage (SSD/HDD)';
@@ -241,14 +254,17 @@ export default function ProductForm() {
           <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
             Category *
             <select name="category" value={formData.category} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
-              <option value="Laptops" className="bg-[#0d0d0e]">Laptops</option>
-              <option value="Desktops" className="bg-[#0d0d0e]">Desktops</option>
-              <option value="Components" className="bg-[#0d0d0e]">Components</option>
               <option value="Accessories" className="bg-[#0d0d0e]">Accessories</option>
+              <option value="New Laptops" className="bg-[#0d0d0e]">New Laptops</option>
+              <option value="Used Laptops" className="bg-[#0d0d0e]">Used Laptops</option>
+              <option value="Desktops" className="bg-[#0d0d0e]">Desktops</option>
+              <option value="Prebuilt PC" className="bg-[#0d0d0e]">Prebuilt PC</option>
+              <option value="Components" className="bg-[#0d0d0e]">Components</option>
+              <option value="Spare Parts" className="bg-[#0d0d0e]">Spare Parts</option>
             </select>
           </label>
           
-          {formData.category === 'Desktops' && (
+          {(formData.category === 'Desktops' || formData.category === 'Prebuilt PC' || formData.category === 'Components') && (
             <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest animate-in fade-in zoom-in duration-200">
               Component Type
               <select name="componentType" value={formData.componentType} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
@@ -269,9 +285,9 @@ export default function ProductForm() {
             Condition *
             <select required name="condition" value={formData.condition} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
               <option value="" className="bg-[#0d0d0e]">Select Condition</option>
-              <option value="New" className="bg-[#0d0d0e]">New</option>
-              <option value="Used" className="bg-[#0d0d0e]">Used / Second Hand</option>
-              <option value="Refurbished" className="bg-[#0d0d0e]">Refurbished</option>
+              {formData.category !== 'Used Laptops' && <option value="New" className="bg-[#0d0d0e]">New</option>}
+              {formData.category !== 'New Laptops' && formData.category !== 'Custom PCs' && <option value="Used" className="bg-[#0d0d0e]">Used / Second Hand</option>}
+              {formData.category !== 'New Laptops' && formData.category !== 'Custom PCs' && <option value="Refurbished" className="bg-[#0d0d0e]">Refurbished</option>}
             </select>
           </label>
           
@@ -310,10 +326,12 @@ export default function ProductForm() {
             <h3 className="text-lg font-bold text-white mb-6">Detailed Specifications (Optional)</h3>
             
             {/* Processor Group */}
-            {(isFullSystem || isProcessor) && (
+            {(isFullSystem || isProcessor || isMotherboard) && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8 border-b border-white/10 pb-8">
-            <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
-              Processor Line
+            {(isFullSystem || isProcessor) && (
+              <>
+                <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
+                  Processor Line
               <select name="processor" value={formData.processor} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
                 <option value="" className="bg-[#0d0d0e]">Select Line</option>
                 <option value="Core i3" className="bg-[#0d0d0e]">Core i3</option>
@@ -347,6 +365,8 @@ export default function ProductForm() {
               Processor Model
               <input name="processorModel" value={formData.processorModel || ''} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. 14600K / 7800X3D" />
             </label>
+            </>
+            )}
             <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
               CPU Platform
               <select name="cpuPlatform" value={formData.cpuPlatform || ''} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
@@ -359,18 +379,24 @@ export default function ProductForm() {
               CPU Socket
               <select name="cpuSocket" value={formData.cpuSocket || ''} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
                 <option value="" className="bg-[#0d0d0e]">Auto-Detect Socket</option>
-                <option value="LGA1700" className="bg-[#0d0d0e]">LGA1700 (Intel 12/13/14th Gen)</option>
+                <option value="LGA1155" className="bg-[#0d0d0e]">LGA1155 (Intel 2nd/3rd Gen - H61/X61)</option>
+                <option value="LGA1150" className="bg-[#0d0d0e]">LGA1150 (Intel 4th Gen - H81/B85)</option>
+                <option value="LGA1151" className="bg-[#0d0d0e]">LGA1151 (Intel 6th/7th/8th/9th Gen - H110/B250/H310)</option>
+                <option value="LGA1200" className="bg-[#0d0d0e]">LGA1200 (Intel 10th/11th Gen - H410/H510)</option>
+                <option value="LGA1700" className="bg-[#0d0d0e]">LGA1700 (Intel 12/13/14th Gen - H610/B760)</option>
                 <option value="LGA1851" className="bg-[#0d0d0e]">LGA1851 (Intel Core Ultra)</option>
-                <option value="AM5" className="bg-[#0d0d0e]">AM5 (AMD Ryzen 7000/8000/9000)</option>
-                <option value="AM4" className="bg-[#0d0d0e]">AM4 (AMD Ryzen 3000/5000)</option>
+                <option value="AM3/AM3+" className="bg-[#0d0d0e]">AM3 / AM3+ (Older AMD)</option>
+                <option value="AM4" className="bg-[#0d0d0e]">AM4 (AMD Ryzen 1000-5000)</option>
+                <option value="AM5" className="bg-[#0d0d0e]">AM5 (AMD Ryzen 7000-9000)</option>
               </select>
             </label>
               </div>
             )}
 
             {/* RAM Group */}
-            {(isFullSystem || isRAM) && (
+            {(isFullSystem || isRAM || isMotherboard) && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8 border-b border-white/10 pb-8">
+            {(isFullSystem || isRAM) && (
             <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
               Memory (RAM)
               <select name="ram" value={formData.ram} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
@@ -385,6 +411,7 @@ export default function ProductForm() {
                 )}
               </select>
             </label>
+            )}
             <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
               RAM Type
               <select name="ramType" value={formData.ramType} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">

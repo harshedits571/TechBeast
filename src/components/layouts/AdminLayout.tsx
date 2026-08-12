@@ -29,8 +29,9 @@ export default function AdminLayout() {
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
     { name: 'Offline POS', href: '/admin/offline-sale', icon: ShoppingBag },
     { name: 'Orders', href: '/admin/orders', icon: ClipboardList },
-    { name: 'Products', href: '/admin/products', icon: Package },
+    { name: 'All Products', href: '/admin/products', icon: Package },
     { name: 'Prebuilt PCs', href: '/admin/prebuilt-pcs', icon: MonitorSmartphone },
+    { name: 'Custom PCs', href: '/admin/custom-pc-requests', icon: Package },
     { name: 'Repairs', href: '/admin/repairs', icon: Wrench },
     { name: 'Inventory', href: '/admin/inventory', icon: ShoppingCart },
     { name: 'Customers', href: '/admin/customers', icon: Users },
@@ -63,7 +64,12 @@ export default function AdminLayout() {
               <nav className="px-4 space-y-2">
                 <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold mb-4 px-2">System Core</div>
                 {navigation.map((item) => {
-                  const isActive = location.pathname === item.href || (item.href !== '/admin' && location.pathname.startsWith(item.href));
+                  let isActive = false;
+                  if (item.href.includes('?')) {
+                    isActive = location.pathname + location.search === item.href;
+                  } else {
+                    isActive = location.pathname === item.href || (item.href !== '/admin' && location.pathname.startsWith(item.href));
+                  }
                   return (
                     <Link
                       key={item.name}

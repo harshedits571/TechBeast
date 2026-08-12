@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter, MoreVertical, Edit, Trash2, Download } from 'lucide-react';
 import { collection, getDocs, query, orderBy, deleteDoc, doc, limit, startAfter } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
@@ -12,10 +12,38 @@ export default function ProductsList() {
   const { data: products, loading, pageSize, setPageSize, currentPage, setCurrentPage, hasNextPage, setCursors } = productsState;
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
-  const categories = ['All', 'Laptops', 'Desktops', 'Accessories', 'Spare Parts', 'Components', 'Pre-built PC'];
+  const categories = ['All', 'New Laptops', 'Used Laptops', 'Desktops', 'Accessories', 'Spare Parts', 'Components', 'Prebuilt PC'];
+  
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const categoryParam = searchParams.get('category');
+
+  const [selectedCategory, setSelectedCategory] = useState<string>(
+    categoryParam && categories.includes(categoryParam) ? categoryParam : 'All'
+  );
+
+  useEffect(() => {
+    if (categoryParam && categories.includes(categoryParam)) {
+      setSelectedCategory(categoryParam);
+    } else if (!categoryParam) {
+      setSelectedCategory('All');
+    }
+  }, [categoryParam]);
+
+  const navigate = useNavigate();
+
+  const handleTabClick = (cat: string) => {
+    setSelectedCategory(cat);
+    if (cat === 'All') {
+      navigate('/admin/products');
+    } else {
+      navigate(`/admin/products?category=${cat}`);
+    }
+  };
+
+
 
   const handleDelete = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this product? This will also delete its images from Cloudinary.")) {
@@ -49,7 +77,22 @@ export default function ProductsList() {
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.sku?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
+    
+    let matchesCategory = false;
+    if (selectedCategory === 'All') {
+      matchesCategory = true;
+    } else if (selectedCategory === 'New Laptops') {
+      matchesCategory = p.category === 'Laptops' && (!p.condition || p.condition === 'New');
+    } else if (selectedCategory === 'Used Laptops') {
+      matchesCategory = p.category === 'Laptops' && p.condition && p.condition !== 'New';
+    } else if (selectedCategory === 'Desktops') {
+      matchesCategory = p.category === 'Desktops' || p.category === 'Desktop Parts' || p.category === 'Desktop' || p.category === 'Components' || p.category === 'Component';
+    } else if (selectedCategory === 'Components') {
+      matchesCategory = p.category === 'Components' || p.category === 'Component' || p.category === 'Desktops' || p.category === 'Desktop Parts' || p.category === 'Processors' || p.category === 'RAM' || p.category === 'Motherboards';
+    } else {
+      matchesCategory = p.category === selectedCategory;
+    }
+
     return matchesSearch && matchesCategory;
   });
 
@@ -93,15 +136,18 @@ export default function ProductsList() {
           {/* Category Tabs */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-2 scrollbar-none border-t border-white/5">
             {categories.map(cat => {
-              const count = cat === 'All' 
-                ? products.length 
-                : products.filter(p => p.category === cat).length;
+              let count = 0;
+              if (cat === 'All') count = products.length;
+              else if (cat === 'New Laptops') count = products.filter(p => p.category === 'Laptops' && (!p.condition || p.condition === 'New')).length;
+              else if (cat === 'Used Laptops') count = products.filter(p => p.category === 'Laptops' && p.condition && p.condition !== 'New').length;
+              else count = products.filter(p => p.category === cat).length;
+              
               const isActive = selectedCategory === cat;
 
               return (
                 <button
                   key={cat}
-                  onClick={() => setSelectedCategory(cat)}
+                  onClick={() => handleTabClick(cat)}
                   className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 uppercase tracking-wider ${
                     isActive 
                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' 

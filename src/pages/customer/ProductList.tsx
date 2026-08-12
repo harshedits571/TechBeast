@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Filter, ChevronDown, Check, Star, X, Search } from 'lucide-react';
 import { db } from '../../lib/firebase';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { CardGridSkeleton } from '../../components/ui/Skeleton';
 import SEO from '../../components/ui/SEO';
 
@@ -13,9 +13,26 @@ function normalizeBrand(brand: string) {
   return brand.charAt(0).toUpperCase() + brand.slice(1).toLowerCase();
 }
 
+function inferComponentType(product: any): string {
+  if (product.componentType) return product.componentType;
+  const title = (product.title || '').toLowerCase();
+  const cat = (product.category || '').toLowerCase();
+  if (title.includes('motherboard') || title.includes('atx') || title.includes('matx') || title.includes('b650') || title.includes('b760') || title.includes('x870') || title.includes('z790')) return 'Motherboard';
+  if (title.includes('processor') || title.includes('intel core') || title.includes('ryzen') || title.includes('i3') || title.includes('i5') || title.includes('i7') || title.includes('i9')) return 'Processor';
+  if (title.includes('cabinet') || title.includes('case') || title.includes('tower')) return 'Cabinet';
+  if (title.includes('ram') || title.includes('ddr4') || title.includes('ddr5') || title.includes('memory')) return 'RAM';
+  if (title.includes('graphics') || title.includes('gpu') || title.includes('rtx') || title.includes('gtx') || title.includes('radeon')) return 'Graphics Card';
+  if (title.includes('power supply') || title.includes('psu') || title.includes('smps')) return 'Power Supply';
+  if (title.includes('ssd') || title.includes('nvme') || title.includes('hdd') || title.includes('hard drive')) return 'Storage';
+  if (title.includes('cooler') || title.includes('fan') || title.includes('liquid')) return 'Cooler';
+  if (cat === 'components' || cat === 'component' || cat === 'desktop parts') return 'Component';
+  return '';
+}
+
 export default function ProductList() {
   const [searchParams] = useSearchParams();
   const categoryFilter = searchParams.get('category');
+  const conditionFilter = searchParams.get('condition');
   
   const [sortBy, setSortBy] = useState('featured');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -32,10 +49,14 @@ export default function ProductList() {
   const [maxPrice, setMaxPrice] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Pagination State (10, 20, 30, 50 per page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
+        const q = query(collection(db, "products"), orderBy("createdAt", "desc"), limit(60));
         const querySnapshot = await getDocs(q);
         const productsData = querySnapshot.docs.map(doc => ({
           id: doc.id,
@@ -59,7 +80,12 @@ export default function ProductList() {
 
   const availableGens = Array.from(new Set(products.map(p => p.processorGen))).filter(Boolean).sort();
   const availableRamTypes = Array.from(new Set(products.map(p => p.ramType))).filter(Boolean).sort();
-  const availableComponentTypes = Array.from(new Set(products.map(p => p.componentType))).filter(Boolean).sort();
+  const availableComponentTypes = Array.from(new Set(products.map(p => inferComponentType(p)))).filter(Boolean).sort();
+  const availableConditions = Array.from(new Set(products.map(p => p.condition))).filter(Boolean).sort();
+
+  const pageTitle = conditionFilter
+    ? (categoryFilter ? `${conditionFilter} ${categoryFilter}` : `${conditionFilter} Products`)
+    : (categoryFilter || 'All Products');
 
   const displayedProducts = products.filter(p => {
     // Search Query
@@ -74,15 +100,36 @@ export default function ProductList() {
     if ((p.isPrebuilt || p.category === 'Pre-built PC') && categoryFilter !== 'Pre-built PC') return false;
 
     // Category Filter
-    if (categoryFilter && p.category !== categoryFilter) return false;
+    if (categoryFilter) {
+      if (categoryFilter === 'Desktops') {
+        const isDesktopOrComponent = p.category === 'Desktops' || p.category === 'Desktop' || p.category === 'Desktop Parts' || p.category === 'Components' || p.category === 'Component';
+        if (!isDesktopOrComponent) return false;
+      } else if (categoryFilter === 'Components') {
+        const isComponentOrDesktop = p.category === 'Components' || p.category === 'Component' || p.category === 'Desktops' || p.category === 'Desktop Parts' || p.category === 'Processors' || p.category === 'RAM' || p.category === 'Motherboards';
+        if (!isComponentOrDesktop) return false;
+      } else if (p.category !== categoryFilter) {
+        return false;
+      }
+    }
     
     // Brand Filter
     let productBrand = p.brand || (p.title ? p.title.split(' ')[0] : 'Unknown');
     productBrand = normalizeBrand(productBrand);
     if (selectedBrands.length > 0 && !selectedBrands.includes(productBrand)) return false;
     
-    // Condition Filter
-    if (selectedConditions.length > 0 && !selectedConditions.includes(p.condition)) return false;
+    // Condition Filter (from checkboxes or URL condition parameter)
+    if (selectedConditions.length > 0) {
+      if (!selectedConditions.includes(p.condition)) return false;
+    } else if (conditionFilter) {
+      const condLower = (p.condition || '').toLowerCase();
+      if (conditionFilter.toLowerCase() === 'new') {
+        if (p.condition && condLower !== 'new') return false;
+      } else if (conditionFilter.toLowerCase() === 'used') {
+        if (!p.condition || (!condLower.includes('used') && !condLower.includes('refurbished') && !condLower.includes('pre-owned'))) return false;
+      } else {
+        if (condLower !== conditionFilter.toLowerCase()) return false;
+      }
+    }
 
     // Generation Filter
     if (selectedGens.length > 0 && (!p.processorGen || !selectedGens.includes(p.processorGen))) return false;
@@ -91,7 +138,8 @@ export default function ProductList() {
     if (selectedRamTypes.length > 0 && (!p.ramType || !selectedRamTypes.includes(p.ramType))) return false;
 
     // Component Type Filter
-    if (selectedComponentTypes.length > 0 && (!p.componentType || !selectedComponentTypes.includes(p.componentType))) return false;
+    const productCompType = inferComponentType(p);
+    if (selectedComponentTypes.length > 0 && (!productCompType || !selectedComponentTypes.includes(productCompType))) return false;
 
     // In Stock Only Filter
     if (inStockOnly && (!p.stock || p.stock <= 0)) return false;
@@ -112,8 +160,8 @@ export default function ProductList() {
   return (
     <div className="bg-slate-50 min-h-screen text-slate-800 font-sans pb-20">
       <SEO 
-        title={`${categoryFilter ? categoryFilter : 'All Products'} - Tech Beast Hubli`}
-        description={`Explore our wide range of ${categoryFilter ? categoryFilter : 'second hand laptops, desktops, and accessories'} at Tech Beast Hubli. Get premium quality at the best prices.`}
+        title={`${pageTitle} - Tech Beast Hubli`}
+        description={`Explore our wide range of ${pageTitle.toLowerCase()} at Tech Beast Hubli. Get premium quality at the best prices.`}
       />
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
@@ -123,8 +171,8 @@ export default function ProductList() {
             <div className="text-lg text-slate-500 mb-6">Filters</div>
             
             <div className="space-y-6">
-              {/* COMPONENT TYPE Filter (Only for Desktops) */}
-              {categoryFilter === 'Desktops' && availableComponentTypes.length > 0 && (
+              {/* COMPONENT TYPE Filter (For Desktops & Components) */}
+              {(categoryFilter === 'Desktops' || categoryFilter === 'Components') && availableComponentTypes.length > 0 && (
                 <div>
                   <div className="flex items-center justify-between cursor-pointer text-sm font-bold text-slate-700 mb-3 uppercase">
                     <span>Component Type</span>
@@ -133,8 +181,9 @@ export default function ProductList() {
                   <ul className="space-y-2">
                     {availableComponentTypes.map((type: any) => {
                       const count = products.filter(p => {
-                        if (categoryFilter && p.category !== categoryFilter) return false;
-                        return p.componentType === type;
+                        if (categoryFilter === 'Desktops' && !(p.category === 'Desktops' || p.category === 'Desktop' || p.category === 'Desktop Parts' || p.category === 'Components' || p.category === 'Component')) return false;
+                        if (categoryFilter === 'Components' && !(p.category === 'Components' || p.category === 'Component' || p.category === 'Desktops' || p.category === 'Desktop Parts')) return false;
+                        return inferComponentType(p) === type;
                       }).length;
                       
                       if (count === 0) return null;
@@ -322,7 +371,7 @@ export default function ProductList() {
             {/* Header Block */}
             <div className="bg-white p-6 shadow-sm border border-slate-200 rounded-sm mb-6">
               <h1 className="text-2xl font-bold text-slate-800 mb-2">
-                {categoryFilter ? categoryFilter : 'Laptops'}
+                {pageTitle}
               </h1>
               <p className="text-sm text-slate-500 leading-relaxed">
                 Buy laptops online at the best price in India. Explore gaming, business, and everyday laptops from top brands including HP, Dell, Lenovo, ASUS, Acer, Apple, MSI, and Samsung. Compare laptop prices in India and choose from premium, mid-range, and budget-friendly models with a genuine warranty and reliable delivery.
@@ -390,6 +439,23 @@ export default function ProductList() {
                   <ChevronDown className="h-4 w-4 absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 </div>
               </div>
+
+              <div className="flex items-center gap-2 border-l border-slate-200 pl-4">
+                <span className="text-sm text-slate-500">Per page:</span>
+                <select 
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="text-sm font-medium text-slate-800 border border-slate-200 bg-slate-50 rounded px-2 py-1 focus:ring-0 cursor-pointer outline-none font-bold"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={30}>30</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
             </div>
 
             {/* Product Grid */}
@@ -397,7 +463,7 @@ export default function ProductList() {
               <CardGridSkeleton count={8} />
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {displayedProducts.map((product) => {
+              {displayedProducts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((product) => {
                 const isDiscounted = product.oldPrice && product.oldPrice > product.price;
                 const discountPercent = isDiscounted 
                   ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100) 
@@ -467,6 +533,52 @@ export default function ProductList() {
                 );
               })}
             </div>
+            )}
+
+            {/* Bottom Pagination Controls */}
+            {Math.ceil(displayedProducts.length / itemsPerPage) > 1 && (
+              <div className="flex items-center justify-end border border-slate-200 bg-white rounded-sm p-4 mt-6 text-sm text-slate-600">
+                <div className="flex items-center gap-1.5 font-bold flex-wrap">
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => {
+                      setCurrentPage(p => Math.max(1, p - 1));
+                      window.scrollTo({ top: 200, behavior: 'smooth' });
+                    }}
+                    className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed border border-slate-200 rounded text-slate-700 transition cursor-pointer text-xs"
+                  >
+                    Previous
+                  </button>
+
+                  {Array.from({ length: Math.ceil(displayedProducts.length / itemsPerPage) }, (_, i) => i + 1).map(pageNum => (
+                    <button
+                      key={pageNum}
+                      onClick={() => {
+                        setCurrentPage(pageNum);
+                        window.scrollTo({ top: 200, behavior: 'smooth' });
+                      }}
+                      className={`w-8 h-8 rounded border transition cursor-pointer text-xs font-bold ${
+                        currentPage === pageNum
+                          ? 'bg-blue-600 border-blue-600 text-white font-extrabold shadow-sm'
+                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  ))}
+
+                  <button
+                    disabled={currentPage === Math.ceil(displayedProducts.length / itemsPerPage)}
+                    onClick={() => {
+                      setCurrentPage(p => Math.min(Math.ceil(displayedProducts.length / itemsPerPage), p + 1));
+                      window.scrollTo({ top: 200, behavior: 'smooth' });
+                    }}
+                    className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed border border-slate-200 rounded text-slate-700 transition cursor-pointer text-xs"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             )}
             
             {displayedProducts.length === 0 && (

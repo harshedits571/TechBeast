@@ -40,10 +40,10 @@ export default function CustomerLayout() {
                 <span>Prebuilt PCs</span>
                 <span className="bg-purple-700 text-white text-[9px] px-1.5 py-0.5 rounded font-black tracking-normal uppercase">Rigs</span>
               </Link>
-              <Link to="/products?category=Laptops" className="text-slate-600 hover:text-red-600 transition-colors">Laptops</Link>
+              <Link to="/products?category=Laptops&condition=New" className="text-slate-600 hover:text-red-600 transition-colors">New Laptops</Link>
+              <Link to="/products?category=Laptops&condition=Used" className="text-slate-600 hover:text-red-600 transition-colors">Used Laptops</Link>
               <Link to="/products?category=Desktops" className="text-slate-600 hover:text-red-600 transition-colors">Desktops</Link>
               <Link to="/products?category=Accessories" className="text-slate-600 hover:text-red-600 transition-colors">Accessories</Link>
-              <Link to="/services" className="text-slate-600 hover:text-red-600 transition-colors">Repair Services</Link>
             </nav>
 
             {/* Actions */}
@@ -99,8 +99,11 @@ export default function CustomerLayout() {
           <div className="lg:hidden bg-white border-t border-slate-200 shadow-lg absolute w-full z-40">
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 text-xs font-bold uppercase tracking-wider">
               <Link to="/" className="block px-3 py-2 text-slate-600 hover:text-red-600 hover:bg-slate-50 rounded-lg" onClick={() => setIsMenuOpen(false)}>Home</Link>
+              <Link to="/products?category=Laptops&condition=New" className="block px-3 py-2 text-slate-600 hover:text-red-600 hover:bg-slate-50 rounded-lg" onClick={() => setIsMenuOpen(false)}>New Laptops</Link>
+              <Link to="/products?category=Laptops&condition=Used" className="block px-3 py-2 text-slate-600 hover:text-red-600 hover:bg-slate-50 rounded-lg" onClick={() => setIsMenuOpen(false)}>Used Laptops</Link>
+              <Link to="/products?category=Desktops" className="block px-3 py-2 text-slate-600 hover:text-red-600 hover:bg-slate-50 rounded-lg" onClick={() => setIsMenuOpen(false)}>Desktops</Link>
+              <Link to="/products?category=Accessories" className="block px-3 py-2 text-slate-600 hover:text-red-600 hover:bg-slate-50 rounded-lg" onClick={() => setIsMenuOpen(false)}>Accessories</Link>
               <Link to="/products" className="block px-3 py-2 text-slate-600 hover:text-red-600 hover:bg-slate-50 rounded-lg" onClick={() => setIsMenuOpen(false)}>Shop All</Link>
-              <Link to="/services" className="block px-3 py-2 text-slate-600 hover:text-red-600 hover:bg-slate-50 rounded-lg" onClick={() => setIsMenuOpen(false)}>Repair Services</Link>
               {user ? (
                 role === 'admin' ? (
                   <Link to="/admin" className="block px-3 py-2 text-slate-600 hover:text-red-600 hover:bg-slate-50 rounded-lg" onClick={() => setIsMenuOpen(false)}>Admin Portal</Link>
@@ -144,8 +147,8 @@ export default function CustomerLayout() {
           <div>
             <h3 className="text-xs text-slate-900 font-bold uppercase tracking-widest mb-4">Shop</h3>
             <ul className="space-y-3 text-sm">
-              <li><Link to="/products?category=Laptops" className="hover:text-blue-600 transition-colors">New Laptops</Link></li>
-              <li><Link to="/products?condition=Used" className="hover:text-blue-600 transition-colors">Used Laptops</Link></li>
+              <li><Link to="/products?category=Laptops&condition=New" className="hover:text-blue-600 transition-colors">New Laptops</Link></li>
+              <li><Link to="/products?category=Laptops&condition=Used" className="hover:text-blue-600 transition-colors">Used Laptops</Link></li>
               <li><Link to="/products?category=Desktops" className="hover:text-blue-600 transition-colors">Desktops</Link></li>
               <li><Link to="/products?category=Accessories" className="hover:text-blue-600 transition-colors">Accessories</Link></li>
             </ul>
@@ -153,6 +156,7 @@ export default function CustomerLayout() {
           <div>
             <h3 className="text-xs text-slate-900 font-bold uppercase tracking-widest mb-4">Services</h3>
             <ul className="space-y-3 text-sm">
+              <li><Link to="/services" className="hover:text-blue-600 transition-colors font-bold text-slate-700">Repair Services</Link></li>
               <li><Link to="/services" className="hover:text-blue-600 transition-colors">Laptop Repair</Link></li>
               <li><Link to="/services" className="hover:text-blue-600 transition-colors">Desktop Repair</Link></li>
               <li><Link to="/services" className="hover:text-blue-600 transition-colors">Data Recovery</Link></li>

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Monitor, Cpu, ShieldCheck, ArrowRight, Sparkles } from 'lucide-react';
 import { db } from '../../lib/firebase';
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query, limit } from 'firebase/firestore';
 
 export default function PrebuiltPCs() {
   const [prebuilts, setPrebuilts] = useState<any[]>([]);
@@ -29,10 +29,10 @@ export default function PrebuiltPCs() {
 
       // 2. Fetch from prebuilts collection or products
       try {
-        const snap = await getDocs(collection(db, "prebuilts"));
+        const snap = await getDocs(query(collection(db, "prebuilts"), limit(30)));
         const collectionList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         
-        const prodSnap = await getDocs(collection(db, "products"));
+        const prodSnap = await getDocs(query(collection(db, "products"), limit(50)));
         const prodList = prodSnap.docs
           .map(d => ({ id: d.id, ...d.data() }))
           .filter((p: any) => p.isPrebuilt || p.category === 'Pre-built PC');
