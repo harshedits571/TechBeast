@@ -33,8 +33,8 @@ const defaultSettings: StoreSettings = {
   warrantyText: '6 Months TechBeast Certified Warranty',
   storeName: 'TechBeast',
   contactEmail: 'techbeasthubli@gmail.com',
-  promoBannerText: 'Get 10% Off on all Laptops! Use code TECH10',
-  promoBannerEnabled: true,
+  promoBannerText: '',
+  promoBannerEnabled: false,
   heroBanners: [],
   flashSaleEnabled: false,
   flashSaleTitle: 'Flash Sale',
@@ -63,7 +63,17 @@ const SettingsContext = createContext<SettingsContextType>({
 });
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-  const [settings, setSettings] = useState<StoreSettings>(defaultSettings);
+  const [settings, setSettings] = useState<StoreSettings>(() => {
+    try {
+      const cached = localStorage.getItem('tb_store_settings');
+      if (cached) {
+        return { ...defaultSettings, ...JSON.parse(cached) };
+      }
+    } catch {
+      // ignore
+    }
+    return defaultSettings;
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -72,7 +82,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const docRef = doc(db, 'settings', 'storeSettings');
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          setSettings({ ...defaultSettings, ...docSnap.data() });
+          const merged = { ...defaultSettings, ...docSnap.data() };
+          setSettings(merged);
+          try {
+            localStorage.setItem('tb_store_settings', JSON.stringify(merged));
+          } catch {
+            // ignore
+          }
         } else {
           // Initialize with defaults if it doesn't exist
           await setDoc(docRef, defaultSettings);
@@ -90,7 +106,15 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     try {
       const docRef = doc(db, 'settings', 'storeSettings');
       await setDoc(docRef, { ...settings, ...newSettings }, { merge: true });
-      setSettings(prev => ({ ...prev, ...newSettings }));
+      setSettings(prev => {
+        const updated = { ...prev, ...newSettings };
+        try {
+          localStorage.setItem('tb_store_settings', JSON.stringify(updated));
+        } catch {
+          // ignore
+        }
+        return updated;
+      });
     } catch (error) {
       console.error("Error updating settings:", error);
       throw error;
