@@ -56,12 +56,17 @@ export default function ProductList() {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const q = query(collection(db, "products"), orderBy("createdAt", "desc"), limit(60));
-        const querySnapshot = await getDocs(q);
+        const querySnapshot = await getDocs(collection(db, "products"));
         const productsData = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
+        // Sort newest first by default
+        productsData.sort((a: any, b: any) => {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : (a.updatedAt ? new Date(a.updatedAt).getTime() : 0);
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : (b.updatedAt ? new Date(b.updatedAt).getTime() : 0);
+          return timeB - timeA;
+        });
         setProducts(productsData);
       } catch (error) {
         console.error("Error fetching products:", error);
@@ -72,22 +77,64 @@ export default function ProductList() {
     fetchProducts();
   }, []);
 
-  const availableBrands = Array.from(new Set(products.map(p => {
+  const productMatchesCategoryAndCondition = (p: any) => {
+    // Exclude Prebuilt PCs from standard store listings (they have dedicated /prebuilt-pc page)
+    if ((p.isPrebuilt || p.category === 'Pre-built PC') && categoryFilter !== 'Pre-built PC') return false;
+
+    const pCatLower = (p.category || '').toLowerCase();
+    const isLaptop = pCatLower.includes('laptop');
+    const isDesktop = pCatLower.includes('desktop') || pCatLower.includes('component');
+
+    // Category Filter
+    if (categoryFilter) {
+      const catLow = categoryFilter.toLowerCase();
+      if (catLow.includes('laptop')) {
+        if (!isLaptop) return false;
+      } else if (catLow.includes('desktop')) {
+        if (!isDesktop) return false;
+      } else if (catLow.includes('component')) {
+        const isComponent = pCatLower.includes('component') || pCatLower.includes('desktop') || pCatLower.includes('processor') || pCatLower.includes('ram') || pCatLower.includes('motherboard') || pCatLower.includes('graphic');
+        if (!isComponent) return false;
+      } else if (pCatLower !== catLow) {
+        return false;
+      }
+    }
+
+    // Condition Filter (from URL condition parameter)
+    if (conditionFilter) {
+      const condLower = (p.condition || '').toLowerCase();
+      if (conditionFilter.toLowerCase() === 'new') {
+        const isNew = condLower === 'new' || pCatLower.includes('new') || (!condLower && !pCatLower.includes('used'));
+        if (!isNew) return false;
+      } else if (conditionFilter.toLowerCase() === 'used') {
+        const isUsed = condLower.includes('used') || condLower.includes('second') || condLower.includes('refurbished') || condLower.includes('pre-owned') || pCatLower.includes('used');
+        if (!isUsed) return false;
+      } else {
+        if (condLower !== conditionFilter.toLowerCase() && !pCatLower.includes(conditionFilter.toLowerCase())) return false;
+      }
+    }
+
+    return true;
+  };
+
+  const relevantProducts = products.filter(productMatchesCategoryAndCondition);
+
+  const availableBrands = Array.from(new Set(relevantProducts.map(p => {
     let b = p.brand;
     if (!b && p.title) b = p.title.split(' ')[0];
     return normalizeBrand(b);
   }))).filter(Boolean).sort();
 
-  const availableGens = Array.from(new Set(products.map(p => p.processorGen))).filter(Boolean).sort();
-  const availableRamTypes = Array.from(new Set(products.map(p => p.ramType))).filter(Boolean).sort();
-  const availableComponentTypes = Array.from(new Set(products.map(p => inferComponentType(p)))).filter(Boolean).sort();
-  const availableConditions = Array.from(new Set(products.map(p => p.condition))).filter(Boolean).sort();
+  const availableGens = Array.from(new Set(relevantProducts.map(p => p.processorGen))).filter(Boolean).sort();
+  const availableRamTypes = Array.from(new Set(relevantProducts.map(p => p.ramType))).filter(Boolean).sort();
+  const availableComponentTypes = Array.from(new Set(relevantProducts.map(p => inferComponentType(p)))).filter(Boolean).sort();
+  const availableConditions = Array.from(new Set(relevantProducts.map(p => p.condition))).filter(Boolean).sort();
 
   const pageTitle = conditionFilter
     ? (categoryFilter ? `${conditionFilter} ${categoryFilter}` : `${conditionFilter} Products`)
     : (categoryFilter || 'All Products');
 
-  const displayedProducts = products.filter(p => {
+  const displayedProducts = relevantProducts.filter(p => {
     // Search Query
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -95,40 +142,27 @@ export default function ProductList() {
       const matchesSku = p.sku?.toLowerCase().includes(q);
       if (!matchesTitle && !matchesSku) return false;
     }
-
-    // Exclude Prebuilt PCs from standard store listings (they have dedicated /prebuilt-pc page)
-    if ((p.isPrebuilt || p.category === 'Pre-built PC') && categoryFilter !== 'Pre-built PC') return false;
-
-    // Category Filter
-    if (categoryFilter) {
-      if (categoryFilter === 'Desktops') {
-        const isDesktopOrComponent = p.category === 'Desktops' || p.category === 'Desktop' || p.category === 'Desktop Parts' || p.category === 'Components' || p.category === 'Component';
-        if (!isDesktopOrComponent) return false;
-      } else if (categoryFilter === 'Components') {
-        const isComponentOrDesktop = p.category === 'Components' || p.category === 'Component' || p.category === 'Desktops' || p.category === 'Desktop Parts' || p.category === 'Processors' || p.category === 'RAM' || p.category === 'Motherboards';
-        if (!isComponentOrDesktop) return false;
-      } else if (p.category !== categoryFilter) {
-        return false;
-      }
-    }
     
     // Brand Filter
     let productBrand = p.brand || (p.title ? p.title.split(' ')[0] : 'Unknown');
     productBrand = normalizeBrand(productBrand);
     if (selectedBrands.length > 0 && !selectedBrands.includes(productBrand)) return false;
     
-    // Condition Filter (from checkboxes or URL condition parameter)
+    // Condition Filter (from checkboxes)
     if (selectedConditions.length > 0) {
-      if (!selectedConditions.includes(p.condition)) return false;
-    } else if (conditionFilter) {
-      const condLower = (p.condition || '').toLowerCase();
-      if (conditionFilter.toLowerCase() === 'new') {
-        if (p.condition && condLower !== 'new') return false;
-      } else if (conditionFilter.toLowerCase() === 'used') {
-        if (!p.condition || (!condLower.includes('used') && !condLower.includes('refurbished') && !condLower.includes('pre-owned'))) return false;
-      } else {
-        if (condLower !== conditionFilter.toLowerCase()) return false;
-      }
+      const pCond = (p.condition || '').toLowerCase();
+      const pCatLower = (p.category || '').toLowerCase();
+      const matchesCond = selectedConditions.some(c => {
+        const cLow = c.toLowerCase();
+        if (cLow === 'used' || cLow.includes('second')) {
+          return pCond.includes('used') || pCond.includes('second') || pCond.includes('refurbished') || pCatLower.includes('used');
+        }
+        if (cLow === 'new') {
+          return pCond === 'new' || pCatLower.includes('new');
+        }
+        return pCond === cLow;
+      });
+      if (!matchesCond) return false;
     }
 
     // Generation Filter
@@ -180,11 +214,7 @@ export default function ProductList() {
                   </div>
                   <ul className="space-y-2">
                     {availableComponentTypes.map((type: any) => {
-                      const count = products.filter(p => {
-                        if (categoryFilter === 'Desktops' && !(p.category === 'Desktops' || p.category === 'Desktop' || p.category === 'Desktop Parts' || p.category === 'Components' || p.category === 'Component')) return false;
-                        if (categoryFilter === 'Components' && !(p.category === 'Components' || p.category === 'Component' || p.category === 'Desktops' || p.category === 'Desktop Parts')) return false;
-                        return inferComponentType(p) === type;
-                      }).length;
+                      const count = relevantProducts.filter(p => inferComponentType(p) === type).length;
                       
                       if (count === 0) return null;
                       return (
@@ -217,8 +247,7 @@ export default function ProductList() {
                 </div>
                 <ul className="space-y-2">
                   {availableBrands.map((brand: any) => {
-                    const count = products.filter(p => {
-                      if (categoryFilter && p.category !== categoryFilter) return false;
+                    const count = relevantProducts.filter(p => {
                       let b = p.brand;
                       if (!b && p.title) b = p.title.split(' ')[0];
                       return normalizeBrand(b) === brand;
@@ -276,10 +305,7 @@ export default function ProductList() {
                   </div>
                   <ul className="space-y-2">
                     {availableGens.map((gen: any) => {
-                      const count = products.filter(p => {
-                        if (categoryFilter && p.category !== categoryFilter) return false;
-                        return p.processorGen === gen;
-                      }).length;
+                      const count = relevantProducts.filter(p => p.processorGen === gen).length;
                       
                       if (count === 0) return null;
                       return (
@@ -313,10 +339,7 @@ export default function ProductList() {
                   </div>
                   <ul className="space-y-2">
                     {availableRamTypes.map((rt: any) => {
-                      const count = products.filter(p => {
-                        if (categoryFilter && p.category !== categoryFilter) return false;
-                        return p.ramType === rt;
-                      }).length;
+                      const count = relevantProducts.filter(p => p.ramType === rt).length;
 
                       if (count === 0) return null;
                       return (
