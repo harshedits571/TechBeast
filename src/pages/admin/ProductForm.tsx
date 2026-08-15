@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, ChevronDown } from 'lucide-react';
 import { db } from '../../lib/firebase';
-import { collection, addDoc, doc, getDoc, updateDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, updateDoc, getDocs, query, where, setDoc } from 'firebase/firestore';
+import { createSlug, generateShortId } from '../../utils/slugify';
 import ImageUpload from '../../components/admin/ImageUpload';
 import { FormSkeleton } from '../../components/ui/Skeleton';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -146,7 +147,8 @@ export default function ProductForm() {
         await updateDoc(doc(db, "products", id), dataToSave);
       } else {
         dataToSave.createdAt = new Date().toISOString();
-        await addDoc(collection(db, "products"), dataToSave);
+        const docId = formData.sku ? createSlug(formData.sku) : `${createSlug(formData.title)}-${generateShortId()}`;
+        await setDoc(doc(db, "products", docId), dataToSave);
       }
       navigate('/admin/products');
     } catch (error) {

@@ -11,7 +11,7 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.email == 'harshks12345@gmail.com';
     }
 
-    // Check if user is an Admin (Role based)
+    // Check if user is an Admin (Role based or Root)
     function isAdmin() {
       return isRootAdmin() || 
         (request.auth != null && (
@@ -49,10 +49,11 @@ service cloud.firestore {
                      isSubAdmin() ||
                      resource.data.role == 'creator';
       
-      // Users can create their own profile, but cannot inject admin/creator roles
-      allow create: if isOwner(uid) && 
-                    (!request.resource.data.keys().hasAny(['role', 'isAdmin', 'isCreatorApproved', 'isPaid', 'isBanned'])) || 
-                    isAdmin();
+      // Users can create their own profile as customer, but cannot inject admin or privilege fields
+      allow create: if (isOwner(uid) && 
+                       (!request.resource.data.keys().hasAny(['isAdmin', 'allowedSections', 'isCreatorApproved', 'isPaid', 'isBanned']) &&
+                        (!('role' in request.resource.data) || request.resource.data.role == 'customer'))) || 
+                       isAdmin();
 
       // Users can update their own profile, but CANNOT modify protected security fields
       allow update: if (isOwner(uid) && 
@@ -63,9 +64,10 @@ service cloud.firestore {
     }
 
     // 1a. Customers Collection
-    match /customers/{email} {
-      allow read, write: if request.auth != null && request.auth.token.email == email;
-      allow read, write: if isAdmin() || isSubAdmin();
+    match /customers/{customerId} {
+      allow read: if isAdmin() || isSubAdmin() || (request.auth != null && (request.auth.token.email == resource.data.email || request.auth.uid == customerId));
+      allow create: if true; // Allowed so online checkout and repairs can register customer records
+      allow update, delete: if isAdmin() || isSubAdmin() || (request.auth != null && (request.auth.token.email == resource.data.email || request.auth.uid == customerId));
     }
 
     // 2. Products Collection (All Marketplace Assets)
@@ -73,12 +75,12 @@ service cloud.firestore {
       // Anyone can read products (Public Storefront)
       allow read: if true; 
 
-      // Create: Admins, Sub-Admins, or Approved Creators (Creators must set status to pending and use their own UID)
+      // Create: Admins, Sub-Admins, or Approved Creators
       allow create: if isAdmin() || 
                     isSubAdmin() ||
                     (isApprovedCreator() && request.resource.data.creatorId == request.auth.uid && request.resource.data.status == 'pending');
 
-      // Update: Admins, Sub-Admins, or Approved Creators (Creators can only edit their own products and must stay pending if edited)
+      // Update: Admins, Sub-Admins, or Approved Creators
       allow update: if isAdmin() ||
                     isSubAdmin() ||
                     (isApprovedCreator() && resource.data.creatorId == request.auth.uid && request.resource.data.creatorId == request.auth.uid);
@@ -86,90 +88,97 @@ service cloud.firestore {
       // Delete: Admins, Sub-Admins, or the Creator who made it
       allow delete: if isAdmin() || isSubAdmin() || 
                     (isApprovedCreator() && resource.data.creatorId == request.auth.uid);
+
+      // Subcollection: Product Reviews
+      match /reviews/{reviewId} {
+        allow read: if true;
+        allow create: if request.auth != null;
+        allow update, delete: if isAdmin() || isSubAdmin();
+      }
+    }
+
+    // 2a. Prebuilt PCs Collection
+    match /prebuilts/{prebuiltId} {
+      allow read: if true;
+      allow write: if isAdmin() || isSubAdmin();
     }
     
-    // 3. Settings & Config (Admin Panel)
+    // 3. Settings & Config (Storefront Configuration)
     match /settings/{docId} {
-      // Global settings are public so the frontend can load them
+      // Global settings (banners, contact, announcements) are public so the frontend can load them
       allow read: if true; 
       // Only Admins can modify settings
-      allow write: if isAdmin();
+      allow write: if isAdmin() || isSubAdmin();
     }
 
     // 4. Transactions Ledger
     match /transactions/{transactionId} {
-      // Admins read all, Users read their own purchases, Creators read their own sales
       allow read: if isAdmin() || 
                      isSubAdmin() ||
                      (request.auth != null && resource.data.uid == request.auth.uid) ||
                      (request.auth != null && resource.data.vendorId == request.auth.uid);
       
-      // Anyone logged in can create a transaction record for themselves
       allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
-      
       allow update, delete: if isAdmin();
     }
     
     // 5. Download Logs Ledger
     match /downloadLogs/{logId} {
-      // Admins read all, Users read their own
       allow read: if isAdmin() || isSubAdmin() || (request.auth != null && resource.data.uid == request.auth.uid) || (request.auth != null && resource.data.ownerUid == request.auth.uid);
-      // Anyone logged in can create a download log for themselves
       allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
-      
       allow update, delete: if isAdmin();
     }
     
     // 6. Ratings & Reviews
     match /ratings/{ratingId} {
       allow read: if true;
-      allow create, update: if request.auth != null; // Must be logged in to rate
-      allow delete: if isAdmin();
+      allow create, update: if request.auth != null;
+      allow delete: if isAdmin() || isSubAdmin();
     }
     
     // 7. Ratings Summary / Product Stats
-    // These are aggregated stats often updated automatically from the client or functions
     match /ratingsSummary/{docId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if request.auth != null || isAdmin() || isSubAdmin();
     }
     
     match /product_stats/{productId} {
       allow read: if true;
-      allow write: if request.auth != null; 
+      allow write: if request.auth != null || isAdmin() || isSubAdmin(); 
     }
 
     // 8. Feedback / Broken Link Reports
     match /brokenLinkReports/{reportId} {
       allow read: if isAdmin() || isSubAdmin();
       allow create: if request.auth != null;
-      allow update, delete: if isAdmin();
+      allow update, delete: if isAdmin() || isSubAdmin();
     }
 
     // 9. Audit Logs
     match /auditLogs/{logId} {
       allow read: if isAdmin() || isSubAdmin();
-      allow create: if request.auth != null; // Logged in users/creators/admins can write logs
+      allow create: if request.auth != null;
       allow update, delete: if isAdmin();
     }
 
     // 10. Banners
     match /banners/{bannerId} {
-      allow read: if true; // Publicly readable
+      allow read: if true;
       allow write: if isAdmin() || isSubAdmin();
     }
 
     // 11. User Messages (Contact Form)
     match /userMessages/{messageId} {
       allow read: if isAdmin() || isSubAdmin();
-      allow create: if true; // Anyone can send a contact message
+      allow create: if true;
       allow update, delete: if isAdmin() || isSubAdmin();
     }
+
     // 12. Product Reviews
     match /productReviews/{reviewId} {
       allow read: if true;
       allow create, update: if request.auth != null;
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || isSubAdmin();
     }
     
     // 13. Storage Audits
@@ -179,9 +188,12 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // 14. Custom PC Quotation Requests
-    match /custom_pc_requests/{document=**} {
-      allow read, write: if true;
+    // 14. Custom PC Quotation Requests (Direct link viewable by ID, list restricted to admin)
+    match /custom_pc_requests/{requestId} {
+      allow get: if true; // Public direct quote viewing by ID
+      allow list: if isAdmin() || isSubAdmin(); // Bulk listing/searching restricted to admins
+      allow create: if true;
+      allow update, delete: if isAdmin() || isSubAdmin();
     }
 
     // 15. Orders
@@ -198,9 +210,10 @@ service cloud.firestore {
       allow update, delete: if isAdmin() || isSubAdmin();
     }
 
-    // 17. Inventory
+    // 17. Inventory (Public read for Custom PC configurator & stock availability, admin write)
     match /inventory/{document=**} {
-      allow read, write: if isAdmin() || isSubAdmin();
+      allow read: if true;
+      allow write: if isAdmin() || isSubAdmin();
     }
   }
 }

@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Save, X, Printer, User, Laptop, Wrench, FileText } from 'lucide-react';
 import { db } from '../../lib/firebase';
-import { collection, addDoc, doc, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { collection, addDoc, doc, getDocs, query, orderBy, limit, setDoc } from 'firebase/firestore';
+import { createSlug, generateShortId } from '../../utils/slugify';
 import { FormSkeleton } from '../../components/ui/Skeleton';
 import { useAdmin } from '../../contexts/AdminContext';
 
@@ -108,7 +109,8 @@ export default function RepairForm() {
         });
         
         if (!existingCust) {
-          await addDoc(collection(db, 'customers'), {
+          const customerId = formData.customerPhone.trim() || `${createSlug(formData.customerName)}-${generateShortId()}`;
+          await setDoc(doc(db, 'customers', customerId), {
             name: formData.customerName,
             phone: formData.customerPhone.trim(),
             email: formData.customerEmail,
@@ -132,7 +134,7 @@ export default function RepairForm() {
         internalNotes: []
       };
       
-      await addDoc(collection(db, "repairs"), dataToSave);
+      await setDoc(doc(db, "repairs", ticketNumber), dataToSave);
       navigate('/admin/repairs');
     } catch (error) {
       console.error("Error adding ticket: ", error);

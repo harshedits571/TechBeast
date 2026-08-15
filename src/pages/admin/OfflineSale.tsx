@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-import { collection, getDocs, addDoc, updateDoc, doc, query, where, increment, runTransaction, getDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, doc, query, where, increment, runTransaction, getDoc, setDoc } from 'firebase/firestore';
+import { createSlug, generateShortId } from '../../utils/slugify';
 import { ShoppingBag, Printer, ArrowLeft, Package, User, CheckCircle2, Gift, ShieldCheck, Mail, Send, MessageCircle } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { FormSkeleton } from '../../components/ui/Skeleton';
@@ -279,7 +280,7 @@ export default function OfflineSale() {
         setOrderId(invNumber);
       } else {
         orderData.createdAt = now;
-        const orderRef = await addDoc(collection(db, 'orders'), orderData);
+        await setDoc(doc(db, 'orders', invNumber), orderData);
         setOrderId(invNumber);
       }
 
@@ -308,7 +309,8 @@ export default function OfflineSale() {
 
       if (!existingCust) {
         // Create new customer
-        await addDoc(collection(db, 'customers'), {
+        const customerId = customerPhone || `${createSlug(customerName)}-${generateShortId()}`;
+        await setDoc(doc(db, 'customers', customerId), {
           name: customerName,
           phone: customerPhone,
           email: customerEmail,

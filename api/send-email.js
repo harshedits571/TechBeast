@@ -1,29 +1,39 @@
 import nodemailer from 'nodemailer';
 
 export default async function handler(req, res) {
+  // Allow only POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { to, subject, text, filename, base64Content, smtpEmail, smtpAppPassword } = req.body;
+    const { to, subject, text, filename, base64Content } = req.body || {};
 
-    if (!to || !smtpEmail || !smtpAppPassword) {
-      return res.status(400).json({ error: 'Missing required email credentials or parameters.' });
+    // Get email & app password securely from Server Environment Variables first, with fallback to request payload
+    const smtpEmail = (process.env.SMTP_EMAIL || process.env.VITE_SMTP_EMAIL || req.body?.smtpEmail || 'techbeasthubli@gmail.com').trim();
+    const rawPassword = process.env.SMTP_APP_PASSWORD || process.env.SMTP_PASSWORD || process.env.GMAIL_APP_PASSWORD || req.body?.smtpAppPassword || '';
+    const cleanPassword = rawPassword.replace(/\s+/g, '');
+
+    if (!to) {
+      return res.status(400).json({ error: 'Missing recipient email address (to).' });
     }
 
-    const cleanPassword = smtpAppPassword.replace(/\s+/g, '');
+    if (!cleanPassword) {
+      return res.status(500).json({
+        error: 'SMTP_APP_PASSWORD is not configured in Vercel Environment Variables. Please add SMTP_APP_PASSWORD to your Vercel project settings.'
+      });
+    }
 
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        user: smtpEmail.trim(),
+        user: smtpEmail,
         pass: cleanPassword
       }
     });
 
     const mailOptions = {
-      from: `"Tech Beast Hubli" <${smtpEmail.trim()}>`,
+      from: `"Tech Beast Hubli" <${smtpEmail}>`,
       to: to.trim(),
       subject: subject || 'Proforma Invoice - Tech Beast Hubli',
       text: text || '',

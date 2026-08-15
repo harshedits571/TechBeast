@@ -42,6 +42,8 @@ import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Login from './pages/admin/Login';
 
+import QuotationView from './pages/customer/QuotationView';
+
 function ScrollToTop() {
   const { pathname } = useLocation();
 
@@ -65,6 +67,8 @@ export default function App() {
             <Route path="services" element={<Services />} />
             <Route path="custom-pc" element={<CustomPC />} />
             <Route path="custom-pc/builder" element={<CustomPCBuilder />} />
+            <Route path="quote/:id" element={<QuotationView />} />
+            <Route path="custom-pc/quote/:id" element={<QuotationView />} />
             <Route path="prebuilt-pc" element={<PrebuiltPCs />} />
             <Route path="prebuilt-pc/:id" element={<PrebuiltPCDetail />} />
             <Route path="products" element={<ProductList />} />

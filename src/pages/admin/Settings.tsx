@@ -214,32 +214,33 @@ export default function Settings() {
               </label>
             </div>
 
-            {/* Direct Gmail App Password Email Integration */}
+            {/* Direct Gmail Serverless Email Integration */}
             <div className="bg-white/5 border border-white/10 p-6 rounded-2xl space-y-4">
-              <h3 className="text-sm font-bold text-white uppercase tracking-widest flex items-center gap-2">
-                Direct Gmail Sending (Google App Password & Anti-Spam Verified)
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-white uppercase tracking-widest flex items-center gap-2">
+                  🛡️ Direct Gmail Sending (Secure Vercel Environment)
+                </h3>
+                <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full">
+                  Credentials Secured
+                </span>
+              </div>
               <p className="text-xs text-slate-400">
                 Send Proforma Invoice PDFs directly from your official Gmail (<code className="text-blue-400">techbeasthubli@gmail.com</code>) straight to customer inboxes with zero spam risk.
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
                 <label className="flex flex-col gap-2 text-xs text-slate-400 font-bold uppercase tracking-widest">
-                  Gmail Address
-                  <input name="smtpEmail" value={formData.smtpEmail || formData.contactEmail || ''} onChange={handleChange} type="email" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case font-normal" placeholder="e.g. techbeasthubli@gmail.com" />
-                </label>
-                <label className="flex flex-col gap-2 text-xs text-slate-400 font-bold uppercase tracking-widest">
-                  Google App Security Password (16-Digit Code)
-                  <input name="smtpAppPassword" value={formData.smtpAppPassword || ''} onChange={handleChange} type="password" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case font-normal font-mono" placeholder="e.g. abcd efgh ijkl mnop" />
+                  Official Store Sender Email
+                  <input name="contactEmail" value={formData.contactEmail || ''} onChange={handleChange} type="email" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case font-normal" placeholder="e.g. techbeasthubli@gmail.com" />
                 </label>
               </div>
 
               <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300 space-y-2">
-                <p className="font-bold text-blue-400">🔑 How to get your Google App Password in 1 minute:</p>
+                <p className="font-bold text-blue-400">🔒 Secure Vercel Deployment Instructions:</p>
                 <ol className="list-decimal list-inside space-y-1 text-slate-300">
-                  <li>Go to your Google Account (<strong>myaccount.google.com</strong>) ➔ <strong>Security</strong>.</li>
-                  <li>Ensure <strong>2-Step Verification</strong> is ON.</li>
-                  <li>Search for <strong>App passwords</strong>, select Mail, and click <strong>Create</strong>.</li>
-                  <li>Paste the generated 16-character code into the Security Password box above!</li>
+                  <li>In your <strong>Vercel Dashboard</strong>, navigate to <strong>Project Settings ➔ Environment Variables</strong>.</li>
+                  <li>Add <code>SMTP_EMAIL</code> = <code>{formData.contactEmail || 'techbeasthubli@gmail.com'}</code></li>
+                  <li>Add <code>SMTP_APP_PASSWORD</code> = your 16-character Google App Password (e.g. <code>abcd efgh ijkl mnop</code>).</li>
+                  <li>Credentials stay strictly encrypted on the serverless backend and are never exposed to browser clients!</li>
                 </ol>
               </div>
             </div>

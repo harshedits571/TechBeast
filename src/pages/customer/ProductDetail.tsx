@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Heart, Share2, Check, ShieldCheck, Truck, RotateCcw, Cpu, HardDrive, Monitor, Battery, Gift, Star } from 'lucide-react';
 import { db } from '../../lib/firebase';
-import { doc, getDoc, collection, getDocs, addDoc, query, orderBy, updateDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, addDoc, query, orderBy, updateDoc, increment, setDoc } from 'firebase/firestore';
+import { createSlug, generateShortId } from '../../utils/slugify';
 import { useCart } from '../../contexts/CartContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import WarrantyModal from '../../components/WarrantyModal';
@@ -115,8 +116,9 @@ export default function ProductDetail() {
     setSubmittingReview(true);
     try {
       const newReview = { ...reviewForm, createdAt: new Date().toISOString() };
-      const docRef = await addDoc(collection(db, "products", id, "reviews"), newReview);
-      setReviews([{ id: docRef.id, ...newReview }, ...reviews]);
+      const docId = `${createSlug(reviewForm.name)}-${generateShortId()}`;
+      await setDoc(doc(db, "products", id, "reviews", docId), newReview);
+      setReviews([{ id: docId, ...newReview }, ...reviews]);
       setReviewForm({ name: '', rating: 5, comment: '' });
     } catch (err) {
       console.error(err);

@@ -1,14 +1,14 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  Home, 
-  Cpu, 
-  Monitor, 
-  ShoppingBag, 
-  Wrench, 
-  ShieldCheck, 
-  FileText, 
-  MapPin, 
+import {
+  Home,
+  Cpu,
+  Monitor,
+  ShoppingBag,
+  Wrench,
+  ShieldCheck,
+  FileText,
+  MapPin,
   ChevronRight,
   Sparkles,
   ExternalLink
@@ -64,8 +64,8 @@ export default function SitemapPage() {
 
   return (
     <div className="bg-slate-50 text-slate-800 min-h-screen py-10 px-4 sm:px-6 lg:px-8">
-      <SEO 
-        title="Sitemap - Tech Beast Hubli" 
+      <SEO
+        title="Sitemap - Tech Beast Hubli"
         description="Comprehensive sitemap and directory of all pages, custom PC builders, prebuilt desktops, and repair services at Tech Beast Hubli."
       />
 
@@ -81,17 +81,6 @@ export default function SitemapPage() {
           <p className="text-sm text-slate-500 max-w-2xl leading-relaxed">
             Easily navigate and explore all sections of Tech Beast Hubli — including custom PC builders, prebuilt gaming desktops, repair services, and legal documentation.
           </p>
-          <div className="pt-2 text-xs font-semibold text-slate-400 flex items-center gap-2">
-            <span>XML Sitemap for Search Engines:</span>
-            <a 
-              href="/sitemap.xml" 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="text-purple-600 hover:text-purple-800 underline inline-flex items-center gap-1 font-bold"
-            >
-              sitemap.xml <ExternalLink className="w-3 h-3" />
-            </a>
-          </div>
         </div>
 
         {/* Directory Grid */}
@@ -110,7 +99,7 @@ export default function SitemapPage() {
                 <ul className="space-y-3">
                   {section.links.map((link, lIdx) => (
                     <li key={lIdx}>
-                      <Link 
+                      <Link
                         to={link.path}
                         className="group flex items-start justify-between p-3 rounded-2xl hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all"
                       >
@@ -140,8 +129,8 @@ export default function SitemapPage() {
               Ground Floor, Shinde Complex, No.183 C Block, Hubballi, Karnataka 580029 • Phone: +91 95352 25266
             </p>
           </div>
-          <Link 
-            to="/services" 
+          <Link
+            to="/services"
             className="shrink-0 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-6 py-3 rounded-xl uppercase tracking-wider transition-all shadow-md"
           >
             Contact & Location

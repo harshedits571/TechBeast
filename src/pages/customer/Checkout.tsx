@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useCart } from '../../contexts/CartContext';
 import { db } from '../../lib/firebase';
-import { collection, addDoc, updateDoc, doc, increment, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, increment, getDocs, query, where, orderBy, limit, setDoc } from 'firebase/firestore';
+import { createSlug, generateShortId } from '../../utils/slugify';
 import { ShoppingBag, MapPin, CreditCard, AlertCircle, Loader2, User } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -86,14 +87,15 @@ export default function Checkout() {
         createdAt: now
       };
 
-      await addDoc(collection(db, 'orders'), orderData);
+      await setDoc(doc(db, 'orders', orderNumber), orderData);
 
       // 2. Update Customer Record
+      const customerId = formData.phone || `${createSlug(formData.name)}-${generateShortId()}`;
       const q = query(collection(db, 'customers'), where('phone', '==', formData.phone));
       const querySnapshot = await getDocs(q);
       
       if (querySnapshot.empty) {
-        await addDoc(collection(db, 'customers'), {
+        await setDoc(doc(db, 'customers', customerId), {
           name: formData.name,
           phone: formData.phone,
           email: formData.email,

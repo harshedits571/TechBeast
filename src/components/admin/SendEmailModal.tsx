@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, X, Send, CheckCircle2, ShieldCheck, Download, AlertCircle } from 'lucide-react';
+import { Mail, X, Send, ShieldCheck, AlertCircle } from 'lucide-react';
 import { getInvoicePdfData } from '../../utils/pdfGenerator';
 import { useSettings } from '../../contexts/SettingsContext';
 
@@ -19,8 +19,7 @@ export default function SendEmailModal({ order, onClose }: SendEmailModalProps) 
   const [isSending, setIsSending] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
-  const smtpEmail = settings?.smtpEmail || settings?.contactEmail || 'techbeasthubli@gmail.com';
-  const smtpAppPassword = settings?.smtpAppPassword || '';
+  const smtpEmail = settings?.contactEmail || 'techbeasthubli@gmail.com';
 
   const handleSendEmail = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,76 +29,64 @@ export default function SendEmailModal({ order, onClose }: SendEmailModalProps) 
     }
 
     setIsSending(true);
-    setStatusMsg({ type: 'info', text: 'Generating PDF & sending directly via Gmail...' });
+    setStatusMsg({ type: 'info', text: 'Generating PDF & sending directly via Gmail SMTP...' });
 
     try {
       // 1. Generate PDF Data
       const { pdf, filename, dataUri } = await getInvoicePdfData(order);
       const base64Content = dataUri.split(',')[1];
 
-      // Check if Gmail App Password is configured
-      if (smtpEmail && smtpAppPassword) {
-        setStatusMsg({ type: 'info', text: `Sending email directly from ${smtpEmail} via Gmail...` });
+      // Try serverless API endpoint
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: customerEmail,
+          subject: subject,
+          text: message,
+          filename: filename,
+          base64Content: base64Content,
+          smtpEmail: smtpEmail
+        })
+      });
 
-        const response = await fetch('/api/send-email', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            to: customerEmail,
-            subject: subject,
-            text: message,
-            filename: filename,
-            base64Content: base64Content,
-            smtpEmail: smtpEmail,
-            smtpAppPassword: smtpAppPassword
-          })
-        });
+      const contentType = response.headers.get('content-type') || '';
+      let resData: any = {};
 
-        const contentType = response.headers.get('content-type') || '';
-        let resData: any = {};
-
-        if (contentType.includes('application/json')) {
-          resData = await response.json();
-        } else {
-          // If deployed on a static frontend host without serverless functions
-          pdf.save(filename);
-          const mailtoUrl = `mailto:${encodeURIComponent(customerEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
-          window.open(mailtoUrl, '_blank');
-
-          setStatusMsg({
-            type: 'info',
-            text: 'PDF invoice downloaded! Mail client opened. (Host is static frontend; for 1-click background sending deploy on Vercel/Netlify).'
-          });
-          return;
-        }
-
-        if (response.ok && resData.success) {
-          setStatusMsg({ type: 'success', text: `Email sent successfully directly from ${smtpEmail}! (Inbox Guaranteed)` });
-          setTimeout(() => {
-            onClose();
-          }, 2000);
-        } else {
-          throw new Error(resData.error || "Failed to send email via Gmail SMTP.");
-        }
+      if (contentType.includes('application/json')) {
+        resData = await response.json();
       } else {
-        // Fallback: Download PDF & open mailto
+        // Fallback for static hosts without serverless backend
         pdf.save(filename);
-        
         const mailtoUrl = `mailto:${encodeURIComponent(customerEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
         window.open(mailtoUrl, '_blank');
 
         setStatusMsg({
           type: 'info',
-          text: 'PDF downloaded! Enter your 16-digit Google App Password in Admin Settings ➔ General Settings for 100% automated direct sending.'
+          text: 'PDF invoice downloaded! Mail client opened. (Deploy to Vercel with SMTP_APP_PASSWORD env variable for automated background sending).'
         });
+        return;
+      }
+
+      if (response.ok && resData.success) {
+        setStatusMsg({ type: 'success', text: `Email sent successfully from ${smtpEmail}!` });
+        setTimeout(() => {
+          onClose();
+        }, 2000);
+      } else {
+        throw new Error(resData.error || "Failed to send email via Gmail SMTP.");
       }
     } catch (err: any) {
       console.error("Email Error:", err);
+      let errMsg = err.message || 'Check SMTP_APP_PASSWORD in Vercel environment variables.';
+      if (errMsg === 'Failed to fetch') {
+        errMsg = 'Could not reach /api/send-email. If testing locally on Vite dev server, add SMTP_APP_PASSWORD to your .env file or Vercel settings.';
+      }
       setStatusMsg({
         type: 'error',
-        text: `Error sending email: ${err.message || 'Check Google App Password in Settings.'}`
+        text: `Error: ${errMsg}`
       });
     } finally {
       setIsSending(false);
@@ -134,7 +121,7 @@ export default function SendEmailModal({ order, onClose }: SendEmailModalProps) 
               <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-400" />
               <span>Direct Gmail Sender: <strong>{smtpEmail}</strong></span>
             </div>
-            <span className="bg-emerald-500/20 px-2 py-0.5 rounded font-bold uppercase text-[10px]">Inbox Verified</span>
+            <span className="bg-emerald-500/20 px-2 py-0.5 rounded font-bold uppercase text-[10px]">Secure Environment</span>
           </div>
 
           {statusMsg && (
@@ -144,7 +131,7 @@ export default function SendEmailModal({ order, onClose }: SendEmailModalProps) 
               'bg-blue-500/10 border-blue-500/20 text-blue-400'
             }`}>
               <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-              <p>{statusMsg.text}</p>
+              <p className="break-words">{statusMsg.text}</p>
             </div>
           )}
 
@@ -183,16 +170,6 @@ export default function SendEmailModal({ order, onClose }: SendEmailModalProps) 
               className="bg-white/5 border border-white/10 rounded-xl p-4 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal resize-none leading-relaxed"
             />
           </label>
-
-          {/* Settings Notice if App Password not set */}
-          {!smtpAppPassword && (
-            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
-              <div>
-                <strong>Automated Sending Setup:</strong> Enter your 16-character <strong>Google App Security Password</strong> in <em>Admin Settings ➔ General Settings</em> to send emails directly from <code>{smtpEmail}</code> in 1-click!
-              </div>
-            </div>
-          )}
 
           {/* Footer Actions */}
           <div className="pt-4 border-t border-white/10 flex items-center justify-between">

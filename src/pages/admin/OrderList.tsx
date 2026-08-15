@@ -13,7 +13,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { collection, getDocs, query, orderBy, deleteDoc, doc, limit, startAfter, writeBatch, addDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, deleteDoc, doc, limit, startAfter, writeBatch, addDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useAdmin } from '../../contexts/AdminContext';
 import { exportToCsv } from '../../utils/exportCsv';
@@ -57,7 +57,7 @@ export default function OrderList() {
   const generateMockOrders = async () => {
     try {
       for (const order of MOCK_ORDERS) {
-        await addDoc(collection(db, 'orders'), order);
+        await setDoc(doc(db, 'orders', order.orderNumber), order);
       }
     } catch (error) {
       alert("Error generating mock data. Check your Firebase Rules for 'orders' collection!");

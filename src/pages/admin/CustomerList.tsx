@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, Plus, Filter, Users, Download, Mail, Phone, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
-import { collection, getDocs, addDoc, query, orderBy, limit, startAfter } from 'firebase/firestore';
+import { collection, getDocs, addDoc, query, orderBy, limit, startAfter, setDoc, doc } from 'firebase/firestore';
+import { createSlug, generateShortId } from '../../utils/slugify';
 import { db } from '../../lib/firebase';
 import { useAdmin } from '../../contexts/AdminContext';
 import { exportToCsv } from '../../utils/exportCsv';
@@ -31,7 +32,8 @@ export default function CustomerList() {
       return;
     }
     try {
-      const docRef = await addDoc(collection(db, 'customers'), {
+      const customerId = newCustomer.phone || `${createSlug(newCustomer.name)}-${generateShortId()}`;
+      await setDoc(doc(db, 'customers', customerId), {
         ...newCustomer,
         totalSpent: 0,
         ordersCount: 0,

@@ -8,7 +8,7 @@ function emailMiddlewarePlugin(): Plugin {
   return {
     name: 'email-middleware',
     configureServer(server) {
-      server.middlewares.use('/api/send-email', async (req, res) => {
+      server.middlewares.use('/api/process-invoice-email', async (req, res) => {
         if (req.method !== 'POST') {
           res.statusCode = 405;
           res.end(JSON.stringify({ error: 'Method Not Allowed' }));

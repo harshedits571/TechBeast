@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Save, ArrowLeft, Package } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { collection, addDoc, doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
+import { createSlug, generateShortId } from '../../utils/slugify';
 import ImageUpload from '../../components/admin/ImageUpload';
 import { FormSkeleton } from '../../components/ui/Skeleton';
 
@@ -104,7 +105,8 @@ export default function InventoryForm() {
       if (isEditing && id) {
         await updateDoc(doc(db, 'inventory', id), dataToSave);
       } else {
-        await addDoc(collection(db, "inventory"), {
+        const docId = formData.sku ? createSlug(formData.sku) : `${createSlug(formData.name)}-${generateShortId()}`;
+        await setDoc(doc(db, "inventory", docId), {
           ...dataToSave,
           createdAt: new Date().toISOString()
         });
