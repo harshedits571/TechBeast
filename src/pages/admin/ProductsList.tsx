@@ -79,18 +79,21 @@ export default function ProductsList() {
       p.sku?.toLowerCase().includes(searchTerm.toLowerCase());
     
     let matchesCategory = false;
+    const pCat = p.category || '';
+    const isLaptop = pCat === 'Laptops' || pCat === 'New Laptops' || pCat === 'Used Laptops' || pCat.toLowerCase().includes('laptop');
+
     if (selectedCategory === 'All') {
       matchesCategory = true;
     } else if (selectedCategory === 'New Laptops') {
-      matchesCategory = p.category === 'Laptops' && (!p.condition || p.condition === 'New');
+      matchesCategory = isLaptop && (pCat === 'New Laptops' || !p.condition || p.condition === 'New');
     } else if (selectedCategory === 'Used Laptops') {
-      matchesCategory = p.category === 'Laptops' && p.condition && p.condition !== 'New';
+      matchesCategory = isLaptop && (pCat === 'Used Laptops' || (p.condition && p.condition !== 'New'));
     } else if (selectedCategory === 'Desktops') {
-      matchesCategory = p.category === 'Desktops' || p.category === 'Desktop Parts' || p.category === 'Desktop' || p.category === 'Components' || p.category === 'Component';
+      matchesCategory = pCat === 'Desktops' || pCat === 'Desktop Parts' || pCat === 'Desktop' || pCat === 'Components' || pCat === 'Component';
     } else if (selectedCategory === 'Components') {
-      matchesCategory = p.category === 'Components' || p.category === 'Component' || p.category === 'Desktops' || p.category === 'Desktop Parts' || p.category === 'Processors' || p.category === 'RAM' || p.category === 'Motherboards';
+      matchesCategory = pCat === 'Components' || pCat === 'Component' || pCat === 'Desktops' || pCat === 'Desktop Parts' || pCat === 'Processors' || pCat === 'RAM' || pCat === 'Motherboards';
     } else {
-      matchesCategory = p.category === selectedCategory;
+      matchesCategory = pCat === selectedCategory;
     }
 
     return matchesSearch && matchesCategory;
@@ -138,8 +141,16 @@ export default function ProductsList() {
             {categories.map(cat => {
               let count = 0;
               if (cat === 'All') count = products.length;
-              else if (cat === 'New Laptops') count = products.filter(p => p.category === 'Laptops' && (!p.condition || p.condition === 'New')).length;
-              else if (cat === 'Used Laptops') count = products.filter(p => p.category === 'Laptops' && p.condition && p.condition !== 'New').length;
+              else if (cat === 'New Laptops') count = products.filter(p => {
+                const pCat = p.category || '';
+                const isL = pCat === 'Laptops' || pCat === 'New Laptops' || pCat === 'Used Laptops' || pCat.toLowerCase().includes('laptop');
+                return isL && (pCat === 'New Laptops' || !p.condition || p.condition === 'New');
+              }).length;
+              else if (cat === 'Used Laptops') count = products.filter(p => {
+                const pCat = p.category || '';
+                const isL = pCat === 'Laptops' || pCat === 'New Laptops' || pCat === 'Used Laptops' || pCat.toLowerCase().includes('laptop');
+                return isL && (pCat === 'Used Laptops' || (p.condition && p.condition !== 'New'));
+              }).length;
               else count = products.filter(p => p.category === cat).length;
               
               const isActive = selectedCategory === cat;
