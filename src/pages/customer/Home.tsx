@@ -14,26 +14,38 @@ function HomeProductCard({ product }: { product: any; key?: string | number }) {
     : Math.floor(Math.random() * 20) + 5;
 
   return (
-    <Link to={`/products/${product.id}`} className="group bg-white border border-slate-200 rounded-sm hover:shadow-xl hover:border-slate-300 transition-all duration-300 flex flex-col relative p-4">
-      <div className="absolute top-4 left-4 z-10">
-        <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded-sm uppercase tracking-wider">
+    <Link to={`/products/${product.id}`} className="group bg-white border border-slate-200 rounded-xl hover:shadow-xl hover:border-slate-300 transition-all duration-300 flex flex-col relative p-4 h-full">
+      <div className="absolute top-3 left-3 z-10">
+        <span className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded shadow-sm uppercase tracking-wider">
           -{discountPercent}% OFF
         </span>
       </div>
-      <div className="aspect-[4/3] w-full flex items-center justify-center mb-4 pt-8">
+      
+      {/* Standardized Centered Bounding Box for Horizontal & Vertical Images */}
+      <div className="w-full h-48 sm:h-52 flex items-center justify-center p-3 mb-3 bg-slate-50/70 rounded-xl overflow-hidden relative">
         {product.imageUrls && product.imageUrls.length > 0 ? (
-          <img src={product.imageUrls[0]} alt={product.title} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500" />
+          <img 
+            src={product.imageUrls[0]} 
+            alt={product.title} 
+            loading="lazy"
+            className="max-h-full max-w-full w-auto h-auto object-contain object-center group-hover:scale-105 transition-transform duration-300 mx-auto my-auto" 
+          />
         ) : (
-          <Monitor className="h-20 w-20 text-slate-200" />
+          <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 group-hover:scale-105 transition-transform duration-300">
+            <Monitor className="h-14 w-14 text-slate-300 stroke-[1.5]" />
+            <span className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-wider">Tech Beast</span>
+          </div>
         )}
       </div>
+
       <div className="flex flex-col flex-grow">
-        <div className="text-xs text-slate-400 font-medium mb-1">{product.brand || product.category}</div>
-        <h3 className="font-bold text-slate-800 text-sm leading-tight mb-2 line-clamp-2">{product.title}</h3>
-        <div className="mt-auto pt-4 flex items-center gap-2">
-          <span className="font-bold text-lg text-slate-900">₹{product.price?.toLocaleString('en-IN')}</span>
+        <div className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-1">{product.brand || product.category}</div>
+        <h3 className="h-10 font-bold text-slate-800 text-sm leading-snug mb-2 line-clamp-2 uppercase group-hover:text-blue-600 transition-colors">{product.title}</h3>
+        
+        <div className="mt-auto pt-3 border-t border-slate-100 flex items-baseline gap-2">
+          <span className="font-black text-lg text-slate-900 font-mono">₹{Number(product.price).toLocaleString('en-IN')}</span>
           {isDiscounted && (
-            <span className="text-sm text-slate-400 line-through">₹{product.oldPrice?.toLocaleString('en-IN')}</span>
+            <span className="text-xs text-slate-400 line-through font-mono">₹{Number(product.oldPrice).toLocaleString('en-IN')}</span>
           )}
         </div>
       </div>

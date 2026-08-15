@@ -108,7 +108,8 @@ export default function PrebuiltPCs() {
                     <img 
                       src={rig.imageUrl || "https://images.unsplash.com/photo-1587202372775-e229f172b9d7?auto=format&fit=crop&w=600&q=80"} 
                       alt={rig.title} 
-                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+                      loading="lazy"
+                      className="max-h-full max-w-full w-auto h-auto object-contain object-center group-hover:scale-105 transition-transform duration-300 mx-auto my-auto"
                     />
                     <div className="absolute top-3 right-3 bg-purple-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
                       {rig.status || 'In Stock'}

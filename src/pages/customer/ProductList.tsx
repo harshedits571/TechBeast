@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Filter, ChevronDown, Check, Star, X, Search } from 'lucide-react';
+import { Filter, ChevronDown, Check, Star, X, Search, Monitor } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { CardGridSkeleton } from '../../components/ui/Skeleton';
@@ -472,45 +472,41 @@ export default function ProductList() {
                 const emiAmount = Math.round(product.price / 12);
 
                 return (
-                  <Link key={product.id} to={`/products/${product.id}`} className="group bg-white border border-slate-200 rounded-sm hover:shadow-xl hover:border-slate-300 transition-all duration-300 flex flex-col relative p-4">
+                  <Link key={product.id} to={`/products/${product.id}`} className="group bg-white border border-slate-200 rounded-xl hover:shadow-xl hover:border-slate-300 transition-all duration-300 flex flex-col relative p-4 h-full">
                     
                     {/* Discount Badge */}
-                    <div className="absolute top-4 left-4 z-10">
-                      <span className="bg-black text-white text-[10px] font-bold px-2 py-1 rounded-sm">
+                    <div className="absolute top-3 left-3 z-10">
+                      <span className="bg-black text-white text-[10px] font-black px-2 py-0.5 rounded shadow-sm">
                         -{discountPercent}%
                       </span>
                     </div>
 
-                    {/* Image Placeholder */}
-                    <div className="aspect-[4/3] w-full flex items-center justify-center mb-4 pt-8">
+                    {/* Standardized Centered Bounding Box for Horizontal & Vertical Images */}
+                    <div className="w-full h-48 sm:h-52 flex items-center justify-center p-3 mb-3 bg-slate-50/70 rounded-xl overflow-hidden relative">
                       {product.imageUrls && product.imageUrls.length > 0 ? (
-                        <div className="relative w-full h-full flex flex-col items-center justify-center group-hover:scale-105 transition-transform duration-500 px-4">
-                          <img 
-                            src={product.imageUrls[0]} 
-                            alt={product.title} 
-                            className="w-full h-full object-contain"
-                          />
-                        </div>
+                        <img 
+                          src={product.imageUrls[0]} 
+                          alt={product.title} 
+                          loading="lazy"
+                          className="max-h-full max-w-full w-auto h-auto object-contain object-center group-hover:scale-105 transition-transform duration-300 mx-auto my-auto"
+                        />
                       ) : (
-                        <div className="relative w-3/4 h-3/4 flex flex-col items-center justify-center group-hover:scale-105 transition-transform duration-500">
-                           <div className="w-full h-full bg-slate-800 rounded-t-md border-4 border-slate-900 relative overflow-hidden flex items-center justify-center">
-                              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20"></div>
-                              <span className="text-white/20 font-bold text-2xl">MSI</span>
-                           </div>
-                           <div className="w-[110%] h-3 bg-slate-300 rounded-b-xl shadow-md border-t border-slate-400"></div>
+                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 group-hover:scale-105 transition-transform duration-300">
+                          <Monitor className="h-14 w-14 text-slate-300 stroke-[1.5]" />
+                          <span className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-wider">Tech Beast</span>
                         </div>
                       )}
                     </div>
 
                     {/* Content */}
                     <div className="flex flex-col flex-1">
-                      <h3 className="text-xs font-bold text-slate-700 mb-2 line-clamp-2 uppercase leading-relaxed group-hover:text-blue-600 transition-colors">
+                      <h3 className="h-10 text-xs font-bold text-slate-800 mb-2 line-clamp-2 uppercase leading-snug group-hover:text-blue-600 transition-colors">
                         {product.title}
                       </h3>
                       
-                      <div className="mt-auto pt-2 space-y-2">
+                      <div className="mt-auto pt-2 space-y-1.5 border-t border-slate-100">
                         <div className="flex items-center gap-2">
-                          <span className="text-lg font-bold text-blue-600">₹ {Number(product.price).toLocaleString('en-IN')}</span>
+                          <span className="text-base sm:text-lg font-black text-blue-600 font-mono">₹ {Number(product.price).toLocaleString('en-IN')}</span>
                           {product.oldPrice ? (
                              <span className="text-xs text-slate-400 line-through">₹ {Number(product.oldPrice).toLocaleString('en-IN')}</span>
                           ) : (
@@ -519,12 +515,12 @@ export default function ProductList() {
                         </div>
 
                         {product.stock > 0 ? (
-                          <div className="flex items-center gap-1 text-xs font-medium text-emerald-500 pt-1">
-                            <Check className="h-3 w-3" /> In stock
+                          <div className="flex items-center gap-1 text-xs font-semibold text-emerald-600">
+                            <Check className="h-3.5 w-3.5" /> In stock
                           </div>
                         ) : (
-                          <div className="flex items-center gap-1 text-xs font-medium text-red-500 pt-1">
-                            <X className="h-3 w-3" /> Out of stock
+                          <div className="flex items-center gap-1 text-xs font-semibold text-red-500">
+                            <X className="h-3.5 w-3.5" /> Out of stock
                           </div>
                         )}
                       </div>
