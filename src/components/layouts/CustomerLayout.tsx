@@ -332,13 +332,6 @@ export default function CustomerLayout() {
         )}
       </header>
 
-      {/* Promo Banner */}
-      {settings.promoBannerEnabled && settings.promoBannerText && (
-        <div className="bg-red-600 text-white text-center py-2 px-4 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 shadow-inner">
-          <span className="animate-pulse">🔥</span> {settings.promoBannerText} <span className="animate-pulse">🔥</span>
-        </div>
-      )}
-
       {/* Main Content */}
       <main className="flex-grow">
         <Outlet />
