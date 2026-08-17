@@ -35,7 +35,7 @@ export default function PrebuiltPCs() {
         const prodSnap = await getDocs(query(collection(db, "products"), limit(50)));
         const prodList = prodSnap.docs
           .map(d => ({ id: d.id, ...d.data() }))
-          .filter((p: any) => p.isPrebuilt || p.category === 'Pre-built PC');
+          .filter((p: any) => p.isPrebuilt || p.category === 'Pre-built PC' || p.category === 'Prebuilt PC');
 
         const combined = [...list, ...collectionList, ...prodList];
         const uniqueMap = new Map();

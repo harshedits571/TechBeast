@@ -174,8 +174,8 @@ export default function OrderList() {
 
         {/* Toolbar */}
         <div className="p-4 border-b border-white/5 flex flex-wrap items-center justify-between gap-4 bg-[#0d0d0e]">
-          <div className="flex items-center gap-4 flex-1 min-w-[300px]">
-            <div className="relative flex-1 max-w-md">
+          <div className="flex flex-wrap items-center gap-4 flex-1">
+            <div className="relative flex-1 min-w-[200px] max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
                 type="text"
@@ -231,7 +231,7 @@ export default function OrderList() {
               More filters
             </button>
 
-            <div className="flex items-center gap-2 border-l border-white/10 pl-4">
+            <div className="flex flex-wrap items-center gap-2 lg:border-l lg:border-white/10 lg:pl-4">
               <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-slate-300 focus:outline-none focus:border-blue-500" title="Start Date" />
               <span className="text-slate-500 text-sm">to</span>
               <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-slate-300 focus:outline-none focus:border-blue-500" title="End Date" />

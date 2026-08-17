@@ -11,7 +11,16 @@ interface StoreSettings {
   contactEmail: string;
   promoBannerText: string;
   promoBannerEnabled: boolean;
-  heroBanners: { imageUrl: string; link: string }[];
+  heroBanners: { 
+    imageUrl: string; 
+    link: string; 
+    x?: number; 
+    y?: number; 
+    w?: number; 
+    h?: number; 
+    fitMode?: string;
+  }[];
+  heroAspectRatio?: number;
   flashSaleEnabled: boolean;
   flashSaleTitle: string;
   flashSaleSubtitle: string;
@@ -36,6 +45,7 @@ const defaultSettings: StoreSettings = {
   promoBannerText: '',
   promoBannerEnabled: false,
   heroBanners: [],
+  heroAspectRatio: 1.5,
   flashSaleEnabled: false,
   flashSaleTitle: 'Flash Sale',
   flashSaleSubtitle: "Today's Special Deals",

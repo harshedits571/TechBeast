@@ -79,7 +79,8 @@ export default function ProductList() {
 
   const productMatchesCategoryAndCondition = (p: any) => {
     // Exclude Prebuilt PCs from standard store listings (they have dedicated /prebuilt-pc page)
-    if ((p.isPrebuilt || p.category === 'Pre-built PC') && categoryFilter !== 'Pre-built PC') return false;
+    const isPrebuiltPC = p.isPrebuilt || p.category === 'Pre-built PC' || p.category === 'Prebuilt PC';
+    if (isPrebuiltPC && categoryFilter !== 'Pre-built PC' && categoryFilter !== 'Prebuilt PC') return false;
 
     const pCatLower = (p.category || '').toLowerCase();
     const isLaptop = pCatLower.includes('laptop');

@@ -5,14 +5,17 @@ import { deleteCloudinaryImage } from '../../utils/cloudinary';
 interface ImageUploadProps {
   images: string[];
   onChange: (urls: string[]) => void;
+  maxImages?: number;
 }
 
-export default function ImageUpload({ images, onChange }: ImageUploadProps) {
+export default function ImageUpload({ images, onChange, maxImages }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [linkInput, setLinkInput] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragItem = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
+
+  const showUploadControls = !maxImages || (images || []).length < maxImages;
 
   const UPLOAD_PRESET = 'vihdngdx';
   // TODO: Replace this with the actual cloud name once provided by the user
@@ -136,21 +139,23 @@ export default function ImageUpload({ images, onChange }: ImageUploadProps) {
           </div>
         ))}
 
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
-          className="w-24 h-24 border-2 border-dashed border-white/20 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-blue-500 hover:bg-blue-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-slate-400 hover:text-blue-400 bg-[#0d0d0e]"
-        >
-          {isUploading ? (
-            <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
-          ) : (
-            <>
-              <Upload className="w-6 h-6 mb-1" />
-              <span className="text-[10px] uppercase font-bold tracking-widest">Upload</span>
-            </>
-          )}
-        </button>
+        {showUploadControls && (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="w-24 h-24 border-2 border-dashed border-white/20 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-blue-500 hover:bg-blue-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-slate-400 hover:text-blue-400 bg-[#0d0d0e]"
+          >
+            {isUploading ? (
+              <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+            ) : (
+              <>
+                <Upload className="w-6 h-6 mb-1" />
+                <span className="text-[10px] uppercase font-bold tracking-widest">Upload</span>
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       <input
@@ -161,26 +166,31 @@ export default function ImageUpload({ images, onChange }: ImageUploadProps) {
         accept="image/*"
         className="hidden"
       />
-      <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">
-        Upload high-quality images. Hosted securely on Cloudinary.
-      </p>
-      
-      <div className="flex gap-2 pt-2 border-t border-white/10">
-        <input 
-          type="text" 
-          placeholder="Or paste an image URL here..." 
-          value={linkInput}
-          onChange={(e) => setLinkInput(e.target.value)}
-          className="flex-1 bg-[#0d0d0e] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors normal-case"
-        />
-        <button 
-          type="button" 
-          onClick={handleAddLink}
-          className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors"
-        >
-          Add URL
-        </button>
-      </div>
+
+      {showUploadControls && (
+        <>
+          <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">
+            Upload high-quality images. Hosted securely on Cloudinary.
+          </p>
+          
+          <div className="flex gap-2 pt-2 border-t border-white/10">
+            <input 
+              type="text" 
+              placeholder="Or paste an image URL here..." 
+              value={linkInput}
+              onChange={(e) => setLinkInput(e.target.value)}
+              className="flex-1 bg-[#0d0d0e] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors normal-case"
+            />
+            <button 
+              type="button" 
+              onClick={handleAddLink}
+              className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors"
+            >
+              Add URL
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

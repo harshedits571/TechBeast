@@ -109,7 +109,7 @@ export default function AdminLayout() {
           </aside>
 
           {/* Main Content */}
-          <main className="flex-1 flex flex-col lg:ml-64 print:ml-0 min-h-[100dvh] w-full">
+          <main className="flex-1 flex flex-col lg:ml-64 print:ml-0 min-h-[100dvh] w-full lg:w-[calc(100%-16rem)] overflow-x-hidden">
             {/* Top Header */}
             <header className="h-16 lg:h-20 border-b border-white/5 px-4 lg:px-8 flex items-center justify-between bg-[#0a0a0b] sticky top-0 z-30 print:hidden">
               <div className="flex items-center gap-2 lg:gap-4">

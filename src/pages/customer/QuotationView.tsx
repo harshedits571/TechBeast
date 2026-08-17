@@ -86,7 +86,7 @@ export default function QuotationView() {
     window.print();
   };
 
-  const storePhone = settings?.contactPhone || '+919535225266';
+  const storePhone = settings?.supportPhone || '+919535225266';
   const cleanPhone = storePhone.replace(/[^0-9]/g, '');
 
   const getWhatsAppUrl = () => {
@@ -168,7 +168,7 @@ export default function QuotationView() {
     compList = rawList.map(c => ({
       label: c.label,
       name: c.item.name,
-      qty: c.isRam ? (c.item.qty || 1) : 1,
+      qty: c.isRam ? ((c.item as any).qty || 1) : 1,
       price: c.item.price,
       icon: c.icon
     }));

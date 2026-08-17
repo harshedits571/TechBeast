@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Save, Plus, Trash2 } from 'lucide-react';
 import { FormSkeleton } from '../../components/ui/Skeleton';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -16,12 +16,86 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState('general');
   const [allProducts, setAllProducts] = useState<any[]>([]);
 
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [activeAction, setActiveAction] = useState<{
+    type: 'drag' | 'resize';
+    index: number;
+    startX: number;
+    startY: number;
+    startXPercent: number;
+    startYPercent: number;
+    startWPercent: number;
+    startHPercent: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!activeAction) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!canvasRef.current) return;
+      const canvasRect = canvasRef.current.getBoundingClientRect();
+      const dx = e.clientX - activeAction.startX;
+      const dy = e.clientY - activeAction.startY;
+      const dxPercent = (dx / canvasRect.width) * 100;
+      const dyPercent = (dy / canvasRect.width) * 100;
+
+      const newBanners = [...formData.heroBanners];
+      const banner = newBanners[activeAction.index];
+
+      if (activeAction.type === 'drag') {
+        let newX = Math.round(activeAction.startXPercent + dxPercent);
+        let newY = Math.round(activeAction.startYPercent + dyPercent);
+        
+        // Snapping boundaries
+        if (Math.abs(newX) < 2) newX = 0;
+        if (Math.abs(newY) < 2) newY = 0;
+        const currentW = banner.w || 50;
+        const currentH = banner.h || 50;
+        if (Math.abs(newX + currentW - 100) < 2) newX = 100 - currentW;
+        if (Math.abs(newY + currentH - 100) < 2) newY = 100 - currentH;
+
+        newBanners[activeAction.index] = {
+          ...banner,
+          x: Math.max(0, Math.min(100 - currentW, newX)),
+          y: Math.max(0, Math.min(1000, newY))
+        };
+      } else if (activeAction.type === 'resize') {
+        let newW = Math.round(activeAction.startWPercent + dxPercent);
+        let newH = Math.round(activeAction.startHPercent + dyPercent);
+
+        newW = Math.max(5, Math.min(100 - (banner.x || 0), newW));
+        newH = Math.max(5, Math.min(1000, newH));
+
+        newBanners[activeAction.index] = {
+          ...banner,
+          w: newW,
+          h: newH
+        };
+      }
+
+      setFormData(prev => ({ ...prev, heroBanners: newBanners }));
+    };
+
+    const handleMouseUp = () => {
+      setActiveAction(null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [activeAction, formData.heroBanners]);
+
   useEffect(() => {
     if (!loading && settings) {
       // Initialize any missing arrays
       setFormData({
         ...settings,
         heroBanners: settings.heroBanners || [],
+        heroAspectRatio: settings.heroAspectRatio || 1.5,
         flashSaleProductIds: settings.flashSaleProductIds || [],
         bestSellerIds: settings.bestSellerIds || [],
         newArrivalIds: settings.newArrivalIds || []
@@ -116,13 +190,29 @@ export default function Settings() {
   };
 
   const addHeroBanner = () => {
+    const defaultCoords = [
+      { x: 0, y: 0, w: 66, h: 100 },      // Banner 1
+      { x: 68, y: 0, w: 32, h: 48 },     // Banner 2
+      { x: 68, y: 52, w: 32, h: 48 },    // Banner 3
+      { x: 0, y: 105, w: 100, h: 25 }    // Banner 4
+    ];
+    const index = formData.heroBanners.length;
+    const coords = defaultCoords[index] || { x: 0, y: 0, w: 50, h: 50 };
+
     setFormData({
       ...formData,
-      heroBanners: [...formData.heroBanners, { imageUrl: '', link: '' }]
+      heroBanners: [...formData.heroBanners, { 
+        imageUrl: '', 
+        link: '',
+        x: coords.x,
+        y: coords.y,
+        w: coords.w,
+        h: coords.h
+      }]
     });
   };
 
-  const updateHeroBanner = (index: number, field: string, value: string) => {
+  const updateHeroBanner = (index: number, field: string, value: any) => {
     const newBanners = [...formData.heroBanners];
     newBanners[index] = { ...newBanners[index], [field]: value };
     setFormData({ ...formData, heroBanners: newBanners });
@@ -139,6 +229,27 @@ export default function Settings() {
     }
     const newBanners = formData.heroBanners.filter((_, i) => i !== index);
     setFormData({ ...formData, heroBanners: newBanners });
+  };
+
+  const autoFitBannerImage = (index: number) => {
+    const banner = formData.heroBanners[index];
+    if (!banner.imageUrl) return;
+
+    const img = new Image();
+    img.src = banner.imageUrl;
+    img.onload = () => {
+      const imageAspect = img.width / img.height;
+      const currentW = banner.w || 50;
+      let newH = Math.round(currentW / imageAspect);
+      newH = Math.max(5, Math.min(1000, newH));
+
+      const newBanners = [...formData.heroBanners];
+      newBanners[index] = {
+        ...banner,
+        h: newH
+      };
+      setFormData(prev => ({ ...prev, heroBanners: newBanners }));
+    };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -274,6 +385,150 @@ export default function Settings() {
                 </button>
               </div>
               
+              {/* CANVAS ASPECT RATIO CONTROL */}
+              {formData.heroBanners.length > 0 && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-950/40 p-4 rounded-xl border border-white/5 mb-4">
+                  <div>
+                    <h4 className="text-sm font-bold text-white uppercase tracking-wider">Canvas Height Adjuster</h4>
+                    <p className="text-xs text-slate-400 mt-0.5">Drag the slider to adjust the height (aspect ratio) of the main hero section.</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">Taller</span>
+                    <input 
+                      type="range" 
+                      min="0.8" 
+                      max="3.0" 
+                      step="0.05" 
+                      value={formData.heroAspectRatio !== undefined ? formData.heroAspectRatio : 1.5}
+                      onChange={(e) => setFormData(prev => ({ ...prev, heroAspectRatio: Number(e.target.value) }))}
+                      className="w-48 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                    />
+                    <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">Wider</span>
+                    <span className="text-xs bg-blue-600 text-white font-bold px-2 py-1 rounded text-mono">
+                      {(formData.heroAspectRatio !== undefined ? formData.heroAspectRatio : 1.5).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* VISUAL LAYOUT BUILDER CANVAS */}
+              {formData.heroBanners.length > 0 && (
+                <div className="mb-6 space-y-2">
+                  <span className="text-xs font-bold uppercase tracking-widest text-slate-400 block">
+                    🖥️ Visual Canvas Designer (Photoshop Style - Click & Drag to Position, Drag Corner to Resize)
+                  </span>
+                  <div 
+                    ref={canvasRef}
+                    style={{ aspectRatio: `${formData.heroAspectRatio || 1.5} / 1` }}
+                    className="relative w-full bg-slate-950 rounded-2xl border border-white/10 overflow-hidden select-none"
+                  >
+                    {formData.heroBanners.map((banner, index) => {
+                      const x = banner.x !== undefined ? banner.x : 0;
+                      const y = banner.y !== undefined ? banner.y : 0;
+                      const w = banner.w !== undefined ? banner.w : 50;
+                      const h = banner.h !== undefined ? banner.h : 50;
+
+                      return (
+                        <div
+                          key={index}
+                          style={{
+                            position: 'absolute',
+                            left: `${x}%`,
+                            top: `${y * (formData.heroAspectRatio || 1.5)}%`,
+                            width: `${w}%`,
+                            height: `${h * (formData.heroAspectRatio || 1.5)}%`,
+                          }}
+                          className={`group/banner rounded-xl overflow-hidden border-2 ${
+                            activeAction?.index === index ? 'border-blue-500 shadow-lg shadow-blue-500/20' : 'border-white/20 hover:border-blue-500/50'
+                          } bg-slate-900 transition-shadow`}
+                        >
+                          {banner.imageUrl ? (
+                            banner.fitMode === 'contain-blur' || !banner.fitMode ? (
+                              <div className="relative w-full h-full overflow-hidden bg-slate-950 flex items-center justify-center">
+                                <img 
+                                  src={banner.imageUrl} 
+                                  alt="Blur Background" 
+                                  className="absolute inset-0 w-full h-full object-cover blur-xl opacity-40 scale-110 pointer-events-none"
+                                />
+                                <img 
+                                  src={banner.imageUrl} 
+                                  alt={`Banner ${index + 1}`}
+                                  className="w-full h-full object-contain relative z-10 pointer-events-none"
+                                />
+                              </div>
+                            ) : (
+                              <img 
+                                src={banner.imageUrl} 
+                                alt={`Banner ${index + 1}`}
+                                className={`w-full h-full pointer-events-none ${
+                                  banner.fitMode === 'contain' ? 'object-contain bg-slate-900/50' : 
+                                  banner.fitMode === 'fill' ? 'object-fill' : 'object-cover'
+                                }`}
+                              />
+                            )
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs font-semibold">
+                              No Image
+                            </div>
+                          )}
+
+                          <div 
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setActiveAction({
+                                type: 'drag',
+                                index,
+                                startX: e.clientX,
+                                startY: e.clientY,
+                                startXPercent: x,
+                                startYPercent: y,
+                                startWPercent: w,
+                                startHPercent: h
+                              });
+                            }}
+                            className="absolute inset-0 bg-black/40 opacity-0 group-hover/banner:opacity-100 transition-opacity flex flex-col justify-between p-2 cursor-move"
+                          >
+                            <div className="bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded self-start">
+                              Banner {index + 1}
+                            </div>
+                            
+                            <div className="text-[10px] text-slate-300 font-bold self-start">
+                              Drag to move
+                            </div>
+                          </div>
+
+                          <div className="absolute top-2 left-2 bg-slate-950/80 backdrop-blur-sm border border-white/15 px-1.5 py-0.5 rounded text-[9px] font-black text-white z-20 pointer-events-none group-hover/banner:hidden">
+                            #{index + 1}
+                          </div>
+
+                          <div 
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setActiveAction({
+                                type: 'resize',
+                                index,
+                                startX: e.clientX,
+                                startY: e.clientY,
+                                startXPercent: x,
+                                startYPercent: y,
+                                startWPercent: w,
+                                startHPercent: h
+                              });
+                            }}
+                            className="absolute bottom-1 right-1 w-4 h-4 bg-blue-500 hover:bg-blue-600 border border-white/20 rounded cursor-se-resize flex items-center justify-center shadow z-30"
+                          >
+                            <svg width="6" height="6" viewBox="0 0 6 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M6 0L0 6M6 3L3 6" stroke="white" strokeWidth="1" strokeLinecap="round" />
+                            </svg>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {formData.heroBanners.length === 0 ? (
                 <p className="text-slate-500 text-sm italic">No banners added. Homepage will use default design.</p>
               ) : (
@@ -284,13 +539,80 @@ export default function Settings() {
                         <ImageUpload
                           images={banner.imageUrl ? [banner.imageUrl] : []}
                           onChange={(urls) => updateHeroBanner(index, 'imageUrl', urls[0] || '')}
+                          maxImages={1}
                         />
                       </div>
                       <div className="flex-1 space-y-4">
-                        <label className="flex flex-col gap-2 text-xs text-slate-400 font-bold uppercase tracking-widest">
-                          Link URL (Optional)
-                          <input type="text" value={banner.link} onChange={(e) => updateHeroBanner(index, 'link', e.target.value)} className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm normal-case" placeholder="/products?category=Laptops" />
-                        </label>
+                        <div className="grid grid-cols-2 gap-4">
+                          <label className="flex flex-col gap-2 text-xs text-slate-400 font-bold uppercase tracking-widest">
+                            Link URL (Optional)
+                            <input type="text" value={banner.link} onChange={(e) => updateHeroBanner(index, 'link', e.target.value)} className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm normal-case font-normal" placeholder="/products?category=Laptops" />
+                          </label>
+
+                          <label className="flex flex-col gap-2 text-xs text-slate-400 font-bold uppercase tracking-widest">
+                            Image Fit Mode
+                            <div className="flex gap-2">
+                              <select 
+                                value={banner.fitMode || 'cover'} 
+                                onChange={(e) => updateHeroBanner(index, 'fitMode', e.target.value)} 
+                                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500 font-normal font-sans"
+                              >
+                                <option value="cover" className="bg-[#0d0d0e]">Cover (Fill & Crop)</option>
+                                <option value="contain" className="bg-[#0d0d0e]">Contain (Fit Fully)</option>
+                                <option value="fill" className="bg-[#0d0d0e]">Stretch (Distort to Fit)</option>
+                              </select>
+                              {banner.imageUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() => autoFitBannerImage(index)}
+                                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider whitespace-nowrap"
+                                  title="Automatically adjusts height to match image aspect ratio perfectly"
+                                >
+                                  Auto-Fit Size
+                                </button>
+                              )}
+                            </div>
+                          </label>
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-2 pt-2 border-t border-white/5">
+                          <label className="flex flex-col gap-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                            X Pos (%)
+                            <input 
+                              type="number" 
+                              value={banner.x !== undefined ? banner.x : 0} 
+                              onChange={(e) => updateHeroBanner(index, 'x', Number(e.target.value))} 
+                              className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white text-xs text-center font-normal" 
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                            Y Pos (%)
+                            <input 
+                              type="number" 
+                              value={banner.y !== undefined ? banner.y : 0} 
+                              onChange={(e) => updateHeroBanner(index, 'y', Number(e.target.value))} 
+                              className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white text-xs text-center font-normal" 
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                            Width (%)
+                            <input 
+                              type="number" 
+                              value={banner.w !== undefined ? banner.w : 50} 
+                              onChange={(e) => updateHeroBanner(index, 'w', Number(e.target.value))} 
+                              className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white text-xs text-center font-normal" 
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                            Height (%)
+                            <input 
+                              type="number" 
+                              value={banner.h !== undefined ? banner.h : 50} 
+                              onChange={(e) => updateHeroBanner(index, 'h', Number(e.target.value))} 
+                              className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white text-xs text-center font-normal" 
+                            />
+                          </label>
+                        </div>
                       </div>
                       <button type="button" onClick={() => removeHeroBanner(index)} className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors">
                         <Trash2 className="h-5 w-5" />

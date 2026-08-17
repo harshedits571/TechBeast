@@ -131,8 +131,8 @@ export default function ProductDetail() {
   const discountAmount = isDiscounted ? (product.oldPrice - product.price) : 0;
   const discountPercent = isDiscounted ? Math.round((discountAmount / product.oldPrice) * 100) : 0;
 
-  const isDesktop = product.category === 'Desktops';
-  const isFullSystem = product.category === 'Laptops' || (isDesktop && product.componentType === 'Assembled PC');
+  const isDesktop = product.category === 'Desktops' || product.category === 'Prebuilt PC' || product.category === 'Pre-built PC' || product.category === 'Components';
+  const isFullSystem = product.category === 'Laptops' || product.category === 'New Laptops' || product.category === 'Used Laptops' || product.category === 'Desktops' || product.category === 'Prebuilt PC' || product.category === 'Pre-built PC' || (isDesktop && product.componentType === 'Assembled PC');
   const isRAM = isDesktop && product.componentType === 'RAM';
   const isProcessor = isDesktop && product.componentType === 'Processor';
   const isStorage = isDesktop && product.componentType === 'Storage (SSD/HDD)';

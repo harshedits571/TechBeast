@@ -87,6 +87,7 @@ export default function PrebuiltPCDetail() {
             price: Number(data.price || 0),
             oldPrice: Number(data.oldPrice || 0),
             imageUrl: data.imageUrl || (data.imageUrls && data.imageUrls[0]) || 'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?auto=format&fit=crop&w=800&q=80',
+            imageUrls: data.imageUrls || (data.imageUrl ? [data.imageUrl] : []),
             cabinet: data.cabinet || data.cabinetFormFactor || 'Ant Esports ARGB Gaming Cabinet',
             processor: data.processor || data.processorModel || 'High Performance Gaming CPU',
             motherboard: data.motherboard || 'Gaming WiFi Motherboard',
@@ -97,8 +98,12 @@ export default function PrebuiltPCDetail() {
             primarySsd: data.primarySsd || data.storage || 'Gen4 NVMe M.2 SSD',
             secStorage: data.secStorage || 'No Secondary Storage',
             os: data.os || 'Windows 11 Professional 64 Bit',
+            monitor: data.monitor || '',
+            keyboard: data.keyboard || '',
+            mouse: data.mouse || '',
             freeGiftTitle: data.freeGiftTitle || 'Premium Warranty Package (Worth ₹9,999) - FREE',
             freeGiftSubtext: data.freeGiftSubtext || 'Includes expert troubleshooting and free pick-up & drop.',
+            freeGifts: data.freeGifts || '',
             ramUpgrades: data.ramUpgrades || [],
             coolerUpgrades: data.coolerUpgrades || [],
             ssdUpgrades: data.ssdUpgrades || [],
@@ -143,7 +148,7 @@ export default function PrebuiltPCDetail() {
 
   // Get WhatsApp Quotation
   const handleWhatsAppQuote = () => {
-    const storePhone = settings?.contactPhone || '+919535225266';
+    const storePhone = settings?.supportPhone || '+919535225266';
     const cleanPhone = storePhone.replace(/[^0-9]/g, '');
 
     const quoteMsg = [
@@ -160,6 +165,9 @@ export default function PrebuiltPCDetail() {
       `• *Cooler:* ${product?.cooler}`,
       `• *Primary SSD:* ${product?.primarySsd}`,
       `• *OS:* ${product?.os}`,
+      product?.monitor ? `• *Monitor:* ${product.monitor}` : null,
+      product?.keyboard ? `• *Keyboard:* ${product.keyboard}` : null,
+      product?.mouse ? `• *Mouse:* ${product.mouse}` : null,
       ``,
       `*CHOSEN UPGRADES:*`,
       selectedRam.price > 0 ? `• *RAM Upgrade:* ${selectedRam.name} (+₹${selectedRam.price.toLocaleString('en-IN')})` : '• *RAM:* Base Specification',
@@ -173,7 +181,7 @@ export default function PrebuiltPCDetail() {
       `*Final Total Price:* ₹${finalTotalPrice.toLocaleString('en-IN')}`,
       ``,
       `Hi Tech Beast Hubli team! Please confirm availability for this Prebuilt Desktop and chosen upgrades.`
-    ].join('\n');
+    ].filter(x => x !== null).join('\n');
 
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(quoteMsg)}`, '_blank');
   };
@@ -231,14 +239,56 @@ export default function PrebuiltPCDetail() {
         {/* --- SECTION 1: TOP REVIEW YOUR PREBUILT (MATCHING SCREENSHOT 1) --- */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
-          {/* Left Box: Rig Photo */}
-          <div className="lg:col-span-6 bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col items-center justify-center min-h-[460px]">
-            <div className="relative w-full aspect-square max-w-md flex items-center justify-center">
-              <img 
-                src={mainImage} 
-                alt={product?.title}
-                className="w-full h-full object-contain rounded-2xl"
-              />
+          {/* Left Box: Rig Photo & Included Free Gifts */}
+          <div className="lg:col-span-6 space-y-6">
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col items-center justify-center min-h-[460px] gap-6">
+              <div className="relative w-full aspect-square max-w-md flex items-center justify-center">
+                {mainImage ? (
+                  <img 
+                    src={mainImage} 
+                    alt={product?.title}
+                    className="w-full h-full object-contain rounded-2xl"
+                  />
+                ) : (
+                  <span className="text-slate-400 font-bold text-lg">No Image Available</span>
+                )}
+              </div>
+
+              {/* Thumbnails Row */}
+              {product?.imageUrls && product.imageUrls.length > 1 && (
+                <div className="flex gap-4 overflow-x-auto custom-scrollbar pb-2 w-full justify-center">
+                  {product.imageUrls.map((url: string, index: number) => (
+                    <div
+                      key={index}
+                      onClick={() => setMainImage(url)}
+                      className={`shrink-0 w-16 h-16 border-2 ${mainImage === url ? 'border-purple-600' : 'border-slate-100'} rounded-xl flex items-center justify-center cursor-pointer hover:border-purple-400 transition-colors bg-white overflow-hidden p-1.5`}
+                    >
+                      <img src={url} alt={`Thumbnail ${index + 1}`} className="w-full h-full object-contain" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Included Free Gifts Card */}
+            <div className="bg-slate-100 border border-slate-200 rounded-3xl p-5 shadow-sm flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="bg-emerald-900 text-white p-3 rounded-2xl flex flex-col items-center justify-center shrink-0 border border-emerald-700 shadow-sm">
+                  <Gift className="w-6 h-6 text-emerald-300" />
+                  <span className="text-[9px] font-bold uppercase tracking-widest mt-1">GIFTS</span>
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">
+                    Included Free Accessories
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                    {product?.freeGifts || 'USB Keyboard, Mouse, WiFi Receiver, Mousepad, USB Speaker'}
+                  </p>
+                </div>
+              </div>
+              <span className="bg-emerald-600 text-white px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider shrink-0 shadow-md">
+                Free
+              </span>
             </div>
           </div>
 
@@ -295,10 +345,28 @@ export default function PrebuiltPCDetail() {
                   <span className="text-slate-400 font-bold">•</span>
                   <span>{product?.os}</span>
                 </li>
+                {product?.monitor && (
+                  <li className="pt-2 flex items-start gap-2">
+                    <span className="text-slate-400 font-bold">•</span>
+                    <span>{product.monitor}</span>
+                  </li>
+                )}
+                {product?.keyboard && (
+                  <li className="pt-2 flex items-start gap-2">
+                    <span className="text-slate-400 font-bold">•</span>
+                    <span>{product.keyboard}</span>
+                  </li>
+                )}
+                {product?.mouse && (
+                  <li className="pt-2 flex items-start gap-2">
+                    <span className="text-slate-400 font-bold">•</span>
+                    <span>{product.mouse}</span>
+                  </li>
+                )}
               </ul>
             </div>
 
-            {/* Included Free Warranty Card (Matching Screenshot 1) */}
+            {/* Included Free Warranty Card */}
             <div className="bg-slate-100 border border-slate-200 rounded-3xl p-5 shadow-sm flex items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="bg-purple-900 text-white p-3 rounded-2xl flex flex-col items-center justify-center shrink-0 border border-purple-700 shadow-sm">
@@ -309,13 +377,12 @@ export default function PrebuiltPCDetail() {
                   <h4 className="text-sm font-bold text-slate-900">
                     {product?.freeGiftTitle || 'Premium Warranty Package (Worth ₹9,999) - FREE'}
                   </h4>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
                     {product?.freeGiftSubtext || 'Includes expert troubleshooting and free pick-up & drop. (Exclusively from Tech Beast Hubli)'}
                   </p>
                 </div>
               </div>
-
-              <span className="bg-purple-600 text-white px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider shrink-0 shadow-md">
+              <span className="bg-purple-600 text-white px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider shrink-0 shadow-md">
                 Included
               </span>
             </div>

@@ -53,6 +53,56 @@ function HomeProductCard({ product }: { product: any; key?: string | number }) {
   );
 }
 
+function HeroSlider({ banners }: { banners: any[] }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const timer = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % banners.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [banners.length]);
+
+  if (banners.length === 0) return null;
+
+  return (
+    <div className="relative w-full h-full min-h-[250px] sm:min-h-[350px] lg:min-h-[400px] rounded-3xl overflow-hidden group shadow-md bg-slate-950 flex">
+      {/* Slides */}
+      {banners.map((banner, index) => (
+        <Link
+          key={index}
+          to={banner.link || '#'}
+          className={`absolute inset-0 w-full h-full transition-opacity duration-1000 ease-in-out flex ${
+            index === currentIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'
+          }`}
+        >
+          <img
+            src={banner.imageUrl}
+            alt={`Hero Slide ${index + 1}`}
+            className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700"
+          />
+        </Link>
+      ))}
+
+      {/* Indicators */}
+      {banners.length > 1 && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20 bg-black/30 px-3 py-1.5 rounded-full backdrop-blur-sm">
+          {banners.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrentIndex(index)}
+              className={`w-2 h-2 rounded-full transition-all ${
+                index === currentIndex ? 'bg-white scale-125' : 'bg-white/50 hover:bg-white/80'
+              }`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Home() {
   const { settings } = useSettings();
   const [flashSaleProducts, setFlashSaleProducts] = useState<any[]>([]);
@@ -117,23 +167,84 @@ export default function Home() {
     <div className="flex flex-col min-h-screen bg-slate-50 text-slate-700">
       <SEO />
 
-      {/* 1. HERO BANNERS (GRID LAYOUT) */}
-      {settings.heroBanners && settings.heroBanners.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pt-8 w-full">
-          <div className={`columns-1 gap-4 space-y-4 ${
-            settings.heroBanners.length === 1 ? '' :
-            settings.heroBanners.length === 2 ? 'md:columns-2' :
-            settings.heroBanners.length === 4 ? 'md:columns-2' :
-            'md:columns-3'
-          }`}>
-            {settings.heroBanners.map((banner: any, idx: number) => (
-              <Link key={idx} to={banner.link || '#'} className="block relative rounded-2xl overflow-hidden group shadow-md w-full break-inside-avoid">
-                <img src={banner.imageUrl} alt={`Hero Banner ${idx + 1}`} className="w-full h-auto object-contain group-hover:scale-105 transition-transform duration-700" />
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
+      {/* 1. HERO BANNERS (DYNAMIC LAYOUT CANVAS) */}
+      {settings.heroBanners && settings.heroBanners.length > 0 && (() => {
+        // Find the maximum bound of all banners to scale the container height dynamically if needed, 
+        // but defaults to aspect-[2.4/1] relative canvas which scales perfectly.
+        return (
+          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pt-8 w-full">
+            {/* Desktop & Tablet View: Absolute Coordinate Canvas */}
+            <div 
+              style={{ aspectRatio: `${settings.heroAspectRatio || 1.5} / 1` }}
+              className="hidden md:block relative w-full bg-slate-900/5 rounded-3xl overflow-hidden shadow-md"
+            >
+              {settings.heroBanners.map((banner: any, idx: number) => {
+                // Coordinate values with defaults matching original grid layout
+                const x = banner.x !== undefined ? banner.x : (idx === 0 ? 0 : 68);
+                const y = banner.y !== undefined ? banner.y : (idx === 0 ? 0 : (idx === 1 ? 0 : 52));
+                const w = banner.w !== undefined ? banner.w : (idx === 0 ? 66 : 32);
+                const h = banner.h !== undefined ? banner.h : (idx === 0 ? 100 : 48);
+
+                return (
+                  <Link
+                    key={idx}
+                    to={banner.link || '#'}
+                    style={{
+                      position: 'absolute',
+                      left: `${x}%`,
+                      top: `${y * (settings.heroAspectRatio || 1.5)}%`,
+                      width: `${w}%`,
+                      height: `${h * (settings.heroAspectRatio || 1.5)}%`,
+                    }}
+                    className="block rounded-3xl overflow-hidden group shadow-md"
+                  >
+                    {banner.fitMode === 'contain-blur' || !banner.fitMode ? (
+                      <div className="relative w-full h-full overflow-hidden bg-slate-950 flex items-center justify-center">
+                        <img 
+                          src={banner.imageUrl} 
+                          alt="Blur Background" 
+                          className="absolute inset-0 w-full h-full object-cover blur-xl opacity-40 scale-110"
+                        />
+                        <img 
+                          src={banner.imageUrl} 
+                          alt={`Hero Banner ${idx + 1}`}
+                          className="w-full h-full object-contain relative z-10 group-hover:scale-[1.02] transition-transform duration-700"
+                        />
+                      </div>
+                    ) : (
+                      <img
+                        src={banner.imageUrl}
+                        alt={`Hero Banner ${idx + 1}`}
+                        className={`w-full h-full group-hover:scale-[1.02] transition-transform duration-700 ${
+                          banner.fitMode === 'contain' ? 'object-contain bg-slate-950/20' : 
+                          banner.fitMode === 'fill' ? 'object-fill' : 'object-cover'
+                        }`}
+                      />
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+
+            {/* Mobile View: Vertical scrollable card stack for perfect readability and no squeezing */}
+            <div className="block md:hidden space-y-4">
+              {settings.heroBanners.map((banner: any, idx: number) => (
+                <Link 
+                  key={idx} 
+                  to={banner.link || '#'} 
+                  className="block rounded-2xl overflow-hidden shadow-md w-full"
+                >
+                  <img
+                    src={banner.imageUrl}
+                    alt={`Hero Banner ${idx + 1}`}
+                    className="w-full h-auto object-contain rounded-2xl bg-slate-900/5"
+                  />
+                </Link>
+              ))}
+            </div>
+          </section>
+        );
+      })()}
 
       {/* 2. INTRO TEXT SECTION */}
       <section className="relative overflow-hidden border-b border-slate-200 bg-white">

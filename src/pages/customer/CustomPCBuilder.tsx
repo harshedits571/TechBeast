@@ -477,7 +477,7 @@ export default function CustomPCBuilder() {
     }
 
     // 2. Open WhatsApp with clickable online quotation link
-    const storePhone = settings?.contactPhone || '+919535225266';
+    const storePhone = settings?.supportPhone || '+919535225266';
     const cleanPhone = storePhone.replace(/[^0-9]/g, '');
 
     const quoteMsg = [

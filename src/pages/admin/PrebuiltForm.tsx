@@ -4,6 +4,8 @@ import { ArrowLeft, Save, Plus, Trash2, ShieldCheck } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 
+import ImageUpload from '../../components/admin/ImageUpload';
+
 interface UpgradeOption {
   id: string;
   name: string;
@@ -22,6 +24,7 @@ export default function PrebuiltForm() {
     oldPrice: 0,
     status: 'In Stock',
     imageUrl: '',
+    imageUrls: [] as string[],
 
     // Base Hardware Specifications
     cabinet: '',
@@ -34,10 +37,14 @@ export default function PrebuiltForm() {
     primarySsd: '',
     secStorage: 'No Secondary Storage',
     os: 'Windows 11 Professional 64 Bit',
+    monitor: '',
+    keyboard: '',
+    mouse: '',
 
     // Free Gift / Warranty Package
     freeGiftTitle: 'Premium Warranty Package (Worth ₹9,999) - FREE',
     freeGiftSubtext: 'Includes expert troubleshooting and free pick-up & drop. (Exclusively from Tech Beast Hubli)',
+    freeGifts: '',
 
     // Configurable Component Upgrades
     ramUpgrades: [] as UpgradeOption[],
@@ -53,7 +60,12 @@ export default function PrebuiltForm() {
         // Try settings prebuilts first
         const settingsSnap = await getDoc(doc(db, 'settings', 'prebuilts'));
         if (settingsSnap.exists() && settingsSnap.data().items && settingsSnap.data().items[id]) {
-          setFormData(prev => ({ ...prev, ...settingsSnap.data().items[id] }));
+          const docData = settingsSnap.data().items[id];
+          setFormData(prev => ({ 
+            ...prev, 
+            ...docData, 
+            imageUrls: docData.imageUrls || (docData.imageUrl ? [docData.imageUrl] : [])
+          }));
           setLoading(false);
           return;
         }
@@ -61,7 +73,12 @@ export default function PrebuiltForm() {
         // Try products collection
         const prodSnap = await getDoc(doc(db, "products", id));
         if (prodSnap.exists()) {
-          setFormData(prev => ({ ...prev, ...prodSnap.data() as any }));
+          const docData = prodSnap.data();
+          setFormData(prev => ({ 
+            ...prev, 
+            ...docData,
+            imageUrls: docData.imageUrls || (docData.imageUrl ? [docData.imageUrl] : [])
+          }));
         }
       } catch (err) {
         console.error("Error fetching prebuilt doc:", err);
@@ -121,7 +138,8 @@ export default function PrebuiltForm() {
         isPrebuilt: true,
         price: Number(formData.price || 0),
         oldPrice: Number(formData.oldPrice || 0),
-        imageUrls: formData.imageUrl ? [formData.imageUrl] : [],
+        imageUrls: formData.imageUrls || [],
+        imageUrl: formData.imageUrls && formData.imageUrls.length > 0 ? formData.imageUrls[0] : '',
         updatedAt: new Date().toISOString()
       };
 
@@ -226,15 +244,11 @@ export default function PrebuiltForm() {
               </select>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-slate-400 block">Main Rig Image URL</label>
-              <input 
-                type="text" 
-                name="imageUrl"
-                value={formData.imageUrl}
-                onChange={handleChange}
-                placeholder="https://images.unsplash.com/..."
-                className="w-full bg-[#18181b] border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-purple-500"
+            <div className="space-y-2 md:col-span-2 border-t border-white/5 pt-4">
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-400 block mb-2">Desktop Images</label>
+              <ImageUpload 
+                images={formData.imageUrls || []} 
+                onChange={(urls) => setFormData({ ...formData, imageUrls: urls })} 
               />
             </div>
           </div>
@@ -366,6 +380,42 @@ export default function PrebuiltForm() {
                 className="w-full bg-[#18181b] border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-purple-500"
               />
             </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-400 block">Monitor (Optional)</label>
+              <input 
+                type="text" 
+                name="monitor"
+                value={formData.monitor}
+                onChange={handleChange}
+                placeholder='e.g. 19" Krysta LED Monitor'
+                className="w-full bg-[#18181b] border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-purple-500"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-400 block">Keyboard (Optional)</label>
+              <input 
+                type="text" 
+                name="keyboard"
+                value={formData.keyboard}
+                onChange={handleChange}
+                placeholder="e.g. USB Keyboard"
+                className="w-full bg-[#18181b] border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-purple-500"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-400 block">Mouse (Optional)</label>
+              <input 
+                type="text" 
+                name="mouse"
+                value={formData.mouse}
+                onChange={handleChange}
+                placeholder="e.g. USB Optical Mouse"
+                className="w-full bg-[#18181b] border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-purple-500"
+              />
+            </div>
           </div>
         </div>
 
@@ -396,6 +446,18 @@ export default function PrebuiltForm() {
                 value={formData.freeGiftSubtext}
                 onChange={handleChange}
                 placeholder="Includes expert troubleshooting and free pick-up & drop."
+                className="w-full bg-[#18181b] border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-purple-500"
+              />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-400 block">Included Free Gifts (Comma separated)</label>
+              <input 
+                type="text" 
+                name="freeGifts"
+                value={formData.freeGifts}
+                onChange={handleChange}
+                placeholder="e.g. USB Keyboard, Gaming Mouse, WiFi Receiver, Mousepad, USB Speaker"
                 className="w-full bg-[#18181b] border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-purple-500"
               />
             </div>
