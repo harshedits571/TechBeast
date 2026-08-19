@@ -35,6 +35,7 @@ export default function AdminLayout() {
     { name: 'Repairs', href: '/admin/repairs', icon: Wrench },
     { name: 'Inventory', href: '/admin/inventory', icon: ShoppingCart },
     { name: 'Customers', href: '/admin/customers', icon: Users },
+    { name: 'Web Accounts', href: '/admin/web-users', icon: MonitorSmartphone },
     { name: 'Settings', href: '/admin/settings', icon: Settings },
   ];
 

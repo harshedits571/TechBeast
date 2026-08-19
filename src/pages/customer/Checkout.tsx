@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useCart } from '../../contexts/CartContext';
 import { db } from '../../lib/firebase';
-import { collection, addDoc, updateDoc, doc, increment, getDocs, query, where, orderBy, limit, setDoc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, increment, getDocs, getDoc, query, where, orderBy, limit, setDoc } from 'firebase/firestore';
 import { createSlug, generateShortId } from '../../utils/slugify';
 import { ShoppingBag, MapPin, CreditCard, AlertCircle, Loader2, User } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function Checkout() {
-  const { cart, totalPrice, clearCart } = useCart();
+  const { cart, totalPrice, clearCart, validateCart } = useCart();
   const { user, openAuthModal } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -39,6 +39,21 @@ export default function Checkout() {
     setError('');
 
     try {
+      // 0. Pre-checkout validation
+      for (const item of cart) {
+        let docSnap = await getDoc(doc(db, 'products', item.id));
+        if (!docSnap.exists()) {
+          docSnap = await getDoc(doc(db, 'prebuilt-pcs', item.id));
+        }
+        
+        if (!docSnap.exists() || (docSnap.data().stock !== undefined && docSnap.data().stock < item.quantity)) {
+          setError(`Sorry, "${item.title}" is out of stock or no longer available in the requested quantity. Your cart has been updated.`);
+          await validateCart(); // Auto-correct their cart
+          setLoading(false);
+          return;
+        }
+      }
+
       const now = new Date().toISOString();
       
       let nextNum = 1001;

@@ -28,6 +28,7 @@ import InventoryList from './pages/admin/InventoryList';
 import InventoryForm from './pages/admin/InventoryForm';
 import CustomerList from './pages/admin/CustomerList';
 import CustomerDetail from './pages/admin/CustomerDetail';
+import RegisteredUsersList from './pages/admin/RegisteredUsersList';
 
 import ProductForm from './pages/admin/ProductForm';
 import CustomPCRequests from './pages/admin/CustomPCRequests';
@@ -42,6 +43,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Login from './pages/admin/Login';
 
+import RequireAccount from './components/customer/RequireAccount';
 import QuotationView from './pages/customer/QuotationView';
 
 function ScrollToTop() {
@@ -70,9 +72,9 @@ export default function App() {
             <Route path="quote/:id" element={<QuotationView />} />
             <Route path="custom-pc/quote/:id" element={<QuotationView />} />
             <Route path="prebuilt-pc" element={<PrebuiltPCs />} />
-            <Route path="prebuilt-pc/:id" element={<PrebuiltPCDetail />} />
+            <Route path="prebuilt-pc/:id" element={<RequireAccount><PrebuiltPCDetail /></RequireAccount>} />
             <Route path="products" element={<ProductList />} />
-            <Route path="products/:id" element={<ProductDetail />} />
+            <Route path="products/:id" element={<RequireAccount><ProductDetail /></RequireAccount>} />
             <Route path="checkout" element={<Checkout />} />
             <Route path="checkout/success" element={<CheckoutSuccess />} />
             <Route path="legal/:policyId" element={<LegalPage />} />
@@ -104,6 +106,7 @@ export default function App() {
 
               <Route path="customers" element={<CustomerList />} />
               <Route path="customers/:id" element={<CustomerDetail />} />
+              <Route path="web-users" element={<RegisteredUsersList />} />
 
               <Route path="orders" element={<OrderList />} />
               <Route path="orders/:id" element={<OrderDetail />} />

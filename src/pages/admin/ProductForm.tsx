@@ -54,11 +54,12 @@ export default function ProductForm() {
     motherboardFormFactor: '',
     powerSupplyWattage: '',
     powerSupplyRating: '',
+    rawSpecifications: '',
     imageUrls: [] as string[],
   });
 
   const [brandOpen, setBrandOpen] = useState(false);
-  const brandRef = useRef<HTMLDivElement>(null);
+  const brandRef = useRef<HTMLLabelElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

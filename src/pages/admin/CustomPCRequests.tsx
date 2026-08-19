@@ -32,7 +32,7 @@ interface CustomPCRequest {
 interface ComponentRow {
   category: string;
   desc: string;
-  qty: number;
+  qty: number | string;
   warranty: string;
   price: number | string;
 }
@@ -195,7 +195,8 @@ export default function CustomPCRequests() {
   // Computations for generator
   const subtotal = componentsList.reduce((acc, item) => {
     const p = item.price === '' ? 0 : Number(item.price) || 0;
-    return acc + (item.qty || 1) * p;
+    const q = Number(item.qty) || 1;
+    return acc + q * p;
   }, 0);
 
   const gstAmount = includeGst ? Math.round(subtotal * 0.18) : 0;
@@ -254,9 +255,15 @@ export default function CustomPCRequests() {
   const updateComp = (idx: number, field: keyof ComponentRow, value: any) => {
     const updated = [...componentsList];
     if (field === 'price' || field === 'qty') {
-      updated[idx][field] = value === '' ? '' : (parseFloat(value) || 0);
+      updated[idx] = {
+        ...updated[idx],
+        [field]: value === '' ? '' : (parseFloat(value) || 0)
+      };
     } else {
-      updated[idx][field] = value;
+      updated[idx] = {
+        ...updated[idx],
+        [field]: value
+      };
     }
     setComponentsList(updated);
   };
@@ -491,7 +498,7 @@ export default function CustomPCRequests() {
             {showGenerator ? 'Close Quotation Generator' : '+ Create Custom Quotation'}
           </button>
           <button
-            onClick={fetchRequests}
+            onClick={() => fetchRequests()}
             className="flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-xl border border-white/10 text-xs font-bold transition-colors"
           >
             <RotateCw className="w-4 h-4" />
@@ -541,7 +548,7 @@ export default function CustomPCRequests() {
                 <Printer className="w-4 h-4" /> 🖨️ Print
               </button>
               <button
-                onClick={handleSaveQuoteToDb}
+                onClick={() => handleSaveQuoteToDb()}
                 className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-md shadow-blue-600/20"
               >
                 <Save className="w-4 h-4" /> 💾 Save to Database
@@ -784,7 +791,8 @@ export default function CustomPCRequests() {
                     <tbody className="divide-y divide-slate-200 font-bold text-slate-900">
                       {componentsList.map((item, idx) => {
                         const priceNum = item.price === '' ? 0 : (parseFloat(String(item.price)) || 0);
-                        const itemTotal = (item.qty || 1) * priceNum;
+                        const qtyNum = Number(item.qty) || 1;
+                        const itemTotal = qtyNum * priceNum;
                         return (
                           <tr key={idx} className="hover:bg-slate-50">
                             <td className="p-1.5 text-center font-black text-slate-500">{idx + 1}</td>

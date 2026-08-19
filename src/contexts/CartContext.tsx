@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 export interface CartItem {
   id: string;
@@ -19,6 +21,7 @@ interface CartContextType {
   totalPrice: number;
   isCartOpen: boolean;
   setIsCartOpen: (isOpen: boolean) => void;
+  validateCart: () => Promise<void>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -33,6 +36,70 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     localStorage.setItem('techbeast_cart', JSON.stringify(cart));
   }, [cart]);
+
+  const validateCart = async () => {
+    if (cart.length === 0) return;
+
+    let cartChanged = false;
+    const updatedCart = [...cart];
+
+    for (let i = 0; i < updatedCart.length; i++) {
+      const item = updatedCart[i];
+      if (!item) continue;
+
+      try {
+        // Try products collection first
+        let docSnap = await getDoc(doc(db, 'products', item.id));
+        if (!docSnap.exists()) {
+          // If not found, try prebuilt-pcs
+          docSnap = await getDoc(doc(db, 'prebuilt-pcs', item.id));
+        }
+
+        if (!docSnap.exists()) {
+          // Product was completely removed from the database
+          updatedCart[i].quantity = 0;
+          cartChanged = true;
+          continue;
+        }
+
+        const data = docSnap.data();
+        const currentStock = data.stock !== undefined ? data.stock : 0;
+        
+        if (item.stock !== currentStock) {
+          updatedCart[i].stock = currentStock;
+          cartChanged = true;
+        }
+
+        // If the quantity in cart exceeds available stock, reduce it
+        // If stock is 0, this will set quantity to 0 (which gets filtered out)
+        if (updatedCart[i].quantity > currentStock) {
+          updatedCart[i].quantity = currentStock;
+          cartChanged = true;
+        }
+      } catch (err) {
+        console.error(`Error validating cart item ${item.id}:`, err);
+      }
+    }
+
+    if (cartChanged) {
+      // Filter out items that are out of stock (quantity = 0)
+      const validCart = updatedCart.filter(item => item.quantity > 0);
+      setCart(validCart);
+    }
+  };
+
+  // Validate on initial load
+  useEffect(() => {
+    validateCart();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Validate whenever the cart is opened
+  useEffect(() => {
+    if (isCartOpen) {
+      validateCart();
+    }
+  }, [isCartOpen]);
 
   const addToCart = (item: CartItem) => {
     setCart(prevCart => {
@@ -80,7 +147,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   return (
     <CartContext.Provider value={{ 
       cart, addToCart, removeFromCart, updateQuantity, clearCart, 
-      totalItems, totalPrice, isCartOpen, setIsCartOpen 
+      totalItems, totalPrice, isCartOpen, setIsCartOpen, validateCart
     }}>
       {children}
     </CartContext.Provider>

@@ -864,17 +864,6 @@ export default function CustomPCBuilder() {
                 </span>
                 <span className="font-bold text-white bg-red-600 px-2 py-0.5 rounded text-[11px]">Save ₹{discountAmount.toLocaleString('en-IN')}</span>
               </div>
-
-              {/* EMI info box */}
-              {finalPrice > 0 && (
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs text-slate-700">
-                  <div>
-                    <span className="text-[10px] text-slate-400 uppercase tracking-widest block font-bold">Easy Store EMI</span>
-                    <span className="font-bold text-emerald-600">From ₹{emiPerMonth.toLocaleString('en-IN')}/month</span>
-                  </div>
-                  <span className="text-[10px] bg-emerald-50 border border-emerald-200 text-emerald-700 px-2 py-1 rounded font-bold">In-Store Available</span>
-                </div>
-              )}
             </div>
 
             {/* Compatibility Badge */}
