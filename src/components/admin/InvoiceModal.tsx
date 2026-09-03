@@ -88,6 +88,11 @@ export default function InvoiceModal({ order, onClose }: InvoiceModalProps) {
           <p className="font-bold text-lg print:text-base">{order.customerName}</p>
           <p className="text-sm print:text-xs text-slate-600">Phone: {order.customerPhone}</p>
           {order.customerEmail && <p className="text-sm print:text-xs text-slate-600">Email: {order.customerEmail}</p>}
+          {(order.customerAddress || order.shippingAddress) && (
+            <p className="text-sm print:text-xs text-slate-600">
+              Address: {order.customerAddress || (typeof order.shippingAddress === 'string' ? order.shippingAddress : `${order.shippingAddress?.address || ''}${order.shippingAddress?.city ? ', ' + order.shippingAddress.city : ''}`)}
+            </p>
+          )}
         </div>
 
         <table className="w-full text-left mb-12 print:mb-4 border-collapse">

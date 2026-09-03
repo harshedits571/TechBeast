@@ -52,6 +52,7 @@ export default function ProductList() {
   // Pagination State (10, 20, 30, 50 per page)
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [viewMode, setViewMode] = useState<'grid-2' | 'grid-3' | 'grid-4' | 'list'>('grid-4');
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -425,26 +426,65 @@ export default function ProductList() {
                 />
               </div>
 
-              {/* Mock View Toggles */}
-              <div className="hidden lg:flex items-center gap-3 text-slate-300">
-                <div className="grid grid-cols-2 gap-0.5 cursor-pointer hover:text-slate-600">
+              {/* View Toggles */}
+              <div className="hidden lg:flex items-center gap-2">
+                <button
+                  type="button"
+                  title="2 Columns Grid"
+                  onClick={() => setViewMode('grid-2')}
+                  className={`grid grid-cols-2 gap-0.5 p-1.5 rounded-lg border transition-all cursor-pointer ${
+                    viewMode === 'grid-2'
+                      ? 'border-blue-500 bg-blue-50 text-blue-600 shadow-sm'
+                      : 'border-transparent text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
                    <div className="w-1.5 h-1.5 bg-current rounded-sm"></div><div className="w-1.5 h-1.5 bg-current rounded-sm"></div>
                    <div className="w-1.5 h-1.5 bg-current rounded-sm"></div><div className="w-1.5 h-1.5 bg-current rounded-sm"></div>
-                </div>
-                <div className="grid grid-cols-3 gap-0.5 cursor-pointer hover:text-slate-600">
+                </button>
+
+                <button
+                  type="button"
+                  title="3 Columns Grid"
+                  onClick={() => setViewMode('grid-3')}
+                  className={`grid grid-cols-3 gap-0.5 p-1.5 rounded-lg border transition-all cursor-pointer ${
+                    viewMode === 'grid-3'
+                      ? 'border-blue-500 bg-blue-50 text-blue-600 shadow-sm'
+                      : 'border-transparent text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
                    <div className="w-1 h-1.5 bg-current rounded-sm"></div><div className="w-1 h-1.5 bg-current rounded-sm"></div><div className="w-1 h-1.5 bg-current rounded-sm"></div>
                    <div className="w-1 h-1.5 bg-current rounded-sm"></div><div className="w-1 h-1.5 bg-current rounded-sm"></div><div className="w-1 h-1.5 bg-current rounded-sm"></div>
-                </div>
-                <div className="grid grid-cols-4 gap-0.5 cursor-pointer text-slate-800">
+                </button>
+
+                <button
+                  type="button"
+                  title="4 Columns Grid"
+                  onClick={() => setViewMode('grid-4')}
+                  className={`grid grid-cols-4 gap-0.5 p-1.5 rounded-lg border transition-all cursor-pointer ${
+                    viewMode === 'grid-4'
+                      ? 'border-blue-500 bg-blue-50 text-blue-600 shadow-sm'
+                      : 'border-transparent text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
                    <div className="w-1 h-1 bg-current"></div><div className="w-1 h-1 bg-current"></div><div className="w-1 h-1 bg-current"></div><div className="w-1 h-1 bg-current"></div>
                    <div className="w-1 h-1 bg-current"></div><div className="w-1 h-1 bg-current"></div><div className="w-1 h-1 bg-current"></div><div className="w-1 h-1 bg-current"></div>
                    <div className="w-1 h-1 bg-current"></div><div className="w-1 h-1 bg-current"></div><div className="w-1 h-1 bg-current"></div><div className="w-1 h-1 bg-current"></div>
-                </div>
-                <div className="flex flex-col gap-0.5 cursor-pointer hover:text-slate-600 ml-2">
+                </button>
+
+                <button
+                  type="button"
+                  title="List View"
+                  onClick={() => setViewMode('list')}
+                  className={`flex flex-col gap-0.5 p-1.5 rounded-lg border transition-all cursor-pointer ml-1 ${
+                    viewMode === 'list'
+                      ? 'border-blue-500 bg-blue-50 text-blue-600 shadow-sm'
+                      : 'border-transparent text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
                    <div className="w-4 h-0.5 bg-current"></div>
                    <div className="w-4 h-0.5 bg-current"></div>
                    <div className="w-4 h-0.5 bg-current"></div>
-                </div>
+                </button>
               </div>
 
               <div className="flex items-center gap-2">
@@ -482,11 +522,19 @@ export default function ProductList() {
               </div>
             </div>
 
-            {/* Product Grid */}
+            {/* Product Grid / List */}
             {loading ? (
               <CardGridSkeleton count={8} />
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className={
+                viewMode === 'list'
+                  ? 'flex flex-col gap-4'
+                  : viewMode === 'grid-2'
+                  ? 'grid grid-cols-1 sm:grid-cols-2 gap-4'
+                  : viewMode === 'grid-3'
+                  ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'
+                  : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'
+              }>
               {displayedProducts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((product) => {
                 const isDiscounted = product.oldPrice && product.oldPrice > product.price;
                 const discountPercent = isDiscounted 
@@ -494,6 +542,90 @@ export default function ProductList() {
                   : Math.floor(Math.random() * 20) + 5; // Fake discount if none provided to match screenshot
                 
                 const emiAmount = Math.round(product.price / 12);
+
+                if (viewMode === 'list') {
+                  return (
+                    <Link key={product.id} to={`/products/${product.id}`} className="group bg-white border border-slate-200 rounded-xl hover:shadow-xl hover:border-slate-300 transition-all duration-300 flex flex-col sm:flex-row items-center p-4 gap-4 sm:gap-6 relative">
+                      {/* Discount Badge */}
+                      <div className="absolute top-3 left-3 z-10">
+                        <span className="bg-black text-white text-[10px] font-black px-2 py-0.5 rounded shadow-sm">
+                          -{discountPercent}%
+                        </span>
+                      </div>
+
+                      {/* Image Box */}
+                      <div className="w-full sm:w-56 h-48 sm:h-44 flex items-center justify-center p-3 bg-slate-50/70 rounded-xl overflow-hidden shrink-0 relative">
+                        {product.imageUrls && product.imageUrls.length > 0 ? (
+                          <img 
+                            src={product.imageUrls[0]} 
+                            alt={product.title} 
+                            loading="lazy"
+                            className="max-h-full max-w-full w-auto h-auto object-contain object-center group-hover:scale-105 transition-transform duration-300 mx-auto my-auto"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 group-hover:scale-105 transition-transform duration-300">
+                            <Monitor className="h-14 w-14 text-slate-300 stroke-[1.5]" />
+                            <span className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-wider">Tech Beast</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex flex-col flex-1 w-full justify-between h-full py-1">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                            {product.category && (
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md">
+                                {product.category}
+                              </span>
+                            )}
+                            {product.condition && (
+                              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md">
+                                {product.condition}
+                              </span>
+                            )}
+                            {product.sku && (
+                              <span className="text-[11px] font-medium text-slate-400">
+                                SKU: {product.sku}
+                              </span>
+                            )}
+                          </div>
+                          <h3 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors uppercase leading-snug">
+                            {product.title}
+                          </h3>
+                          {product.description && (
+                            <p className="text-xs text-slate-500 line-clamp-2 mt-1.5 leading-relaxed">
+                              {product.description}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100 flex-wrap gap-2">
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-lg sm:text-xl font-black text-blue-600 font-mono">₹ {Number(product.price).toLocaleString('en-IN')}</span>
+                            {product.oldPrice ? (
+                               <span className="text-xs text-slate-400 line-through">₹ {Number(product.oldPrice).toLocaleString('en-IN')}</span>
+                            ) : (
+                               <span className="text-xs text-slate-400 line-through">₹ {Number(product.price + (product.price * 0.1)).toLocaleString('en-IN')}</span>
+                            )}
+                          </div>
+
+                          {product.stock > 0 ? (
+                            <div className="flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
+                              <Check className="h-3.5 w-3.5" /> In stock ({product.stock} units)
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 text-xs font-semibold text-red-500 bg-red-50 px-2.5 py-1 rounded-full">
+                              <X className="h-3.5 w-3.5" /> Out of stock
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                }
+
+                const imgHeightClass = viewMode === 'grid-2' ? 'h-56 sm:h-64' : viewMode === 'grid-3' ? 'h-52 sm:h-56' : 'h-48 sm:h-52';
 
                 return (
                   <Link key={product.id} to={`/products/${product.id}`} className="group bg-white border border-slate-200 rounded-xl hover:shadow-xl hover:border-slate-300 transition-all duration-300 flex flex-col relative p-4 h-full">
@@ -506,7 +638,7 @@ export default function ProductList() {
                     </div>
 
                     {/* Standardized Centered Bounding Box for Horizontal & Vertical Images */}
-                    <div className="w-full h-48 sm:h-52 flex items-center justify-center p-3 mb-3 bg-slate-50/70 rounded-xl overflow-hidden relative">
+                    <div className={`w-full ${imgHeightClass} flex items-center justify-center p-3 mb-3 bg-slate-50/70 rounded-xl overflow-hidden relative`}>
                       {product.imageUrls && product.imageUrls.length > 0 ? (
                         <img 
                           src={product.imageUrls[0]} 

@@ -278,7 +278,7 @@ export default function QuotationView() {
             <p className="font-bold text-slate-900">Tech Beast Experience Center</p>
             <p className="text-slate-600 text-xs mt-0.5">Ground Floor, Shinde Complex, Neeligin Road,</p>
             <p className="text-slate-600 text-xs">Hubli, Karnataka 580029</p>
-            <p className="text-blue-600 font-bold text-xs mt-1">Ph: +91 95352 25266 | techbeasthubli@gmail.com</p>
+            <p className="text-blue-600 font-bold text-xs mt-1">Ph: {settings?.supportPhone || '+91-9248071734'} | {settings?.contactEmail || 'techbeasthubli@gmail.com'}</p>
           </div>
         </div>
 

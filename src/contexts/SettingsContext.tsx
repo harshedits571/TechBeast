@@ -11,13 +11,13 @@ interface StoreSettings {
   contactEmail: string;
   promoBannerText: string;
   promoBannerEnabled: boolean;
-  heroBanners: { 
-    imageUrl: string; 
-    link: string; 
-    x?: number; 
-    y?: number; 
-    w?: number; 
-    h?: number; 
+  heroBanners: {
+    imageUrl: string;
+    link: string;
+    x?: number;
+    y?: number;
+    w?: number;
+    h?: number;
     fitMode?: string;
   }[];
   heroAspectRatio?: number;
@@ -36,7 +36,7 @@ interface StoreSettings {
 }
 
 const defaultSettings: StoreSettings = {
-  supportPhone: '+91-9248071734',
+  supportPhone: '+91-9535225266',
   estimatedDispatch: '24 - 48hrs',
   bankOfferText: '7.5% Instant Discount Up To Rs.2000/- with HDFC Bank',
   warrantyText: '6 Months TechBeast Certified Warranty',
@@ -68,7 +68,7 @@ interface SettingsContextType {
 
 const SettingsContext = createContext<SettingsContextType>({
   settings: defaultSettings,
-  updateSettings: async () => {},
+  updateSettings: async () => { },
   loading: true
 });
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
 import { collection, getDocs, addDoc, updateDoc, doc, query, where, increment, runTransaction, getDoc, setDoc } from 'firebase/firestore';
 import { createSlug, generateShortId } from '../../utils/slugify';
-import { ShoppingBag, Printer, ArrowLeft, Package, User, CheckCircle2, Gift, ShieldCheck, Mail, Send, MessageCircle } from 'lucide-react';
+import { ShoppingBag, Printer, ArrowLeft, Package, User, CheckCircle2, Gift, ShieldCheck, Mail, Send, MessageCircle, Eye } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { FormSkeleton } from '../../components/ui/Skeleton';
 import { useAdmin } from '../../contexts/AdminContext';
@@ -15,6 +15,7 @@ export default function OfflineSale() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [invoiceGenerated, setInvoiceGenerated] = useState(false);
+  const [isPreview, setIsPreview] = useState(false);
   const [orderId, setOrderId] = useState('');
   const [invoiceDate, setInvoiceDate] = useState('');
 
@@ -27,13 +28,14 @@ export default function OfflineSale() {
 
   const isLoading = productsState.loading || inventoryState.loading || customersState.loading;
 
-  const products = productsState.data.filter((p: any) => p.stock > 0);
-  const inventory = inventoryState.data.filter((i: any) => i.quantity > 0);
+  const products = productsState.data;
+  const inventory = inventoryState.data;
 
   // Form State
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,6 +52,7 @@ export default function OfflineSale() {
       if (match) {
         if (!customerName) setCustomerName(match.name || '');
         if (!customerEmail) setCustomerEmail(match.email || '');
+        if (!customerAddress) setCustomerAddress(match.address || match.shippingAddress?.address || '');
       }
     }
   };
@@ -91,6 +94,7 @@ export default function OfflineSale() {
           setCustomerName(data.customerName || '');
           setCustomerPhone(data.customerPhone || '');
           setCustomerEmail(data.customerEmail || '');
+          setCustomerAddress(data.customerAddress || data.shippingAddress?.address || '');
           setOrderId(data.orderNumber || '');
           setPaymentMethod(data.paymentMethod || 'Cash');
 
@@ -266,6 +270,7 @@ export default function OfflineSale() {
         customerName,
         customerPhone,
         customerEmail,
+        customerAddress,
         totalAmount: total,
         paymentStatus: 'PAID',
         paymentMethod,
@@ -314,6 +319,7 @@ export default function OfflineSale() {
           name: customerName,
           phone: customerPhone,
           email: customerEmail,
+          address: customerAddress,
           totalSpent: total,
           ordersCount: 1,
           createdAt: now,
@@ -326,7 +332,8 @@ export default function OfflineSale() {
         await updateDoc(doc(db, 'customers', existingCust.id), {
           totalSpent: increment(delta),
           ordersCount: increment(countDelta),
-          lastOrderDate: now
+          lastOrderDate: now,
+          ...(customerAddress ? { address: customerAddress } : {})
         });
       }
 
@@ -352,12 +359,28 @@ export default function OfflineSale() {
     window.print();
   };
 
+  const handlePreview = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (selectedProducts.length === 0) {
+      alert("Please add at least one product or item to preview the invoice.");
+      return;
+    }
+    if (!orderId) {
+      const date = new Date();
+      setOrderId(`INV-${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}-PREVIEW`);
+    }
+    setInvoiceDate(invoiceDate || new Date().toISOString());
+    setIsPreview(true);
+    setInvoiceGenerated(true);
+  };
+
   const handleWhatsApp = async () => {
     const orderObj = {
       orderNumber: orderId,
       customerName,
       customerPhone,
       customerEmail,
+      customerAddress,
       totalAmount: total,
       paymentMethod,
       items: getCurrentItems(),
@@ -375,8 +398,36 @@ export default function OfflineSale() {
     return (
       <div className="bg-white min-h-screen print:min-h-[95vh] print:flex print:flex-col text-black p-8 max-w-4xl mx-auto shadow-2xl relative print:shadow-none print:p-0 print:m-0">
         
+        {/* Preview Mode Banner */}
+        {isPreview && (
+          <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between print:hidden">
+            <div className="flex items-center gap-2">
+              <Eye className="w-4 h-4 text-amber-600 shrink-0" />
+              <span><strong>Live Preview:</strong> This invoice is not saved to the database. No stock or order records have been altered.</span>
+            </div>
+            <button
+              onClick={() => { setInvoiceGenerated(false); setIsPreview(false); }}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors shrink-0 ml-3"
+            >
+              ← Back to Edit Form
+            </button>
+          </div>
+        )}
+
         {/* Controls - Hidden on Print */}
         <div className="absolute top-8 right-8 print:hidden flex items-center gap-2">
+          {isPreview ? (
+            <button
+              onClick={() => { setInvoiceGenerated(false); setIsPreview(false); }}
+              className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-full font-bold text-sm flex items-center gap-1.5 shadow-md transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" /> Back to Edit
+            </button>
+          ) : (
+            <button onClick={() => window.location.reload()} className="text-sm text-blue-600 hover:underline px-3 py-2">
+              New Sale
+            </button>
+          )}
           {customerEmail && (
             <button 
               onClick={() => setShowSendEmailModal(true)} 
@@ -394,20 +445,17 @@ export default function OfflineSale() {
           <button onClick={handlePrint} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-full font-bold text-sm flex items-center gap-2 shadow-md transition-colors">
             <Printer className="h-4 w-4" /> Print Invoice
           </button>
-          <button onClick={() => window.location.reload()} className="text-sm text-blue-600 hover:underline px-3 py-2">
-            New Sale
-          </button>
         </div>
 
         <div className="border-b-2 border-slate-200 pb-8 mb-8 flex justify-between items-start mt-8 print:mt-0 print:pb-4 print:mb-4">
           <div>
             <div className="text-3xl font-bold tracking-tight flex items-center gap-2 mb-2">
               <img src="/logo2.jpeg" alt="Store Logo" className="h-10 object-contain rounded" />
-              Tech Beast
+              {settings?.storeName || 'Tech Beast'}
             </div>
             <p className="text-sm text-slate-500">Ground Floor, Shinde Complex,</p>
             <p className="text-sm text-slate-500">No.183 C Block, Hubballi, Karnataka 580029</p>
-            <p className="text-sm text-slate-500">+91-9248071734 |techbeasthubli@gmail.com</p>
+            <p className="text-sm text-slate-500">{settings?.supportPhone || '+91-9248071734'} | {settings?.contactEmail || 'techbeasthubli@gmail.com'}</p>
           </div>
           <div className="text-right">
             <h2 className="text-2xl print:text-xl font-bold text-slate-200 tracking-widest mb-4">Proforma Invoice</h2>
@@ -422,6 +470,7 @@ export default function OfflineSale() {
           <p className="font-bold text-lg print:text-base">{customerName}</p>
           <p className="text-sm print:text-xs text-slate-600">Phone: {customerPhone}</p>
           {customerEmail && <p className="text-sm print:text-xs text-slate-600">Email: {customerEmail}</p>}
+          {customerAddress && <p className="text-sm print:text-xs text-slate-600">Address: {customerAddress}</p>}
         </div>
 
         <table className="w-full text-left mb-12 print:mb-4 border-collapse">
@@ -506,7 +555,7 @@ export default function OfflineSale() {
           <div className="w-48 print:w-40 text-center mt-8 md:mt-0 print:mt-0 shrink-0">
             <div className="h-16 print:h-10 border-b border-slate-400 mb-2 print:mb-1"></div>
             <p className="text-sm print:text-xs font-bold text-slate-700">Authorized Signature</p>
-            <p className="text-xs print:text-[10px] text-slate-500">Tech Beast</p>
+            <p className="text-xs print:text-[10px] text-slate-500">{settings?.storeName || 'Tech Beast'}</p>
           </div>
         </div>
 
@@ -555,6 +604,7 @@ export default function OfflineSale() {
               customerName,
               customerPhone,
               customerEmail,
+              customerAddress,
               totalAmount: total,
               paymentMethod,
               items: getCurrentItems(),
@@ -605,6 +655,7 @@ export default function OfflineSale() {
                 <option value="Credit/Debit Card">Paid via Credit/Debit Card</option>
                 <option value="Bank Transfer">Paid via Bank Transfer</option>
               </select>
+              <input type="text" placeholder="Customer Address (Optional)" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} className="md:col-span-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500" />
             </div>
           </div>
 
@@ -635,7 +686,9 @@ export default function OfflineSale() {
                           <div key={p.id} onClick={() => handleAddProduct(p)} className="p-3 hover:bg-white/10 cursor-pointer border-b border-white/5 last:border-0 flex justify-between items-center">
                             <div>
                               <p className="text-sm font-bold text-white">{p.title}</p>
-                              <p className="text-xs text-slate-500">Stock: {p.stock} | SKU: {p.sku || 'N/A'}</p>
+                              <p className="text-xs text-slate-500">
+                                Stock: {p.stock ?? 0} {Number(p.stock) <= 0 ? <span className="text-amber-400 font-medium">(0 in system)</span> : ''} | SKU: {p.sku || 'N/A'}
+                              </p>
                             </div>
                             <span className="text-emerald-400 font-bold text-sm">₹{Number(p.price).toLocaleString()}</span>
                           </div>
@@ -783,7 +836,9 @@ export default function OfflineSale() {
                   <input type="checkbox" checked={selectedAccessories.includes(item.id)} onChange={() => toggleAccessory(item.id)} className="w-4 h-4 rounded bg-black/50 border-white/20 text-emerald-500 focus:ring-emerald-500" />
                   <div>
                     <p className="text-sm font-bold text-white leading-tight">{item.name}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{item.quantity} in stock</p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {item.quantity ?? 0} in stock {Number(item.quantity) <= 0 ? <span className="text-amber-400 font-medium">(0 in system)</span> : ''}
+                    </p>
                   </div>
                 </label>
               ))}
@@ -842,14 +897,26 @@ export default function OfflineSale() {
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={isSubmitting || (selectedProducts.length === 0)}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors mt-6 shadow-xl shadow-emerald-900/20"
-            >
-              <Printer className="w-5 h-5" />
-              {isSubmitting ? 'Processing...' : isEditing ? 'Update & Print Invoice' : 'Generate & Print Invoice'}
-            </button>
+            <div className="space-y-3 mt-6">
+              <button
+                type="button"
+                onClick={handlePreview}
+                disabled={selectedProducts.length === 0}
+                className="w-full bg-white/10 hover:bg-white/15 border border-white/10 disabled:opacity-50 text-white p-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors text-sm"
+              >
+                <Eye className="w-4 h-4 text-blue-400" />
+                Live Preview Invoice (No Save)
+              </button>
+
+              <button
+                type="submit"
+                disabled={isSubmitting || (selectedProducts.length === 0)}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors shadow-xl shadow-emerald-900/20 text-base"
+              >
+                <Printer className="w-5 h-5" />
+                {isSubmitting ? 'Processing...' : isEditing ? 'Update & Complete Sale' : 'Generate & Complete Sale'}
+              </button>
+            </div>
           </div>
         </div>
 

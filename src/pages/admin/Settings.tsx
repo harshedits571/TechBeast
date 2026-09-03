@@ -12,7 +12,7 @@ export default function Settings() {
   const [formData, setFormData] = useState(settings);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
-  
+
   const [activeTab, setActiveTab] = useState('general');
   const [allProducts, setAllProducts] = useState<any[]>([]);
 
@@ -45,7 +45,7 @@ export default function Settings() {
       if (activeAction.type === 'drag') {
         let newX = Math.round(activeAction.startXPercent + dxPercent);
         let newY = Math.round(activeAction.startYPercent + dyPercent);
-        
+
         // Snapping boundaries
         if (Math.abs(newX) < 2) newX = 0;
         if (Math.abs(newY) < 2) newY = 0;
@@ -137,7 +137,7 @@ export default function Settings() {
 
   const renderProductSelector = (field: 'bestSellerIds' | 'newArrivalIds' | 'flashSaleProductIds', title: string, desc: string) => {
     const selectedIds = formData[field] || [];
-    
+
     const handleAdd = (id: string) => {
       if (id && !selectedIds.includes(id)) {
         setFormData({ ...formData, [field]: [...selectedIds, id] });
@@ -156,7 +156,7 @@ export default function Settings() {
           {title}
           <span className="text-xs text-slate-500 normal-case font-normal">{desc}</span>
         </label>
-        
+
         <div className="space-y-2 mb-4">
           {selectedIds.length === 0 ? (
             <p className="text-sm text-slate-500 italic">No products selected.</p>
@@ -174,8 +174,8 @@ export default function Settings() {
             })
           )}
         </div>
-        
-        <select 
+
+        <select
           onChange={(e) => { handleAdd(e.target.value); e.target.value = ''; }}
           className="w-full bg-[#0d0d0e] border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 transition-colors"
           defaultValue=""
@@ -201,8 +201,8 @@ export default function Settings() {
 
     setFormData({
       ...formData,
-      heroBanners: [...formData.heroBanners, { 
-        imageUrl: '', 
+      heroBanners: [...formData.heroBanners, {
+        imageUrl: '',
         link: '',
         x: coords.x,
         y: coords.y,
@@ -284,7 +284,7 @@ export default function Settings() {
       </div>
 
       <form onSubmit={handleSubmit} className="bg-[#0d0d0e] rounded-3xl border border-white/10 shadow-2xl p-8 space-y-8 relative">
-        
+
         {successMsg && (
           <div className="bg-emerald-500/10 border border-emerald-500/50 text-emerald-500 px-4 py-3 rounded-xl text-sm font-semibold">
             {successMsg}
@@ -307,7 +307,7 @@ export default function Settings() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
                 Support Phone Number
-                <input required name="supportPhone" value={formData.supportPhone} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. +91-9248071734" />
+                <input required name="supportPhone" value={formData.supportPhone} onChange={handleChange} type="text" className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal" placeholder="e.g. +91-9535225266" />
               </label>
               <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
                 Estimated Dispatch Time
@@ -384,7 +384,7 @@ export default function Settings() {
                   <Plus className="h-4 w-4" /> Add Banner
                 </button>
               </div>
-              
+
               {/* CANVAS ASPECT RATIO CONTROL */}
               {formData.heroBanners.length > 0 && (
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-950/40 p-4 rounded-xl border border-white/5 mb-4">
@@ -394,11 +394,11 @@ export default function Settings() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">Taller</span>
-                    <input 
-                      type="range" 
-                      min="0.8" 
-                      max="3.0" 
-                      step="0.05" 
+                    <input
+                      type="range"
+                      min="0.8"
+                      max="3.0"
+                      step="0.05"
                       value={formData.heroAspectRatio !== undefined ? formData.heroAspectRatio : 1.5}
                       onChange={(e) => setFormData(prev => ({ ...prev, heroAspectRatio: Number(e.target.value) }))}
                       className="w-48 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
@@ -417,7 +417,7 @@ export default function Settings() {
                   <span className="text-xs font-bold uppercase tracking-widest text-slate-400 block">
                     🖥️ Visual Canvas Designer (Photoshop Style - Click & Drag to Position, Drag Corner to Resize)
                   </span>
-                  <div 
+                  <div
                     ref={canvasRef}
                     style={{ aspectRatio: `${formData.heroAspectRatio || 1.5} / 1` }}
                     className="relative w-full bg-slate-950 rounded-2xl border border-white/10 overflow-hidden select-none"
@@ -438,32 +438,30 @@ export default function Settings() {
                             width: `${w}%`,
                             height: `${h * (formData.heroAspectRatio || 1.5)}%`,
                           }}
-                          className={`group/banner rounded-xl overflow-hidden border-2 ${
-                            activeAction?.index === index ? 'border-blue-500 shadow-lg shadow-blue-500/20' : 'border-white/20 hover:border-blue-500/50'
-                          } bg-slate-900 transition-shadow`}
+                          className={`group/banner rounded-xl overflow-hidden border-2 ${activeAction?.index === index ? 'border-blue-500 shadow-lg shadow-blue-500/20' : 'border-white/20 hover:border-blue-500/50'
+                            } bg-slate-900 transition-shadow`}
                         >
                           {banner.imageUrl ? (
                             banner.fitMode === 'contain-blur' || !banner.fitMode ? (
                               <div className="relative w-full h-full overflow-hidden bg-slate-950 flex items-center justify-center">
-                                <img 
-                                  src={banner.imageUrl} 
-                                  alt="Blur Background" 
+                                <img
+                                  src={banner.imageUrl}
+                                  alt="Blur Background"
                                   className="absolute inset-0 w-full h-full object-cover blur-xl opacity-40 scale-110 pointer-events-none"
                                 />
-                                <img 
-                                  src={banner.imageUrl} 
+                                <img
+                                  src={banner.imageUrl}
                                   alt={`Banner ${index + 1}`}
                                   className="w-full h-full object-contain relative z-10 pointer-events-none"
                                 />
                               </div>
                             ) : (
-                              <img 
-                                src={banner.imageUrl} 
+                              <img
+                                src={banner.imageUrl}
                                 alt={`Banner ${index + 1}`}
-                                className={`w-full h-full pointer-events-none ${
-                                  banner.fitMode === 'contain' ? 'object-contain bg-slate-900/50' : 
-                                  banner.fitMode === 'fill' ? 'object-fill' : 'object-cover'
-                                }`}
+                                className={`w-full h-full pointer-events-none ${banner.fitMode === 'contain' ? 'object-contain bg-slate-900/50' :
+                                    banner.fitMode === 'fill' ? 'object-fill' : 'object-cover'
+                                  }`}
                               />
                             )
                           ) : (
@@ -472,7 +470,7 @@ export default function Settings() {
                             </div>
                           )}
 
-                          <div 
+                          <div
                             onMouseDown={(e) => {
                               e.preventDefault();
                               setActiveAction({
@@ -491,7 +489,7 @@ export default function Settings() {
                             <div className="bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded self-start">
                               Banner {index + 1}
                             </div>
-                            
+
                             <div className="text-[10px] text-slate-300 font-bold self-start">
                               Drag to move
                             </div>
@@ -501,7 +499,7 @@ export default function Settings() {
                             #{index + 1}
                           </div>
 
-                          <div 
+                          <div
                             onMouseDown={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -552,9 +550,9 @@ export default function Settings() {
                           <label className="flex flex-col gap-2 text-xs text-slate-400 font-bold uppercase tracking-widest">
                             Image Fit Mode
                             <div className="flex gap-2">
-                              <select 
-                                value={banner.fitMode || 'cover'} 
-                                onChange={(e) => updateHeroBanner(index, 'fitMode', e.target.value)} 
+                              <select
+                                value={banner.fitMode || 'cover'}
+                                onChange={(e) => updateHeroBanner(index, 'fitMode', e.target.value)}
                                 className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500 font-normal font-sans"
                               >
                                 <option value="cover" className="bg-[#0d0d0e]">Cover (Fill & Crop)</option>
@@ -578,38 +576,38 @@ export default function Settings() {
                         <div className="grid grid-cols-4 gap-2 pt-2 border-t border-white/5">
                           <label className="flex flex-col gap-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                             X Pos (%)
-                            <input 
-                              type="number" 
-                              value={banner.x !== undefined ? banner.x : 0} 
-                              onChange={(e) => updateHeroBanner(index, 'x', Number(e.target.value))} 
-                              className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white text-xs text-center font-normal" 
+                            <input
+                              type="number"
+                              value={banner.x !== undefined ? banner.x : 0}
+                              onChange={(e) => updateHeroBanner(index, 'x', Number(e.target.value))}
+                              className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white text-xs text-center font-normal"
                             />
                           </label>
                           <label className="flex flex-col gap-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                             Y Pos (%)
-                            <input 
-                              type="number" 
-                              value={banner.y !== undefined ? banner.y : 0} 
-                              onChange={(e) => updateHeroBanner(index, 'y', Number(e.target.value))} 
-                              className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white text-xs text-center font-normal" 
+                            <input
+                              type="number"
+                              value={banner.y !== undefined ? banner.y : 0}
+                              onChange={(e) => updateHeroBanner(index, 'y', Number(e.target.value))}
+                              className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white text-xs text-center font-normal"
                             />
                           </label>
                           <label className="flex flex-col gap-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                             Width (%)
-                            <input 
-                              type="number" 
-                              value={banner.w !== undefined ? banner.w : 50} 
-                              onChange={(e) => updateHeroBanner(index, 'w', Number(e.target.value))} 
-                              className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white text-xs text-center font-normal" 
+                            <input
+                              type="number"
+                              value={banner.w !== undefined ? banner.w : 50}
+                              onChange={(e) => updateHeroBanner(index, 'w', Number(e.target.value))}
+                              className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white text-xs text-center font-normal"
                             />
                           </label>
                           <label className="flex flex-col gap-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                             Height (%)
-                            <input 
-                              type="number" 
-                              value={banner.h !== undefined ? banner.h : 50} 
-                              onChange={(e) => updateHeroBanner(index, 'h', Number(e.target.value))} 
-                              className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white text-xs text-center font-normal" 
+                            <input
+                              type="number"
+                              value={banner.h !== undefined ? banner.h : 50}
+                              onChange={(e) => updateHeroBanner(index, 'h', Number(e.target.value))}
+                              className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white text-xs text-center font-normal"
                             />
                           </label>
                         </div>
@@ -634,19 +632,19 @@ export default function Settings() {
                       <h4 className="text-white font-bold mb-2">Card {index + 1}</h4>
                       <label className="flex flex-col gap-2 text-xs text-slate-400 font-bold uppercase tracking-widest">
                         Subtitle (Small Text)
-                        <input type="text" value={card.subtitle} onChange={(e) => setFormData({...formData, promoCards: {...formData.promoCards, [cardKey]: {...card, subtitle: e.target.value}}})} className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm normal-case" placeholder="e.g. Weekend Deals" />
+                        <input type="text" value={card.subtitle} onChange={(e) => setFormData({ ...formData, promoCards: { ...formData.promoCards, [cardKey]: { ...card, subtitle: e.target.value } } })} className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm normal-case" placeholder="e.g. Weekend Deals" />
                       </label>
                       <label className="flex flex-col gap-2 text-xs text-slate-400 font-bold uppercase tracking-widest">
                         Title (Large Text)
-                        <input type="text" value={card.title} onChange={(e) => setFormData({...formData, promoCards: {...formData.promoCards, [cardKey]: {...card, title: e.target.value}}})} className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm normal-case" placeholder="e.g. Next-gen gaming console" />
+                        <input type="text" value={card.title} onChange={(e) => setFormData({ ...formData, promoCards: { ...formData.promoCards, [cardKey]: { ...card, title: e.target.value } } })} className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm normal-case" placeholder="e.g. Next-gen gaming console" />
                       </label>
                       <label className="flex flex-col gap-2 text-xs text-slate-400 font-bold uppercase tracking-widest">
                         Link URL
-                        <input type="text" value={card.link} onChange={(e) => setFormData({...formData, promoCards: {...formData.promoCards, [cardKey]: {...card, link: e.target.value}}})} className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm normal-case" placeholder="/products" />
+                        <input type="text" value={card.link} onChange={(e) => setFormData({ ...formData, promoCards: { ...formData.promoCards, [cardKey]: { ...card, link: e.target.value } } })} className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm normal-case" placeholder="/products" />
                       </label>
                       <label className="flex flex-col gap-2 text-xs text-slate-400 font-bold uppercase tracking-widest">
                         Background Color
-                        <select value={card.bgColor} onChange={(e) => setFormData({...formData, promoCards: {...formData.promoCards, [cardKey]: {...card, bgColor: e.target.value}}})} className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm normal-case">
+                        <select value={card.bgColor} onChange={(e) => setFormData({ ...formData, promoCards: { ...formData.promoCards, [cardKey]: { ...card, bgColor: e.target.value } } })} className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm normal-case">
                           <option value="blue" className="bg-[#0d0d0e]">Blue</option>
                           <option value="red" className="bg-[#0d0d0e]">Red</option>
                           <option value="green" className="bg-[#0d0d0e]">Green</option>
@@ -666,7 +664,7 @@ export default function Settings() {
                 <input type="checkbox" id="flashSaleEnabled" name="flashSaleEnabled" checked={formData.flashSaleEnabled} onChange={handleChange} className="w-5 h-5 rounded bg-white/5 border border-white/20 text-blue-600 focus:ring-blue-500" />
                 <label htmlFor="flashSaleEnabled" className="text-sm font-bold text-slate-300 cursor-pointer">Enable Flash Sale Section</label>
               </div>
-              
+
               {formData.flashSaleEnabled && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -681,9 +679,9 @@ export default function Settings() {
                   </div>
                   <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
                     End Date/Time
-                    <input type="datetime-local" name="flashSaleEndTime" value={formData.flashSaleEndTime ? new Date(formData.flashSaleEndTime).toISOString().slice(0, 16) : ''} onChange={(e) => setFormData({...formData, flashSaleEndTime: new Date(e.target.value).toISOString()})} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 normal-case font-normal" />
+                    <input type="datetime-local" name="flashSaleEndTime" value={formData.flashSaleEndTime ? new Date(formData.flashSaleEndTime).toISOString().slice(0, 16) : ''} onChange={(e) => setFormData({ ...formData, flashSaleEndTime: new Date(e.target.value).toISOString() })} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 normal-case font-normal" />
                   </label>
-                  
+
                   <div className="pt-4">
                     {renderProductSelector('flashSaleProductIds', 'Flash Sale Products', 'Select which products are part of the current flash sale.')}
                   </div>

@@ -1,9 +1,21 @@
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import jsPDF from 'jspdf';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import html2canvas from 'html2canvas';
+
+const fetchStoreSettings = async () => {
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'store'));
+    if (snap.exists()) {
+      return snap.data();
+    }
+  } catch (err) {
+    console.error('Error fetching store settings for invoice:', err);
+  }
+  return null;
+};
 
 export const generateBulkInvoices = async (
   startDate: string,
@@ -33,6 +45,11 @@ export const generateBulkInvoices = async (
 
     const snap = await getDocs(q);
     let orders = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+
+    const storeSettings = await fetchStoreSettings();
+    const storePhone = storeSettings?.supportPhone || '+91-9248071734';
+    const storeEmail = storeSettings?.contactEmail || 'techbeasthubli@gmail.com';
+    const storeName = storeSettings?.storeName || 'Tech Beast';
 
     // Apply UI Filters
     orders = orders.filter(order => {
@@ -143,10 +160,10 @@ export const generateBulkInvoices = async (
             <div>
               <div style="font-size: 24px; font-weight: bold; display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                 <img src="/logo2.jpeg" alt="Logo" style="height: 32px; object-fit: contain; border-radius: 4px;" />
-                Tech Beast
+                ${storeName}
               </div>
               <p style="margin: 0; font-size: 12px; color: #64748b;">Ground Floor, Shinde Complex, No.183 C Block, Hubballi, Karnataka 580029</p>
-              <p style="margin: 0; font-size: 12px; color: #64748b;">+91 95352 25266 |techbeasthubli@gmail.com</p>
+              <p style="margin: 0; font-size: 12px; color: #64748b;">${storePhone} | ${storeEmail}</p>
             </div>
             <div style="text-align: right;">
               <h2 style="margin: 0 0 8px 0; font-size: 32px; color: #e2e8f0; letter-spacing: 2px;">Proforma Invoice</h2>
@@ -161,6 +178,7 @@ export const generateBulkInvoices = async (
             <p style="margin: 0; font-weight: bold; font-size: 16px;">${order.customerName}</p>
             <p style="margin: 0; font-size: 12px; color: #475569;">Phone: ${order.customerPhone}</p>
             ${order.customerEmail ? `<p style="margin: 0; font-size: 12px; color: #475569;">Email: ${order.customerEmail}</p>` : ''}
+            ${(order.customerAddress || order.shippingAddress) ? `<p style="margin: 0; font-size: 12px; color: #475569;">Address: ${order.customerAddress || (typeof order.shippingAddress === 'string' ? order.shippingAddress : `${order.shippingAddress?.address || ''}${order.shippingAddress?.city ? ', ' + order.shippingAddress.city : ''}`)}</p>` : ''}
           </div>
 
           <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
@@ -208,7 +226,7 @@ export const generateBulkInvoices = async (
             <div style="width: 160px; text-align: center;">
               <div style="height: 40px; border-bottom: 1px solid #94a3b8; margin-bottom: 4px;"></div>
               <p style="margin: 0; font-size: 12px; font-weight: bold;">Authorized Signature</p>
-              <p style="margin: 0; font-size: 10px; color: #64748b;">Tech Beast</p>
+              <p style="margin: 0; font-size: 10px; color: #64748b;">${storeName}</p>
             </div>
           </div>
         </div>
@@ -261,6 +279,11 @@ export const generateSingleInvoicePdf = async (order: any, onProgress?: (msg: st
     container.style.backgroundColor = 'white';
     document.body.appendChild(container);
 
+    const storeSettings = await fetchStoreSettings();
+    const storePhone = storeSettings?.supportPhone || '+91-9248071734';
+    const storeEmail = storeSettings?.contactEmail || 'techbeasthubli@gmail.com';
+    const storeName = storeSettings?.storeName || 'Tech Beast';
+
     const subTotal = order.items?.reduce((sum: number, item: any) => sum + Number(item.price || 0), 0) || order.totalAmount;
     const discountAmount = Math.max(0, subTotal - (order.totalAmount || 0));
 
@@ -299,10 +322,10 @@ export const generateSingleInvoicePdf = async (order: any, onProgress?: (msg: st
           <div>
             <div style="font-size: 24px; font-weight: bold; display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
               <img src="/logo2.jpeg" alt="Logo" style="height: 32px; object-fit: contain; border-radius: 4px;" />
-              Tech Beast
+              ${storeName}
             </div>
             <p style="margin: 0; font-size: 12px; color: #64748b;">Ground Floor, Shinde Complex, No.183 C Block, Hubballi, Karnataka 580029</p>
-            <p style="margin: 0; font-size: 12px; color: #64748b;">+91 95352 25266 |techbeasthubli@gmail.com</p>
+            <p style="margin: 0; font-size: 12px; color: #64748b;">${storePhone} | ${storeEmail}</p>
           </div>
           <div style="text-align: right;">
             <h2 style="margin: 0 0 8px 0; font-size: 32px; color: #e2e8f0; letter-spacing: 2px;">Proforma Invoice</h2>
@@ -317,6 +340,7 @@ export const generateSingleInvoicePdf = async (order: any, onProgress?: (msg: st
           <p style="margin: 0; font-weight: bold; font-size: 16px;">${order.customerName}</p>
           <p style="margin: 0; font-size: 12px; color: #475569;">Phone: ${order.customerPhone}</p>
           ${order.customerEmail ? `<p style="margin: 0; font-size: 12px; color: #475569;">Email: ${order.customerEmail}</p>` : ''}
+          ${(order.customerAddress || order.shippingAddress) ? `<p style="margin: 0; font-size: 12px; color: #475569;">Address: ${order.customerAddress || (typeof order.shippingAddress === 'string' ? order.shippingAddress : `${order.shippingAddress?.address || ''}${order.shippingAddress?.city ? ', ' + order.shippingAddress.city : ''}`)}</p>` : ''}
         </div>
 
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
@@ -364,7 +388,7 @@ export const generateSingleInvoicePdf = async (order: any, onProgress?: (msg: st
           <div style="width: 160px; text-align: center;">
             <div style="height: 40px; border-bottom: 1px solid #94a3b8; margin-bottom: 4px;"></div>
             <p style="margin: 0; font-size: 12px; font-weight: bold;">Authorized Signature</p>
-            <p style="margin: 0; font-size: 10px; color: #64748b;">Tech Beast</p>
+            <p style="margin: 0; font-size: 10px; color: #64748b;">${storeName}</p>
           </div>
         </div>
       </div>
@@ -410,6 +434,11 @@ export const getInvoicePdfData = async (order: any, onProgress?: (msg: string) =
     container.style.width = '800px';
     container.style.backgroundColor = 'white';
     document.body.appendChild(container);
+
+    const storeSettings = await fetchStoreSettings();
+    const storePhone = storeSettings?.supportPhone || '+91-9248071734';
+    const storeEmail = storeSettings?.contactEmail || 'techbeasthubli@gmail.com';
+    const storeName = storeSettings?.storeName || 'Tech Beast';
 
     const subTotal = order.items?.reduce((sum: number, item: any) => sum + Number(item.price || 0), 0) || order.totalAmount;
     const discountAmount = Math.max(0, subTotal - (order.totalAmount || 0));
@@ -472,10 +501,10 @@ export const getInvoicePdfData = async (order: any, onProgress?: (msg: string) =
           <div>
             <div style="font-size: 24px; font-weight: bold; display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
               <img src="/logo2.jpeg" alt="Logo" style="height: 32px; object-fit: contain; border-radius: 4px;" />
-              Tech Beast
+              ${storeName}
             </div>
             <p style="margin: 0; font-size: 12px; color: #64748b;">Ground Floor, Shinde Complex, No.183 C Block, Hubballi, Karnataka 580029</p>
-            <p style="margin: 0; font-size: 12px; color: #64748b;">+91 95352 25266 | techbeasthubli@gmail.com</p>
+            <p style="margin: 0; font-size: 12px; color: #64748b;">${storePhone} | ${storeEmail}</p>
           </div>
           <div style="text-align: right;">
             <h2 style="margin: 0 0 8px 0; font-size: 32px; color: #cbd5e1; letter-spacing: 2px;">Proforma Invoice</h2>
@@ -490,6 +519,7 @@ export const getInvoicePdfData = async (order: any, onProgress?: (msg: string) =
           <p style="margin: 0; font-weight: bold; font-size: 16px;">${order.customerName}</p>
           <p style="margin: 0; font-size: 12px; color: #475569;">Phone: ${order.customerPhone}</p>
           ${order.customerEmail ? `<p style="margin: 0; font-size: 12px; color: #475569;">Email: ${order.customerEmail}</p>` : ''}
+          ${(order.customerAddress || order.shippingAddress) ? `<p style="margin: 0; font-size: 12px; color: #475569;">Address: ${order.customerAddress || (typeof order.shippingAddress === 'string' ? order.shippingAddress : `${order.shippingAddress?.address || ''}${order.shippingAddress?.city ? ', ' + order.shippingAddress.city : ''}`)}</p>` : ''}
         </div>
 
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
@@ -538,7 +568,7 @@ export const getInvoicePdfData = async (order: any, onProgress?: (msg: string) =
           <div style="width: 160px; text-align: center;">
             <div style="height: 40px; border-bottom: 1px solid #94a3b8; margin-bottom: 4px;"></div>
             <p style="margin: 0; font-size: 12px; font-weight: bold;">Authorized Signature</p>
-            <p style="margin: 0; font-size: 10px; color: #64748b;">Tech Beast</p>
+            <p style="margin: 0; font-size: 10px; color: #64748b;">${storeName}</p>
           </div>
         </div>
       </div>
@@ -586,7 +616,11 @@ export const shareInvoiceViaWhatsApp = async (order: any, onProgress?: (msg: str
       phone = '91' + phone;
     }
 
-    const text = `Hi ${order.customerName || 'Customer'},\n\nThank you for choosing Tech Beast Hubli! 🙏\nHere is your official invoice #${order.orderNumber || ''}.\n\nTotal Amount: ₹${Number(order.totalAmount || 0).toLocaleString()}\nPayment Method: ${order.paymentMethod || 'Paid'}\n\nWe appreciate your business! Feel free to contact us for any assistance.\nTech Beast Hubli | +91 95352 25266`;
+    const storeSettings = await fetchStoreSettings();
+    const storePhone = storeSettings?.supportPhone || '+91-9248071734';
+    const storeName = storeSettings?.storeName || 'Tech Beast Hubli';
+
+    const text = `Hi ${order.customerName || 'Customer'},\n\nThank you for choosing ${storeName}! 🙏\nHere is your official invoice #${order.orderNumber || ''}.\n\nTotal Amount: ₹${Number(order.totalAmount || 0).toLocaleString()}\nPayment Method: ${order.paymentMethod || 'Paid'}\n\nWe appreciate your business! Feel free to contact us for any assistance.\n${storeName} | ${storePhone}`;
 
     // 1. Download PDF invoice directly to Downloads
     pdf.save(filename);

@@ -11,9 +11,9 @@ interface SendEmailModalProps {
 export default function SendEmailModal({ order, onClose }: SendEmailModalProps) {
   const { settings } = useSettings();
   const [customerEmail, setCustomerEmail] = useState(order.customerEmail || '');
-  const [subject, setSubject] = useState(`Proforma Invoice #${order.orderNumber || ''} - Tech Beast Hubli`);
+  const [subject, setSubject] = useState(`Proforma Invoice #${order.orderNumber || ''} - ${settings?.storeName || 'Tech Beast Hubli'}`);
   const [message, setMessage] = useState(
-    `Dear ${order.customerName || 'Valued Customer'},\n\nThank you for choosing Tech Beast Hubli!\n\nPlease find attached your official Proforma Invoice #${order.orderNumber || ''} for your recent purchase.\n\nOrder Summary:\n- Proforma Invoice No: ${order.orderNumber || ''}\n- Total Amount: ₹${Number(order.totalAmount || 0).toLocaleString()}\n- Payment Method: ${order.paymentMethod || 'Paid'}\n\nWe appreciate your trust in us. If you have any questions, feel free to contact us at +91 95352 25266 or techbeasthubli@gmail.com.\n\nWarm regards,\nTech Beast Hubli Team\nGround Floor, Shinde Complex, Hubli, Karnataka 580029`
+    `Dear ${order.customerName || 'Valued Customer'},\n\nThank you for choosing ${settings?.storeName || 'Tech Beast Hubli'}!\n\nPlease find attached your official Proforma Invoice #${order.orderNumber || ''} for your recent purchase.\n\nOrder Summary:\n- Proforma Invoice No: ${order.orderNumber || ''}\n- Total Amount: ₹${Number(order.totalAmount || 0).toLocaleString()}\n- Payment Method: ${order.paymentMethod || 'Paid'}\n\nWe appreciate your trust in us. If you have any questions, feel free to contact us at ${settings?.supportPhone || '+91-9248071734'} or ${settings?.contactEmail || 'techbeasthubli@gmail.com'}.\n\nWarm regards,\n${settings?.storeName || 'Tech Beast Hubli'} Team\nGround Floor, Shinde Complex, Hubli, Karnataka 580029`
   );
 
   const [isSending, setIsSending] = useState(false);

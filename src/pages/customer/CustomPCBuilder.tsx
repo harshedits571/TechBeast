@@ -891,7 +891,7 @@ export default function CustomPCBuilder() {
                 <Building2 className="w-4 h-4 text-slate-600" /> Visit Tech Beast Store
               </div>
               <p>Ground Floor, Shinde Complex, Hubli, Karnataka 580029</p>
-              <p>Ph: +91 95352 25266 | Testing & Cable Management included.</p>
+              <p>Ph: {settings?.supportPhone || '+91-9248071734'} | Testing & Cable Management included.</p>
             </div>
 
           </div>

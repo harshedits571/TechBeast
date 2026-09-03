@@ -289,20 +289,22 @@ export default function OrderDetail() {
                 </div>
               </div>
 
-              {order.shippingAddress && (
+              {(order.shippingAddress || order.customerAddress) && (
                 <div>
                   <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-2 flex items-center gap-1">
-                    <MapPin className="w-3 h-3" /> Shipping Address
+                    <MapPin className="w-3 h-3" /> Address
                   </p>
                   <div className="bg-white/5 rounded-xl p-4 text-sm text-slate-300">
-                    {typeof order.shippingAddress === 'string' ? (
+                    {order.customerAddress ? (
+                      <p>{order.customerAddress}</p>
+                    ) : typeof order.shippingAddress === 'string' ? (
                       <p>{order.shippingAddress}</p>
                     ) : (
                       <>
-                        <p className="font-bold text-white">{order.shippingAddress.firstName} {order.shippingAddress.lastName}</p>
-                        <p className="mt-1">{order.shippingAddress.address}</p>
-                        {order.shippingAddress.apartment && <p>{order.shippingAddress.apartment}</p>}
-                        <p>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}</p>
+                        <p className="font-bold text-white">{order.shippingAddress?.firstName} {order.shippingAddress?.lastName}</p>
+                        <p className="mt-1">{order.shippingAddress?.address}</p>
+                        {order.shippingAddress?.apartment && <p>{order.shippingAddress?.apartment}</p>}
+                        <p>{order.shippingAddress?.city}, {order.shippingAddress?.state} {order.shippingAddress?.zipCode}</p>
                       </>
                     )}
                   </div>
