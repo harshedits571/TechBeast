@@ -37,6 +37,13 @@ export default function ProductDetail() {
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           const productData = docSnap.data();
+
+          if (productData.status === 'Offline') {
+            setProduct(null);
+            setLoading(false);
+            return;
+          }
+
           const currentViews = productData.views || 0;
 
           const viewedProducts = JSON.parse(localStorage.getItem('viewedProducts') || '[]');
@@ -182,6 +189,8 @@ export default function ProductDetail() {
     specs['Efficiency Rating'] = product.powerSupplyRating || 'Not Specified';
   }
 
+  const isProductInStock = product && (product.status === 'In Stock' || (!product.status && Number(product.stock) > 0)) && product.status !== 'Out of Stock' && Number(product.stock) > 0;
+
   const productSchema = {
     "@context": "https://schema.org/",
     "@type": "Product",
@@ -201,7 +210,7 @@ export default function ProductDetail() {
       "price": product.price,
       "priceValidUntil": new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
       "itemCondition": product.condition === 'New' ? "https://schema.org/NewCondition" : "https://schema.org/UsedCondition",
-      "availability": product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      "availability": isProductInStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
       "seller": {
         "@type": "Organization",
         "name": "Tech Beast Hubli"
@@ -215,7 +224,7 @@ export default function ProductDetail() {
   };
 
   const handleBuyNow = () => {
-    if (!product || product.stock <= 0) return;
+    if (!product || !isProductInStock) return;
     addToCart({
       id: product.id,
       title: product.title,
@@ -227,6 +236,75 @@ export default function ProductDetail() {
     navigate('/checkout');
   };
 
+  const getCategoryDetails = () => {
+    const cat = (product.category || '').toLowerCase();
+    const cond = (product.condition || '').toLowerCase();
+
+    // If Used Laptops
+    if (cat === 'used laptops' || (cat.includes('laptop') && (cond.includes('used') || cond.includes('second') || cond.includes('refurbished')))) {
+      return {
+        label: 'Used Laptops',
+        link: '/products?category=Laptops&condition=Used'
+      };
+    }
+
+    // If New Laptops
+    if (cat === 'new laptops' || (cat.includes('laptop') && (cond === 'new' || !cond))) {
+      return {
+        label: 'New Laptops',
+        link: '/products?category=Laptops&condition=New'
+      };
+    }
+
+    // If Prebuilt PC
+    if (cat === 'prebuilt pc' || cat === 'pre-built pc' || product.isPrebuilt) {
+      return {
+        label: 'Prebuilt PC',
+        link: '/prebuilt-pc'
+      };
+    }
+
+    // If Desktops
+    if (cat === 'desktops' || cat === 'desktop') {
+      return {
+        label: 'Desktops',
+        link: '/products?category=Desktops'
+      };
+    }
+
+    // If Components
+    if (cat === 'components' || cat === 'component' || cat === 'desktop parts') {
+      return {
+        label: 'Components',
+        link: '/products?category=Components'
+      };
+    }
+
+    // If Accessories
+    if (cat === 'accessories' || cat === 'accessory') {
+      return {
+        label: 'Accessories',
+        link: '/products?category=Accessories'
+      };
+    }
+
+    // If Spare Parts
+    if (cat === 'spare parts') {
+      return {
+        label: 'Spare Parts',
+        link: '/products?category=Spare%20Parts'
+      };
+    }
+
+    // Fallback
+    return {
+      label: product.category || 'Products',
+      link: product.category ? `/products?category=${encodeURIComponent(product.category)}` : '/products'
+    };
+  };
+
+  const { label: categoryLabel, link: categoryLink } = getCategoryDetails();
+
   return (
     <div className="bg-[#f8f9fa] min-h-screen text-slate-800 font-sans pb-20">
       <SEO
@@ -236,13 +314,13 @@ export default function ProductDetail() {
         ogImage={product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : undefined}
       />
 
-      {/* Breadcrumb - Optional */}
+      {/* Breadcrumb */}
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-4 text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-        <a href="/" className="hover:text-blue-600 transition-colors">Home</a>
+        <Link to="/" className="hover:text-blue-600 transition-colors">Home</Link>
         <span>/</span>
-        <a href="/products" className="hover:text-blue-600 transition-colors">{product.category}</a>
+        <Link to={categoryLink} className="hover:text-blue-600 transition-colors">{categoryLabel}</Link>
         <span>/</span>
-        <span className="text-slate-800">{product.title}</span>
+        <span className="text-slate-800 line-clamp-1">{product.title}</span>
       </div>
 
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pb-8">
@@ -483,15 +561,15 @@ export default function ProductDetail() {
               {/* Stock Status & Availability */}
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Availability</div>
-                <div className={`text-xs font-bold flex items-center gap-1.5 ${product.stock > 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                  <div className={`w-2 h-2 rounded-full ${product.stock > 0 ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
-                  {product.stock > 0 ? 'IN STOCK' : 'OUT OF STOCK'}
+                <div className={`text-xs font-bold flex items-center gap-1.5 ${isProductInStock ? 'text-emerald-500' : 'text-red-500'}`}>
+                  <div className={`w-2 h-2 rounded-full ${isProductInStock ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                  {isProductInStock ? 'IN STOCK' : 'OUT OF STOCK'}
                 </div>
               </div>
 
               {/* Add to Cart Actions */}
               <div className="flex flex-col sm:flex-row items-center gap-4">
-                <div className={`flex items-center border-2 border-slate-200 rounded-xl bg-white px-4 py-3 sm:py-3.5 w-full sm:w-32 justify-between ${product.stock <= 0 ? 'opacity-50 pointer-events-none' : ''}`}>
+                <div className={`flex items-center border-2 border-slate-200 rounded-xl bg-white px-4 py-3 sm:py-3.5 w-full sm:w-32 justify-between ${!isProductInStock ? 'opacity-50 pointer-events-none' : ''}`}>
                   <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="text-slate-500 hover:text-black font-bold focus:outline-none">-</button>
                   <span className="text-sm font-bold text-slate-800">{quantity.toString().padStart(2, '0')}</span>
                   <button onClick={() => setQuantity(Math.min(product.stock, quantity + 1))} className="text-slate-500 hover:text-black font-bold focus:outline-none">+</button>
@@ -505,16 +583,16 @@ export default function ProductDetail() {
                     image: product.imageUrls?.[0],
                     stock: product.stock
                   })}
-                  disabled={product.stock <= 0}
-                  className={`flex-1 w-full text-slate-900 border-2 border-slate-900 text-sm font-bold py-3 sm:py-3.5 px-6 rounded-xl transition-colors flex items-center justify-center uppercase tracking-widest ${product.stock > 0 ? 'hover:bg-slate-50' : 'bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed'}`}
+                  disabled={!isProductInStock}
+                  className={`flex-1 w-full text-slate-900 border-2 border-slate-900 text-sm font-bold py-3 sm:py-3.5 px-6 rounded-xl transition-colors flex items-center justify-center uppercase tracking-widest ${isProductInStock ? 'hover:bg-slate-50' : 'bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed'}`}
                 >
-                  {product.stock > 0 ? 'Add to cart' : 'Out of stock'}
+                  {isProductInStock ? 'Add to cart' : 'Out of stock'}
                 </button>
               </div>
               <button
                 onClick={handleBuyNow}
-                disabled={product.stock <= 0}
-                className={`w-full text-white text-sm font-bold py-3.5 px-6 rounded-xl transition-colors flex items-center justify-center uppercase tracking-widest ${product.stock > 0 ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-400 cursor-not-allowed hidden'}`}
+                disabled={!isProductInStock}
+                className={`w-full text-white text-sm font-bold py-3.5 px-6 rounded-xl transition-colors flex items-center justify-center uppercase tracking-widest ${isProductInStock ? 'bg-red-600 hover:bg-red-700 shadow-md shadow-red-600/20' : 'bg-slate-400 cursor-not-allowed hidden'}`}
               >
                 Buy it Now
               </button>

@@ -241,6 +241,7 @@ export default function PrebuiltForm() {
                 <option value="In Stock">In Stock</option>
                 <option value="Pre-Order">Pre-Order / Custom Build</option>
                 <option value="Out of Stock">Out of Stock</option>
+                <option value="Offline">Offline (Make Offline - Hidden from Customers)</option>
               </select>
             </div>
 

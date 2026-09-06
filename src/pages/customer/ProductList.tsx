@@ -58,10 +58,12 @@ export default function ProductList() {
     const fetchProducts = async () => {
       try {
         const querySnapshot = await getDocs(collection(db, "products"));
-        const productsData = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
+        const productsData = querySnapshot.docs
+          .map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }))
+          .filter((p: any) => p.status !== 'Offline');
         // Sort newest first by default
         productsData.sort((a: any, b: any) => {
           const timeA = a.createdAt ? new Date(a.createdAt).getTime() : (a.updatedAt ? new Date(a.updatedAt).getTime() : 0);
@@ -84,13 +86,20 @@ export default function ProductList() {
     if (isPrebuiltPC && categoryFilter !== 'Pre-built PC' && categoryFilter !== 'Prebuilt PC') return false;
 
     const pCatLower = (p.category || '').toLowerCase();
+    const condLower = (p.condition || '').toLowerCase();
     const isLaptop = pCatLower.includes('laptop');
     const isDesktop = pCatLower.includes('desktop') || pCatLower.includes('component');
+    const isUsed = condLower.includes('used') || condLower.includes('second') || condLower.includes('refurbished') || condLower.includes('pre-owned') || pCatLower.includes('used');
+    const isNew = condLower === 'new' || (!condLower && !pCatLower.includes('used'));
 
     // Category Filter
     if (categoryFilter) {
       const catLow = categoryFilter.toLowerCase();
-      if (catLow.includes('laptop')) {
+      if (catLow === 'used laptops' || (catLow.includes('laptop') && catLow.includes('used'))) {
+        if (!isLaptop || !isUsed) return false;
+      } else if (catLow === 'new laptops' || (catLow.includes('laptop') && catLow.includes('new'))) {
+        if (!isLaptop || !isNew) return false;
+      } else if (catLow.includes('laptop')) {
         if (!isLaptop) return false;
       } else if (catLow.includes('desktop')) {
         if (!isDesktop) return false;
@@ -104,15 +113,13 @@ export default function ProductList() {
 
     // Condition Filter (from URL condition parameter)
     if (conditionFilter) {
-      const condLower = (p.condition || '').toLowerCase();
-      if (conditionFilter.toLowerCase() === 'new') {
-        const isNew = condLower === 'new' || pCatLower.includes('new') || (!condLower && !pCatLower.includes('used'));
+      const condParam = conditionFilter.toLowerCase();
+      if (condParam === 'new') {
         if (!isNew) return false;
-      } else if (conditionFilter.toLowerCase() === 'used') {
-        const isUsed = condLower.includes('used') || condLower.includes('second') || condLower.includes('refurbished') || condLower.includes('pre-owned') || pCatLower.includes('used');
+      } else if (condParam === 'used') {
         if (!isUsed) return false;
       } else {
-        if (condLower !== conditionFilter.toLowerCase() && !pCatLower.includes(conditionFilter.toLowerCase())) return false;
+        if (condLower !== condParam && !pCatLower.includes(condParam)) return false;
       }
     }
 
@@ -132,9 +139,19 @@ export default function ProductList() {
   const availableComponentTypes = Array.from(new Set(relevantProducts.map(p => inferComponentType(p)))).filter(Boolean).sort();
   const availableConditions = Array.from(new Set(relevantProducts.map(p => p.condition))).filter(Boolean).sort();
 
-  const pageTitle = conditionFilter
-    ? (categoryFilter ? `${conditionFilter} ${categoryFilter}` : `${conditionFilter} Products`)
-    : (categoryFilter || 'All Products');
+  const pageTitle = (() => {
+    if (conditionFilter && categoryFilter) {
+      const catClean = categoryFilter.toLowerCase().includes('laptop') ? 'Laptops' : categoryFilter;
+      return `${conditionFilter} ${catClean}`;
+    }
+    if (conditionFilter) {
+      return `${conditionFilter} Products`;
+    }
+    if (categoryFilter) {
+      return categoryFilter;
+    }
+    return 'All Products';
+  })();
 
   const displayedProducts = relevantProducts.filter(p => {
     // Search Query
@@ -178,7 +195,7 @@ export default function ProductList() {
     if (selectedComponentTypes.length > 0 && (!productCompType || !selectedComponentTypes.includes(productCompType))) return false;
 
     // In Stock Only Filter
-    if (inStockOnly && (!p.stock || p.stock <= 0)) return false;
+    if (inStockOnly && (p.status === 'Out of Stock' || (!p.status && Number(p.stock) <= 0) || Number(p.stock) <= 0)) return false;
     
     // Price Filter
     const price = Number(p.price);
@@ -543,6 +560,8 @@ export default function ProductList() {
                 
                 const emiAmount = Math.round(product.price / 12);
 
+                const isProductInStock = (product.status === 'In Stock' || (!product.status && Number(product.stock) > 0)) && product.status !== 'Out of Stock' && Number(product.stock) > 0;
+
                 if (viewMode === 'list') {
                   return (
                     <Link key={product.id} to={`/products/${product.id}`} className="group bg-white border border-slate-200 rounded-xl hover:shadow-xl hover:border-slate-300 transition-all duration-300 flex flex-col sm:flex-row items-center p-4 gap-4 sm:gap-6 relative">
@@ -610,7 +629,7 @@ export default function ProductList() {
                             )}
                           </div>
 
-                          {product.stock > 0 ? (
+                          {isProductInStock ? (
                             <div className="flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
                               <Check className="h-3.5 w-3.5" /> In stock ({product.stock} units)
                             </div>
@@ -670,7 +689,7 @@ export default function ProductList() {
                           )}
                         </div>
 
-                        {product.stock > 0 ? (
+                        {isProductInStock ? (
                           <div className="flex items-center gap-1 text-xs font-semibold text-emerald-600">
                             <Check className="h-3.5 w-3.5" /> In stock
                           </div>

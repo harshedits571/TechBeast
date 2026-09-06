@@ -30,12 +30,14 @@ export default function PrebuiltPCs() {
       // 2. Fetch from prebuilts collection or products
       try {
         const snap = await getDocs(query(collection(db, "prebuilts"), limit(30)));
-        const collectionList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const collectionList = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter((p: any) => p.status !== 'Offline');
         
         const prodSnap = await getDocs(query(collection(db, "products"), limit(50)));
         const prodList = prodSnap.docs
           .map(d => ({ id: d.id, ...d.data() }))
-          .filter((p: any) => p.isPrebuilt || p.category === 'Pre-built PC' || p.category === 'Prebuilt PC');
+          .filter((p: any) => p.status !== 'Offline' && (p.isPrebuilt || p.category === 'Pre-built PC' || p.category === 'Prebuilt PC'));
 
         const combined = [...list, ...collectionList, ...prodList];
         const uniqueMap = new Map();

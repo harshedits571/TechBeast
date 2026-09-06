@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter, MoreVertical, Edit, Trash2, Download } from 'lucide-react';
-import { collection, getDocs, query, orderBy, deleteDoc, doc, limit, startAfter } from 'firebase/firestore';
+import { Plus, Search, Filter, MoreVertical, Edit, Trash2, Download, ChevronDown } from 'lucide-react';
+import { collection, getDocs, query, orderBy, deleteDoc, doc, updateDoc, limit, startAfter } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useAdmin } from '../../contexts/AdminContext';
 import { exportToCsv } from '../../utils/exportCsv';
@@ -44,6 +44,23 @@ export default function ProductsList() {
   };
 
 
+
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
+
+  const handleStatusUpdate = async (productId: string, newStatus: string) => {
+    try {
+      setUpdatingStatusId(productId);
+      await updateDoc(doc(db, "products", productId), {
+        status: newStatus,
+        updatedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Error updating status:", error);
+      alert("Failed to update status.");
+    } finally {
+      setUpdatingStatusId(null);
+    }
+  };
 
   const handleDelete = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this product? This will also delete its images from Cloudinary.")) {
@@ -200,69 +217,121 @@ export default function ProductsList() {
                   <td colSpan={8} className="px-6 py-8 text-center text-slate-500">No products found.</td>
                 </tr>
               ) : (
-                filteredProducts.map((product) => (
-                  <tr key={product.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center w-full max-w-[200px] sm:max-w-xs lg:max-w-sm">
-                        <div className="h-10 w-10 flex-shrink-0 bg-slate-800 rounded-xl border border-white/5 flex items-center justify-center overflow-hidden">
-                          {product.imageUrls && product.imageUrls.length > 0 ? (
-                            <img src={product.imageUrls[0]} alt={product.title} className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-slate-500 text-[10px] font-bold">IMG</span>
-                          )}
+                filteredProducts.map((product) => {
+                  const currentStatus = product.status || (Number(product.stock) > 0 ? 'In Stock' : 'Out of Stock');
+                  const isUpdating = updatingStatusId === product.id;
+
+                  return (
+                    <tr key={product.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center w-full max-w-[200px] sm:max-w-xs lg:max-w-sm">
+                          <div className="h-10 w-10 flex-shrink-0 bg-slate-800 rounded-xl border border-white/5 flex items-center justify-center overflow-hidden">
+                            {product.imageUrls && product.imageUrls.length > 0 ? (
+                              <img src={product.imageUrls[0]} alt={product.title} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-slate-500 text-[10px] font-bold">IMG</span>
+                            )}
+                          </div>
+                          <div className="ml-4 flex-1 min-w-0">
+                            <div className="text-sm font-bold text-slate-200 truncate" title={product.title}>{product.title}</div>
+                          </div>
                         </div>
-                        <div className="ml-4 flex-1 min-w-0">
-                          <div className="text-sm font-bold text-slate-200 truncate" title={product.title}>{product.title}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap font-mono text-xs text-slate-400">{product.sku}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">{product.category}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 text-[10px] font-bold rounded-md border ${product.condition === 'New'
+                            ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                            : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                          }`}>
+                          {(product.condition || 'Unknown').toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-white font-bold">{product.stock}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-white font-bold">₹{Number(product.price).toLocaleString('en-IN')}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="relative inline-flex items-center">
+                          <select
+                            value={currentStatus}
+                            onChange={(e) => handleStatusUpdate(product.id, e.target.value)}
+                            disabled={isUpdating}
+                            title="Click to switch status (In Stock / Out of Stock / Offline)"
+                            className={`appearance-none cursor-pointer pl-3 pr-8 py-1 text-[11px] font-extrabold rounded-lg border transition-all focus:outline-none focus:ring-1 uppercase tracking-wider ${
+                              currentStatus === 'Offline'
+                                ? 'bg-slate-800/90 text-slate-300 border-slate-700 hover:border-slate-500 focus:ring-slate-500'
+                                : currentStatus === 'Out of Stock'
+                                ? 'bg-red-500/10 text-red-400 border-red-500/30 hover:border-red-500/50 focus:ring-red-500'
+                                : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:border-emerald-500/50 focus:ring-emerald-500'
+                            } ${isUpdating ? 'opacity-50 cursor-wait' : ''}`}
+                          >
+                            <option value="In Stock" className="bg-[#18181b] text-emerald-400 font-bold">IN STOCK</option>
+                            <option value="Out of Stock" className="bg-[#18181b] text-red-400 font-bold">OUT OF STOCK</option>
+                            <option value="Offline" className="bg-[#18181b] text-slate-400 font-bold">OFFLINE</option>
+                          </select>
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2 text-current opacity-70">
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap font-mono text-xs text-slate-400">{product.sku}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">{product.category}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-[10px] font-bold rounded-md border ${product.condition === 'New'
-                          ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                          : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-                        }`}>
-                        {(product.condition || 'Unknown').toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-white font-bold">{product.stock}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-white font-bold">₹{Number(product.price).toLocaleString('en-IN')}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-[10px] font-bold rounded-md border ${product.stock <= 0
-                          ? 'bg-red-500/10 text-red-500 border-red-500/20'
-                          : 'bg-blue-500/10 text-blue-500 border-blue-500/20'
-                        }`}>
-                        {product.stock <= 0 ? 'OUT OF STOCK' : (product.status || 'Unknown').toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end gap-2 relative">
-                        <Link to={`/admin/products/edit/${product.id}`} className="text-slate-500 hover:text-blue-400 transition-colors p-1" title="Edit">
-                          <Edit className="h-4 w-4" />
-                        </Link>
-                        <button onClick={() => handleDelete(product.id)} className="text-slate-500 hover:text-red-400 transition-colors p-1" title="Delete">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                        <div className="relative">
-                          <button onClick={() => toggleDropdown(product.id)} className="text-slate-500 hover:text-white transition-colors p-1" title="More options">
-                            <MoreVertical className="h-4 w-4" />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex items-center justify-end gap-2 relative">
+                          <Link to={`/admin/products/edit/${product.id}`} className="text-slate-500 hover:text-blue-400 transition-colors p-1" title="Edit">
+                            <Edit className="h-4 w-4" />
+                          </Link>
+                          <button onClick={() => handleDelete(product.id)} className="text-slate-500 hover:text-red-400 transition-colors p-1" title="Delete">
+                            <Trash2 className="h-4 w-4" />
                           </button>
-                          {openDropdownId === product.id && (
-                            <div className="absolute right-0 mt-2 w-48 bg-[#1a1a1c] border border-white/10 rounded-xl shadow-2xl z-10 py-1 flex flex-col">
-                              <Link to={`/products/${product.id}`} target="_blank" className="text-left px-4 py-2 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
-                                View in Store
-                              </Link>
-                              <button onClick={() => { navigator.clipboard.writeText(product.id); setOpenDropdownId(null); }} className="text-left px-4 py-2 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
-                                Copy Product ID
-                              </button>
-                            </div>
-                          )}
+                          <div className="relative">
+                            <button onClick={() => toggleDropdown(product.id)} className="text-slate-500 hover:text-white transition-colors p-1" title="More options">
+                              <MoreVertical className="h-4 w-4" />
+                            </button>
+                            {openDropdownId === product.id && (
+                              <div className="absolute right-0 mt-2 w-52 bg-[#1a1a1c] border border-white/10 rounded-xl shadow-2xl z-20 py-1.5 flex flex-col text-xs text-left">
+                                <div className="px-3 py-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-white/5">
+                                  Quick Status Change
+                                </div>
+                                <button 
+                                  onClick={() => { handleStatusUpdate(product.id, 'In Stock'); setOpenDropdownId(null); }} 
+                                  className={`px-3 py-2 flex items-center gap-2 transition-colors ${currentStatus === 'In Stock' ? 'text-emerald-400 font-bold bg-white/5' : 'text-slate-300 hover:bg-white/5 hover:text-white'}`}
+                                >
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                  Set In Stock
+                                </button>
+                                <button 
+                                  onClick={() => { handleStatusUpdate(product.id, 'Out of Stock'); setOpenDropdownId(null); }} 
+                                  className={`px-3 py-2 flex items-center gap-2 transition-colors ${currentStatus === 'Out of Stock' ? 'text-red-400 font-bold bg-white/5' : 'text-slate-300 hover:bg-white/5 hover:text-white'}`}
+                                >
+                                  <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                                  Set Out of Stock
+                                </button>
+                                <button 
+                                  onClick={() => { handleStatusUpdate(product.id, 'Offline'); setOpenDropdownId(null); }} 
+                                  className={`px-3 py-2 flex items-center gap-2 transition-colors ${currentStatus === 'Offline' ? 'text-slate-300 font-bold bg-white/5' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+                                >
+                                  <span className="w-2 h-2 rounded-full bg-slate-500"></span>
+                                  Make Offline (Hide)
+                                </button>
+                                <div className="h-px bg-white/5 my-1" />
+                                {currentStatus !== 'Offline' ? (
+                                  <Link to={`/products/${product.id}`} target="_blank" className="text-left px-3 py-2 text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
+                                    View in Store
+                                  </Link>
+                                ) : (
+                                  <span className="px-3 py-2 text-slate-500 italic">
+                                    Hidden in Store (Offline)
+                                  </span>
+                                )}
+                                <button onClick={() => { navigator.clipboard.writeText(product.id); setOpenDropdownId(null); }} className="text-left px-3 py-2 text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
+                                  Copy Product ID
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

@@ -62,7 +62,9 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
       setLoading(true);
       const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'), limit(100));
       const snap = await getDocs(q);
-      const items = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const items = snap.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .filter((p: any) => p.status !== 'Offline');
       setProducts(items);
       setHasFetched(true);
     } catch (err) {
@@ -223,6 +225,11 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
                           {product.condition && (
                             <span className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-md">
                               {product.condition}
+                            </span>
+                          )}
+                          {(product.status === 'Out of Stock' || (!product.status && Number(product.stock) <= 0) || Number(product.stock) <= 0) && (
+                            <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-md">
+                              Out of stock
                             </span>
                           )}
                         </div>

@@ -320,6 +320,7 @@ export default function ProductForm() {
             <select name="status" value={formData.status} onChange={handleChange} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors normal-case tracking-normal font-normal">
               <option value="In Stock" className="bg-[#0d0d0e]">In Stock</option>
               <option value="Out of Stock" className="bg-[#0d0d0e]">Out of Stock</option>
+              <option value="Offline" className="bg-[#0d0d0e]">Offline (Make Offline - Hidden from Customers)</option>
             </select>
           </label>
         </div>

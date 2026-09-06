@@ -80,7 +80,7 @@ export default function PrebuiltPCDetail() {
           }
         }
 
-        if (data) {
+        if (data && data.status !== 'Offline') {
           const loadedProduct = {
             id: id,
             title: data.title || data.name || 'Prebuilt Gaming Desktop',

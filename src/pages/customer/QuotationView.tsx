@@ -342,42 +342,63 @@ export default function QuotationView() {
               </div>
             </div>
 
-            {/* Free Store Gifts Card */}
-            <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-xl p-3 space-y-1 shadow-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <span>🎁</span>
-                  <span>Free Store Gifts</span>
-                </span>
-                <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded uppercase font-mono">
-                  FREE
-                </span>
-              </div>
-              {(() => {
-                if ((quote as any).comboName) {
-                  const itemsStr = Array.isArray((quote as any).comboItems) && (quote as any).comboItems.length > 0
-                    ? (quote as any).comboItems.join(', ')
-                    : '';
-                  return (
+            {/* Free Store Gifts Card (Only shown if bonus gifts are enabled) */}
+            {(() => {
+              const isHidden = (quote as any).comboId === 'none' || (quote as any).hasFreeGift === false;
+              if (isHidden) return null;
+
+              const customName = (quote as any).comboName;
+              const customItems = (quote as any).comboItems;
+
+              if (customName) {
+                const itemsStr = Array.isArray(customItems) && customItems.length > 0
+                  ? customItems.join(', ')
+                  : '';
+                return (
+                  <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-xl p-3 space-y-1 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                        <span>🎁</span>
+                        <span>Free Store Gifts</span>
+                      </span>
+                      <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded uppercase font-mono">
+                        FREE
+                      </span>
+                    </div>
                     <div>
-                      <strong className="text-xs text-emerald-950 block font-bold">🎉 {(quote as any).comboName}</strong>
+                      <strong className="text-xs text-emerald-950 block font-bold">🎉 {customName}</strong>
                       {itemsStr && <p className="text-[11px] text-emerald-800 font-medium mt-0.5">{itemsStr}</p>}
                     </div>
-                  );
-                }
-                return Number(quote.finalPrice || quote.subTotal || 0) >= 20000 ? (
-                  <div>
-                    <strong className="text-xs text-emerald-950 block font-bold">🎉 Special Bonus: 8 Free Accessories Pack</strong>
-                    <p className="text-[11px] text-emerald-800 font-medium mt-0.5">Gaming Mouse, Keyboard, Mousepad, Headset, WiFi Dongle, Cables & Kit</p>
-                  </div>
-                ) : (
-                  <div>
-                    <strong className="text-xs text-emerald-950 block font-bold">🎁 Special Bonus: 4 Free Accessories Pack</strong>
-                    <p className="text-[11px] text-emerald-800 font-medium mt-0.5">Mousepad, WiFi USB Adapter, Power Cable & Cleaning Kit</p>
                   </div>
                 );
-              })()}
-            </div>
+              }
+
+              // Fallback for older quotes without custom comboName
+              return (
+                <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-xl p-3 space-y-1 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>🎁</span>
+                      <span>Free Store Gifts</span>
+                    </span>
+                    <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded uppercase font-mono">
+                      FREE
+                    </span>
+                  </div>
+                  {Number(quote.finalPrice || quote.subTotal || 0) >= 20000 ? (
+                    <div>
+                      <strong className="text-xs text-emerald-950 block font-bold">🎉 Special Bonus: 8 Free Accessories Pack</strong>
+                      <p className="text-[11px] text-emerald-800 font-medium mt-0.5">Gaming Mouse, Keyboard, Mousepad, Headset, WiFi Dongle, Cables & Kit</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <strong className="text-xs text-emerald-950 block font-bold">🎁 Special Bonus: 4 Free Accessories Pack</strong>
+                      <p className="text-[11px] text-emerald-800 font-medium mt-0.5">Mousepad, WiFi USB Adapter, Power Cable & Cleaning Kit</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Free Service & Assembly Card */}
             <div className="bg-blue-50/80 border border-blue-200/80 rounded-xl p-3 space-y-1 shadow-sm">
@@ -453,41 +474,45 @@ export default function QuotationView() {
                   </td>
                 </tr>
 
-                <tr className="bg-emerald-50/50">
-                  <td className="py-3 px-4 font-bold text-emerald-800 flex items-center gap-2">
-                    <span>🎁</span>
-                    <span>Free Store Gifts</span>
-                  </td>
-                  <td className="py-3 px-4 text-emerald-700 text-xs font-semibold">
-                    {(() => {
-                      if ((quote as any).comboName) {
-                        const itemsStr = Array.isArray((quote as any).comboItems) && (quote as any).comboItems.length > 0
-                          ? (quote as any).comboItems.join(', ')
-                          : '';
-                        return (
+                {(() => {
+                  const isHidden = (quote as any).comboId === 'none' || (quote as any).hasFreeGift === false;
+                  if (isHidden) return null;
+
+                  const customName = (quote as any).comboName;
+                  const customItems = (quote as any).comboItems;
+
+                  return (
+                    <tr className="bg-emerald-50/50">
+                      <td className="py-3 px-4 font-bold text-emerald-800 flex items-center gap-2">
+                        <span>🎁</span>
+                        <span>Free Store Gifts</span>
+                      </td>
+                      <td className="py-3 px-4 text-emerald-700 text-xs font-semibold">
+                        {customName ? (
                           <div>
-                            <strong className="text-emerald-900 block font-bold">🎉 Special Bonus: {(quote as any).comboName}</strong>
-                            {itemsStr && <span className="text-[11px] text-emerald-700 font-medium">{itemsStr}</span>}
+                            <strong className="text-emerald-900 block font-bold">🎉 Special Bonus: {customName}</strong>
+                            {Array.isArray(customItems) && customItems.length > 0 && (
+                              <span className="text-[11px] text-emerald-700 font-medium">{customItems.join(', ')}</span>
+                            )}
                           </div>
-                        );
-                      }
-                      return Number(quote.finalPrice || quote.subTotal || 0) >= 20000 ? (
-                        <div>
-                          <strong className="text-emerald-900 block font-bold">🎉 Special Bonus: 8 Free Tech Beast Accessories Pack (Build ₹20,000+)</strong>
-                          <span className="text-[11px] text-emerald-700 font-medium">Gaming Mouse, Keyboard, Mousepad, Headset, WiFi Dongle, Cables & Care Kit</span>
-                        </div>
-                      ) : (
-                        <div>
-                          <strong className="text-emerald-900 block font-bold">🎁 Special Bonus: 4 Free Tech Beast Accessories Pack (Build Under ₹20,000)</strong>
-                          <span className="text-[11px] text-emerald-700 font-medium">Mousepad, WiFi USB Adapter, Power Cable & Cleaning Kit</span>
-                        </div>
-                      );
-                    })()}
-                  </td>
-                  <td className="py-3 px-4 text-right font-bold text-emerald-700 font-mono text-xs">
-                    FREE INCLUDED
-                  </td>
-                </tr>
+                        ) : Number(quote.finalPrice || quote.subTotal || 0) >= 20000 ? (
+                          <div>
+                            <strong className="text-emerald-900 block font-bold">🎉 Special Bonus: 8 Free Tech Beast Accessories Pack (Build ₹20,000+)</strong>
+                            <span className="text-[11px] text-emerald-700 font-medium">Gaming Mouse, Keyboard, Mousepad, Headset, WiFi Dongle, Cables & Care Kit</span>
+                          </div>
+                        ) : (
+                          <div>
+                            <strong className="text-emerald-900 block font-bold">🎁 Special Bonus: 4 Free Tech Beast Accessories Pack (Build Under ₹20,000)</strong>
+                            <span className="text-[11px] text-emerald-700 font-medium">Mousepad, WiFi USB Adapter, Power Cable & Cleaning Kit</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-right font-bold text-emerald-700 font-mono text-xs">
+                        FREE INCLUDED
+                      </td>
+                    </tr>
+                  );
+                })()}
 
                 <tr className="bg-blue-50/50">
                   <td className="py-3 px-4 font-bold text-blue-800 flex items-center gap-2">
@@ -512,7 +537,7 @@ export default function QuotationView() {
                 <ShieldCheck className="w-4 h-4 text-blue-600" /> Official Store Quotation Guarantee
               </div>
               <p>
-                • Quotation valid for 7 days from the date of generation based on stock availability.
+                • Quotation valid for 2 days from the date of generation based on stock availability.
               </p>
               <p>
                 • All components carry official manufacturer warranties (1 to 3+ Years).

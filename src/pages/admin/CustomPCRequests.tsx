@@ -97,7 +97,7 @@ export default function CustomPCRequests() {
     }, 4000);
   };
 
-  const { settings } = useSettings();
+  const { settings, updateSettings } = useSettings();
 
   // Generator Modal State
   const [showGenerator, setShowGenerator] = useState(false);
@@ -107,10 +107,13 @@ export default function CustomPCRequests() {
   const [quoteNo, setQuoteNo] = useState(`TB-${new Date().getFullYear()}-1001`);
   const [quoteDate, setQuoteDate] = useState(format(new Date(), 'dd/MM/yyyy'));
   const [discount, setDiscount] = useState<number>(0);
-  const [warrantyNote, setWarrantyNote] = useState('Prices Valid For 7 Days');
+  const [warrantyNote, setWarrantyNote] = useState('Prices Valid For 2 Days');
   const [includeGst, setIncludeGst] = useState(true);
   const [componentsList, setComponentsList] = useState<ComponentRow[]>(DEFAULT_COMPONENTS);
   const [selectedComboId, setSelectedComboId] = useState<string>('auto');
+  const [bonusTitle, setBonusTitle] = useState<string>('8-Item Mega Tech Beast Accessories Pack');
+  const [bonusItems, setBonusItems] = useState<string>('Gaming Mouse, Keyboard, RGB Mousepad, Headset, WiFi Dongle, HDMI/Power Cable, Cleaner Kit, Gaming Stickers');
+  const [isSavingPreset, setIsSavingPreset] = useState<boolean>(false);
 
   const printableRef = useRef<HTMLDivElement>(null);
 
@@ -204,46 +207,96 @@ export default function CustomPCRequests() {
 
   // Helper to resolve the selected combo
   const resolveCombo = () => {
-    if (selectedComboId === 'none') {
+    if (selectedComboId === 'none' || !bonusTitle.trim()) {
       return { id: 'none', name: '', items: [] };
     }
-    if (selectedComboId === '8-item') {
-      return {
-        id: '8-item',
-        name: '8-Item Mega Tech Beast Accessories Pack',
-        items: ['Gaming Mouse', 'Keyboard', 'RGB Mousepad', 'Headset', 'WiFi Dongle', 'HDMI/Power Cable', 'Cleaner Kit', 'Gaming Stickers']
-      };
-    }
-    if (selectedComboId === '4-item') {
-      return {
-        id: '4-item',
-        name: '4-Item Essential Tech Beast Accessories Pack',
-        items: ['Mousepad', 'WiFi USB Adapter', 'Power Cable', 'Cleaning Kit']
-      };
-    }
-    if (selectedComboId === 'auto') {
+    const itemsArr = bonusItems ? bonusItems.split(',').map(s => s.trim()).filter(Boolean) : [];
+    return {
+      id: selectedComboId,
+      name: bonusTitle.trim(),
+      items: itemsArr
+    };
+  };
+
+  // Combo Selection Handler
+  const handleComboSelect = (id: string) => {
+    setSelectedComboId(id);
+    if (id === 'none') {
+      setBonusTitle('');
+      setBonusItems('');
+    } else if (id === '8-item') {
+      setBonusTitle('8-Item Mega Tech Beast Accessories Pack');
+      setBonusItems('Gaming Mouse, Keyboard, RGB Mousepad, Headset, WiFi Dongle, HDMI/Power Cable, Cleaner Kit, Gaming Stickers');
+    } else if (id === '4-item') {
+      setBonusTitle('4-Item Essential Tech Beast Accessories Pack');
+      setBonusItems('Mousepad, WiFi USB Adapter, Power Cable, Cleaning Kit');
+    } else if (id === 'auto') {
       if (netTotal >= 20000) {
-        return {
-          id: '8-item',
-          name: '8-Item Mega Tech Beast Accessories Pack',
-          items: ['Gaming Mouse', 'Keyboard', 'RGB Mousepad', 'Headset', 'WiFi Dongle', 'HDMI/Power Cable', 'Cleaner Kit', 'Gaming Stickers']
-        };
+        setBonusTitle('8-Item Mega Tech Beast Accessories Pack');
+        setBonusItems('Gaming Mouse, Keyboard, RGB Mousepad, Headset, WiFi Dongle, HDMI/Power Cable, Cleaner Kit, Gaming Stickers');
+      } else {
+        setBonusTitle('4-Item Essential Tech Beast Accessories Pack');
+        setBonusItems('Mousepad, WiFi USB Adapter, Power Cable, Cleaning Kit');
       }
-      return {
-        id: '4-item',
-        name: '4-Item Essential Tech Beast Accessories Pack',
-        items: ['Mousepad', 'WiFi USB Adapter', 'Power Cable', 'Cleaning Kit']
-      };
+    } else if (id === 'custom') {
+      // Keep existing custom values or allow immediate typing
+    } else {
+      const found = settings.accessoryCombos?.find(c => c.id === id);
+      if (found) {
+        setBonusTitle(found.name);
+        setBonusItems(found.items?.join(', ') || '');
+      }
     }
-    const found = settings.accessoryCombos?.find(c => c.id === selectedComboId);
-    if (found) {
-      return {
-        id: found.id,
-        name: found.name,
-        items: found.items || []
-      };
+  };
+
+  // Save current custom bonus as a reusable preset
+  const handleSaveAsPreset = async () => {
+    if (!bonusTitle.trim()) {
+      showToast("Please enter a bonus title to save as preset");
+      return;
     }
-    return { id: 'none', name: '', items: [] };
+    setIsSavingPreset(true);
+    try {
+      const newId = 'combo_' + Date.now();
+      const itemsArr = bonusItems.split(',').map(s => s.trim()).filter(Boolean);
+      const newPreset = {
+        id: newId,
+        name: bonusTitle.trim(),
+        items: itemsArr
+      };
+      const currentCombos = settings.accessoryCombos || [];
+      const updatedCombos = [...currentCombos, newPreset];
+      await updateSettings({ accessoryCombos: updatedCombos });
+      setSelectedComboId(newId);
+      showToast(`Preset "${bonusTitle.trim()}" saved successfully!`);
+    } catch (err) {
+      console.error("Error saving preset:", err);
+      showToast("Failed to save preset");
+    } finally {
+      setIsSavingPreset(false);
+    }
+  };
+
+  // Delete a saved custom preset
+  const handleDeletePreset = async (presetId: string, presetName: string) => {
+    if (!window.confirm(`Delete preset "${presetName}"?`)) return;
+    try {
+      const currentCombos = settings.accessoryCombos || [];
+      const updatedCombos = currentCombos.filter(c => c.id !== presetId);
+      await updateSettings({ accessoryCombos: updatedCombos });
+      setSelectedComboId('auto');
+      if (netTotal >= 20000) {
+        setBonusTitle('8-Item Mega Tech Beast Accessories Pack');
+        setBonusItems('Gaming Mouse, Keyboard, RGB Mousepad, Headset, WiFi Dongle, HDMI/Power Cable, Cleaner Kit, Gaming Stickers');
+      } else {
+        setBonusTitle('4-Item Essential Tech Beast Accessories Pack');
+        setBonusItems('Mousepad, WiFi USB Adapter, Power Cable, Cleaning Kit');
+      }
+      showToast(`Preset "${presetName}" deleted`);
+    } catch (err) {
+      console.error("Error deleting preset:", err);
+      showToast("Failed to delete preset");
+    }
   };
 
   // Pagination computations
@@ -294,7 +347,37 @@ export default function CustomPCRequests() {
     setQuoteNo(req.quoteNo || getNextSerialQuoteNo(requests));
     setQuoteDate(req.createdAt ? format(new Date(req.createdAt), 'dd/MM/yyyy') : format(new Date(), 'dd/MM/yyyy'));
     setDiscount(req.discountAmount || 0);
-    setSelectedComboId((req as any).comboId || 'auto');
+
+    const reqComboId = (req as any).comboId;
+    const reqComboName = (req as any).comboName;
+    const reqComboItems = (req as any).comboItems;
+
+    if (reqComboId === 'none' || (req as any).hasFreeGift === false) {
+      setSelectedComboId('none');
+      setBonusTitle('');
+      setBonusItems('');
+    } else if (reqComboName) {
+      setSelectedComboId(reqComboId || 'custom');
+      setBonusTitle(reqComboName);
+      setBonusItems(Array.isArray(reqComboItems) ? reqComboItems.join(', ') : '');
+    } else if (reqComboId === '8-item') {
+      setSelectedComboId('8-item');
+      setBonusTitle('8-Item Mega Tech Beast Accessories Pack');
+      setBonusItems('Gaming Mouse, Keyboard, RGB Mousepad, Headset, WiFi Dongle, HDMI/Power Cable, Cleaner Kit, Gaming Stickers');
+    } else if (reqComboId === '4-item') {
+      setSelectedComboId('4-item');
+      setBonusTitle('4-Item Essential Tech Beast Accessories Pack');
+      setBonusItems('Mousepad, WiFi USB Adapter, Power Cable, Cleaning Kit');
+    } else {
+      setSelectedComboId('auto');
+      if ((req.finalPrice || req.subTotal || 0) >= 20000) {
+        setBonusTitle('8-Item Mega Tech Beast Accessories Pack');
+        setBonusItems('Gaming Mouse, Keyboard, RGB Mousepad, Headset, WiFi Dongle, HDMI/Power Cable, Cleaner Kit, Gaming Stickers');
+      } else {
+        setBonusTitle('4-Item Essential Tech Beast Accessories Pack');
+        setBonusItems('Mousepad, WiFi USB Adapter, Power Cable, Cleaning Kit');
+      }
+    }
 
     const loadedRows: ComponentRow[] = [];
     if (req.components?.cpu) loadedRows.push({ category: "Processor (CPU)", desc: req.components.cpu.name, qty: 1, warranty: "3", price: req.components.cpu.price });
@@ -332,6 +415,7 @@ export default function CustomPCRequests() {
         comboId: selectedComboId,
         comboName: resolved.name,
         comboItems: resolved.items,
+        hasFreeGift: resolved.id !== 'none' && resolved.name !== '',
         components: {
           cpu: { name: componentsList.find(c => c.category.includes('Processor'))?.desc || 'Processor', price: Number(componentsList.find(c => c.category.includes('Processor'))?.price) || 0 },
           motherboard: { name: componentsList.find(c => c.category.includes('Motherboard'))?.desc || 'Motherboard', price: Number(componentsList.find(c => c.category.includes('Motherboard'))?.price) || 0 },
@@ -606,27 +690,105 @@ export default function CustomPCRequests() {
                 </div>
               </div>
 
-              {/* Free Gift / Accessory Combo Selector */}
-              <div className="border-t border-slate-700 pt-3">
-                <label className="block text-[11px] font-bold text-amber-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                  <span>🎁 Free Gift / Combo Bonus:</span>
-                  <span className="text-[10px] text-slate-400 lowercase font-normal">customizable</span>
-                </label>
+              {/* Free Gift / Accessory Combo & Manual Bonus Editor */}
+              <div className="border-t border-slate-700 pt-3 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>🎁 Free Gifts / Special Bonus:</span>
+                  </label>
+                  {settings?.accessoryCombos?.some(c => c.id === selectedComboId) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const found = settings.accessoryCombos?.find(c => c.id === selectedComboId);
+                        if (found) handleDeletePreset(found.id, found.name);
+                      }}
+                      className="text-[10px] text-red-400 hover:text-red-300 font-bold flex items-center gap-1 transition"
+                      title="Delete this custom preset"
+                    >
+                      <Trash2 className="w-3 h-3" /> Delete Preset
+                    </button>
+                  )}
+                </div>
+
+                {/* Preset Selector */}
                 <select
                   value={selectedComboId}
-                  onChange={(e) => setSelectedComboId(e.target.value)}
+                  onChange={(e) => handleComboSelect(e.target.value)}
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-bold focus:border-amber-400 focus:outline-none"
                 >
                   <option value="auto">⚡ Auto (8-Item for ₹20K+, 4-Item for &lt;₹20K)</option>
                   <option value="8-item">🎉 8-Item Mega Tech Beast Pack</option>
                   <option value="4-item">🎁 4-Item Essential Tech Beast Pack</option>
-                  {settings?.accessoryCombos?.map((combo) => (
-                    <option key={combo.id} value={combo.id}>
-                      ✨ {combo.name} ({combo.items?.length || 0} items)
-                    </option>
-                  ))}
-                  <option value="none">❌ No Free Gift</option>
+                  <option value="custom">✏️ Custom / Manual Bonus</option>
+                  {settings?.accessoryCombos && settings.accessoryCombos.length > 0 && (
+                    <optgroup label="Saved Custom Presets">
+                      {settings.accessoryCombos.map((combo) => (
+                        <option key={combo.id} value={combo.id}>
+                          ✨ {combo.name} ({combo.items?.length || 0} items)
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  <option value="none">❌ No Free Gift (Hide Bonus Banner)</option>
                 </select>
+
+                {/* Editable Bonus Fields (Title & Included Items) */}
+                {selectedComboId !== 'none' && (
+                  <div className="bg-slate-900/90 border border-slate-700/80 rounded-xl p-2.5 space-y-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-300 uppercase tracking-wider mb-1">
+                        Bonus Title / Banner Text:
+                      </label>
+                      <input
+                        type="text"
+                        value={bonusTitle}
+                        onChange={(e) => {
+                          setBonusTitle(e.target.value);
+                          if (selectedComboId !== 'custom' && !settings?.accessoryCombos?.some(c => c.id === selectedComboId)) {
+                            setSelectedComboId('custom');
+                          }
+                        }}
+                        placeholder="e.g. 8-Item Mega Tech Beast Accessories Pack"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-amber-300 font-bold focus:border-amber-400 focus:outline-none placeholder-slate-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-300 uppercase tracking-wider mb-1">
+                        Included Items (comma separated):
+                      </label>
+                      <input
+                        type="text"
+                        value={bonusItems}
+                        onChange={(e) => {
+                          setBonusItems(e.target.value);
+                          if (selectedComboId !== 'custom' && !settings?.accessoryCombos?.some(c => c.id === selectedComboId)) {
+                            setSelectedComboId('custom');
+                          }
+                        }}
+                        placeholder="e.g. Gaming Mouse, RGB Mousepad, Headset, WiFi Adapter"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-medium focus:border-amber-400 focus:outline-none placeholder-slate-500"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-[10px] text-slate-400">
+                        Edit freely for this customer, or save:
+                      </span>
+                      <button
+                        type="button"
+                        disabled={isSavingPreset || !bonusTitle.trim()}
+                        onClick={handleSaveAsPreset}
+                        className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-[10px] font-bold transition flex items-center gap-1 disabled:opacity-50"
+                        title="Save this bonus title and items as a reusable preset"
+                      >
+                        <Save className="w-3 h-3" />
+                        {isSavingPreset ? 'Saving...' : 'Save as Preset'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Quick Fill Presets */}

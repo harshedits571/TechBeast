@@ -144,7 +144,9 @@ export default function Home() {
         if (!ids || ids.length === 0) return [];
         const promises = ids.map(id => getDoc(doc(db, 'products', id)));
         const docs = await Promise.all(promises);
-        return docs.filter(d => d.exists()).map(d => ({ id: d.id, ...d.data() }));
+        return docs
+          .filter(d => d.exists() && d.data()?.status !== 'Offline')
+          .map(d => ({ id: d.id, ...d.data() }));
       };
 
       try {

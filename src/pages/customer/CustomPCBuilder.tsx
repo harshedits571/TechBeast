@@ -192,22 +192,25 @@ export default function CustomPCBuilder() {
     const fetchData = async () => {
       try {
         const prodSnap = await getDocs(query(collection(db, "products"), limit(100)));
-        const prodList: ComponentOption[] = prodSnap.docs.map(doc => {
-          const data = doc.data();
-          const name = data.title || data.name || 'Unnamed Product';
-          return {
-            id: doc.id,
-            name: name,
-            price: Number(data.price || 0),
-            category: data.category || 'Other',
-            brand: data.brand || inferBrand(name),
-            inStock: Number(data.stock || 0) > 0,
-            cpuPlatform: data.cpuPlatform || inferPlatform(name, data.brand),
-            socket: data.cpuSocket || data.motherboardSocket || inferSocket(name),
-            ramType: (data.ramType as any) || inferRamType(name),
-            specsSummary: data.description || ''
-          };
-        });
+        const prodList: ComponentOption[] = prodSnap.docs
+          .filter(doc => doc.data()?.status !== 'Offline')
+          .map(doc => {
+            const data = doc.data();
+            const name = data.title || data.name || 'Unnamed Product';
+            const inStock = (data.status === 'In Stock' || (!data.status && Number(data.stock || 0) > 0)) && data.status !== 'Out of Stock' && Number(data.stock || 0) > 0;
+            return {
+              id: doc.id,
+              name: name,
+              price: Number(data.price || 0),
+              category: data.category || 'Other',
+              brand: data.brand || inferBrand(name),
+              inStock: inStock,
+              cpuPlatform: data.cpuPlatform || inferPlatform(name, data.brand),
+              socket: data.cpuSocket || data.motherboardSocket || inferSocket(name),
+              ramType: (data.ramType as any) || inferRamType(name),
+              specsSummary: data.description || ''
+            };
+          });
 
         const invSnap = await getDocs(query(collection(db, "inventory"), limit(100)));
         const invList: ComponentOption[] = invSnap.docs.map(doc => {
