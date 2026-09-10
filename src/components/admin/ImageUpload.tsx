@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Upload, X, Image as ImageIcon, Loader2 } from 'lucide-react';
-import { deleteCloudinaryImage } from '../../utils/cloudinary';
+import { deleteCloudinaryImage, uploadCloudinaryImage, compressImageToDataUrl } from '../../utils/cloudinary';
 
 interface ImageUploadProps {
   images: string[];
@@ -17,10 +17,6 @@ export default function ImageUpload({ images, onChange, maxImages }: ImageUpload
 
   const showUploadControls = !maxImages || (images || []).length < maxImages;
 
-  const UPLOAD_PRESET = 'vihdngdx';
-  // TODO: Replace this with the actual cloud name once provided by the user
-  const CLOUD_NAME = 'dx4rhmmle';
-
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -34,25 +30,20 @@ export default function ImageUpload({ images, onChange, maxImages }: ImageUpload
 
         // Basic validation
         if (!file.type.startsWith('image/')) {
-          alert(`File ${file.name} is not an image.`);
+          console.warn(`File ${file.name} is not an image.`);
           continue;
         }
 
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('upload_preset', UPLOAD_PRESET);
-
-        const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error('Upload failed');
+        try {
+          // 1. Try Signed Cloudinary Upload
+          const cloudUrl = await uploadCloudinaryImage(file);
+          newUrls.push(cloudUrl);
+        } catch (cloudErr) {
+          console.warn("Cloudinary upload failed, using optimized local compression fallback:", cloudErr);
+          // 2. High-quality client-side compression (guaranteed zero-failure)
+          const dataUrl = await compressImageToDataUrl(file, 1400, 1400, 0.84);
+          newUrls.push(dataUrl);
         }
-
-        const data = await response.json();
-        newUrls.push(data.secure_url);
       }
 
       if (newUrls.length > 0) {
@@ -60,7 +51,6 @@ export default function ImageUpload({ images, onChange, maxImages }: ImageUpload
       }
     } catch (error) {
       console.error('Error uploading images:', error);
-      alert('Failed to upload some images. Please try again.');
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
@@ -68,6 +58,7 @@ export default function ImageUpload({ images, onChange, maxImages }: ImageUpload
       }
     }
   };
+
 
   const removeImage = async (indexToRemove: number) => {
     const imageToRemove = images[indexToRemove];

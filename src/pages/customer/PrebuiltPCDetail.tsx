@@ -9,13 +9,17 @@ import {
   ArrowLeft,
   Gift,
   Building2,
-  Check
+  Check,
+  Maximize2
 } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { useCart } from '../../contexts/CartContext';
 import { useSettings } from '../../contexts/SettingsContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { trackProductView } from '../../utils/activityTracker';
 import SEO from '../../components/ui/SEO';
+import ProductImageLightbox from '../../components/customer/ProductImageLightbox';
 
 interface UpgradeOption {
   id: string;
@@ -28,10 +32,12 @@ export default function PrebuiltPCDetail() {
   const navigate = useNavigate();
   const { addToCart } = useCart();
   const { settings } = useSettings();
+  const { user } = useAuth();
 
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [mainImage, setMainImage] = useState<string>('');
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
   // Sourced Inventory for Upgrades
   const [ramUpgrades, setRamUpgrades] = useState<UpgradeOption[]>([]);
@@ -115,6 +121,18 @@ export default function PrebuiltPCDetail() {
           setCoolerUpgrades(data.coolerUpgrades || []);
           setPrimarySsdUpgrades(data.ssdUpgrades || []);
           setSecStorageUpgrades(data.secStorageUpgrades || []);
+
+          // Track this Prebuilt Desktop view for customer inquiries & CRM lead follow-up
+          trackProductView({
+            id: loadedProduct.id,
+            title: loadedProduct.title,
+            category: 'Prebuilt PC',
+            price: loadedProduct.price,
+            oldPrice: loadedProduct.oldPrice,
+            imageUrl: loadedProduct.imageUrl,
+            condition: 'New',
+            brand: 'Tech Beast Gaming'
+          }, user);
         } else {
           setProduct(null);
         }
@@ -241,14 +259,25 @@ export default function PrebuiltPCDetail() {
           
           {/* Left Box: Rig Photo & Included Free Gifts */}
           <div className="lg:col-span-6 space-y-6">
-            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col items-center justify-center min-h-[460px] gap-6">
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col items-center justify-center min-h-[460px] gap-6 relative group">
               <div className="relative w-full aspect-square max-w-md flex items-center justify-center">
                 {mainImage ? (
-                  <img 
-                    src={mainImage} 
-                    alt={product?.title}
-                    className="w-full h-full object-contain rounded-2xl"
-                  />
+                  <>
+                    <button
+                      onClick={() => setIsLightboxOpen(true)}
+                      title="View full screen"
+                      aria-label="View full screen"
+                      className="absolute top-0 right-0 bg-white/90 hover:bg-white border border-slate-200 rounded-full p-2.5 text-slate-500 hover:text-purple-600 shadow-sm z-10 transition-all hover:scale-110 active:scale-95 cursor-pointer"
+                    >
+                      <Maximize2 className="w-4 h-4" />
+                    </button>
+                    <img 
+                      src={mainImage} 
+                      alt={product?.title}
+                      onClick={() => setIsLightboxOpen(true)}
+                      className="w-full h-full object-contain rounded-2xl cursor-zoom-in transition-transform duration-300 group-hover:scale-105"
+                    />
+                  </>
                 ) : (
                   <span className="text-slate-400 font-bold text-lg">No Image Available</span>
                 )}
@@ -547,6 +576,20 @@ export default function PrebuiltPCDetail() {
         </div>
 
       </div>
+
+      {/* Product Image Fullscreen Lightbox */}
+      <ProductImageLightbox
+        isOpen={isLightboxOpen}
+        onClose={() => setIsLightboxOpen(false)}
+        images={product?.imageUrls && product.imageUrls.length > 0 ? product.imageUrls : (mainImage ? [mainImage] : [])}
+        initialIndex={product?.imageUrls?.indexOf(mainImage) >= 0 ? product.imageUrls.indexOf(mainImage) : 0}
+        productTitle={product?.title || 'Prebuilt PC'}
+        onIndexChange={(newIndex) => {
+          if (product?.imageUrls?.[newIndex]) {
+            setMainImage(product.imageUrls[newIndex]);
+          }
+        }}
+      />
     </div>
   );
 }

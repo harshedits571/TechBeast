@@ -13,37 +13,118 @@ async function sha1(message: string): Promise<string> {
 }
 
 // Extract public_id from Cloudinary URL
-function getPublicIdFromUrl(url: string): string | null {
+export function getPublicIdFromUrl(url: string): string | null {
   try {
-    // Example URL: https://res.cloudinary.com/dx4rhmmle/image/upload/v1234567890/folder/sample.jpg
-    const parts = url.split('/upload/');
+    if (!url || typeof url !== 'string' || !url.includes('cloudinary.com')) return null;
+
+    const cleanUrl = url.split('?')[0].split('#')[0];
+    const parts = cleanUrl.split('/upload/');
     if (parts.length < 2) return null;
 
-    const afterUpload = parts[1];
+    let path = parts[1];
 
-    // Remove the version tag if it exists (e.g., "v1234567890/")
-    const pathWithoutVersion = afterUpload.replace(/^v\d+\//, '');
+    // Check if version tag exists (e.g. /v123456789/...)
+    const versionMatch = path.match(/(?:^|\/)v\d+\/(.+)$/);
+    if (versionMatch && versionMatch[1]) {
+      path = versionMatch[1];
+    } else {
+      // If no version tag, check if the first segment is a transformation string (e.g. c_scale,w_500, q_auto, etc.)
+      const segments = path.split('/');
+      if (segments.length > 1 && (segments[0].includes('_') || segments[0].includes(','))) {
+        path = segments.slice(1).join('/');
+      }
+    }
 
-    // Remove the file extension
-    const publicId = pathWithoutVersion.substring(0, pathWithoutVersion.lastIndexOf('.'));
-    return publicId || pathWithoutVersion; // Fallback if no extension
+    // Strip file extension (.jpg, .png, .webp, etc.)
+    const lastDot = path.lastIndexOf('.');
+    const publicId = lastDot !== -1 ? path.substring(0, lastDot) : path;
+    return decodeURIComponent(publicId) || null;
   } catch (error) {
     console.error("Failed to parse public_id from URL", url);
     return null;
   }
 }
 
+/**
+ * Uploads an image file to Cloudinary with authentication signature.
+ */
+export async function uploadCloudinaryImage(file: File): Promise<string> {
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const stringToSign = `timestamp=${timestamp}${API_SECRET}`;
+  const signature = await sha1(stringToSign);
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('api_key', API_KEY);
+  formData.append('timestamp', timestamp);
+  formData.append('signature', signature);
+
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+    method: 'POST',
+    body: formData
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData?.error?.message || `Cloudinary upload failed (status ${response.status})`);
+  }
+
+  const data = await response.json();
+  return data.secure_url;
+}
+
+/**
+ * Client-side high quality image compression fallback (WebP/JPEG)
+ */
+export async function compressImageToDataUrl(file: File, maxWidth = 1400, maxHeight = 1400, quality = 0.85): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxWidth || height > maxHeight) {
+          if (width / height > maxWidth / maxHeight) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(e.target?.result as string);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      img.onerror = () => resolve(e.target?.result as string);
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Deletes an image from Cloudinary using signed destroy API.
+ */
 export async function deleteCloudinaryImage(url: string): Promise<boolean> {
+  if (!url || !url.includes('cloudinary.com')) return false;
+
   const publicId = getPublicIdFromUrl(url);
   if (!publicId) {
-    console.error("Could not find public_id for url", url);
+    console.warn("Could not determine public_id for Cloudinary URL:", url);
     return false;
   }
 
   const timestamp = Math.floor(Date.now() / 1000).toString();
-
-  // The signature string MUST include all parameters (except api_key and resource_type) in alphabetical order
-  // For destroy, we just have public_id and timestamp.
   const stringToSign = `public_id=${publicId}&timestamp=${timestamp}${API_SECRET}`;
 
   try {
@@ -60,19 +141,18 @@ export async function deleteCloudinaryImage(url: string): Promise<boolean> {
       body: formData
     });
 
-    const result = await response.json();
-    if (result.result === 'ok') {
-      console.log(`Successfully deleted image: ${publicId}`);
-      alert(`Deleted image ${publicId} successfully!`);
-      return true;
-    } else {
-      console.error(`Failed to delete image: ${publicId}`, result);
-      alert(`Cloudinary Error: ${JSON.stringify(result)}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.warn("Cloudinary destroy response not ok:", errorData);
       return false;
     }
-  } catch (error: any) {
-    console.error("Error deleting image from Cloudinary", error);
-    alert(`Error calling Cloudinary: ${error.message}`);
+
+    const result = await response.json();
+    console.log(`Cloudinary destroy result for "${publicId}":`, result);
+    return result.result === 'ok';
+  } catch (error) {
+    console.warn("Could not delete image from Cloudinary:", error);
     return false;
   }
 }
+

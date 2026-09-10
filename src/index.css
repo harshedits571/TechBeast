@@ -3,3 +3,126 @@
 @theme {
   --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
+
+@keyframes sunburstSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes winnerCardEnter {
+  0% {
+    opacity: 0;
+    transform: scale(0.4) translateY(40px);
+    filter: blur(12px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.04) translateY(-6px);
+    filter: blur(0px);
+  }
+  80% {
+    transform: scale(0.98) translateY(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0px);
+  }
+}
+
+@keyframes shimmerGold {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@keyframes pulseHalo {
+  0%, 100% {
+    transform: scale(0.95);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.85;
+  }
+}
+
+@keyframes beaconBorderGlow {
+  0%, 100% {
+    box-shadow: 0 0 30px rgba(245, 158, 11, 0.4), 0 0 60px rgba(234, 179, 8, 0.2), inset 0 0 15px rgba(245, 158, 11, 0.15);
+    border-color: rgba(245, 158, 11, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 60px rgba(245, 158, 11, 0.75), 0 0 100px rgba(234, 179, 8, 0.4), inset 0 0 30px rgba(245, 158, 11, 0.3);
+    border-color: rgba(253, 224, 71, 0.9);
+  }
+}
+
+@keyframes floatSparkle {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg) scale(1);
+    opacity: 0.75;
+  }
+  50% {
+    transform: translateY(-15px) rotate(15deg) scale(1.2);
+    opacity: 1;
+  }
+}
+
+@keyframes ribbonFloat {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-sunburst-spin {
+  animation: sunburstSpin 24s linear infinite;
+}
+
+.animate-winner-enter {
+  animation: winnerCardEnter 0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-shimmer-gold {
+  background-size: 200% auto;
+  animation: shimmerGold 3.5s linear infinite;
+}
+
+.animate-pulse-halo {
+  animation: pulseHalo 3s ease-in-out infinite;
+}
+
+.animate-beacon-glow {
+  animation: beaconBorderGlow 2.5s ease-in-out infinite;
+}
+
+.animate-float-sparkle {
+  animation: floatSparkle 3s ease-in-out infinite;
+}
+
+.animate-ribbon-float {
+  animation: ribbonFloat 2s ease-in-out infinite;
+}
+
+/* Remove number input spin arrows globally */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+

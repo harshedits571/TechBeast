@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { ShoppingCart, Menu, Search, User, MonitorSmartphone, Monitor, Cpu, Wrench, Sparkles, ShieldCheck } from 'lucide-react';
+import { ShoppingCart, Menu, Search, User, MonitorSmartphone, Monitor, Cpu, Wrench, Sparkles, ShieldCheck, Gift } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useCart } from '../../contexts/CartContext';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -121,6 +121,7 @@ export default function CustomerLayout() {
                   RIGS
                 </span>
               </Link>
+
 
               {/* New Laptops */}
               <Link 
@@ -358,6 +359,7 @@ export default function CustomerLayout() {
               <li><Link to="/products?category=Laptops&condition=Used" className="hover:text-blue-600 transition-colors">Used Laptops</Link></li>
               <li><Link to="/products?category=Desktops" className="hover:text-blue-600 transition-colors">Desktops</Link></li>
               <li><Link to="/products?category=Accessories" className="hover:text-blue-600 transition-colors">Accessories</Link></li>
+              <li><Link to="/lucky-draw/winners" className="hover:text-amber-600 transition-colors">🏆 Lucky Draw Winners</Link></li>
             </ul>
           </div>
           <div>

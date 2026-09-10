@@ -15,7 +15,8 @@ import {
   ClipboardList,
   ShoppingBag,
   Menu,
-  X
+  X,
+  Gift
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -28,6 +29,7 @@ export default function AdminLayout() {
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
     { name: 'Offline POS', href: '/admin/offline-sale', icon: ShoppingBag },
+    { name: 'Lucky Draw', href: '/admin/lucky-draw', icon: Gift },
     { name: 'Orders', href: '/admin/orders', icon: ClipboardList },
     { name: 'All Products', href: '/admin/products', icon: Package },
     { name: 'Prebuilt PCs', href: '/admin/prebuilt-pcs', icon: MonitorSmartphone },

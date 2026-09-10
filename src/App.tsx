@@ -45,6 +45,9 @@ import Login from './pages/admin/Login';
 
 import RequireAccount from './components/customer/RequireAccount';
 import QuotationView from './pages/customer/QuotationView';
+import LuckyDraw from './pages/customer/LuckyDraw';
+import LuckyDrawWinners from './pages/customer/LuckyDrawWinners';
+import AdminLuckyDraw from './pages/admin/AdminLuckyDraw';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -71,6 +74,10 @@ export default function App() {
             <Route path="custom-pc/builder" element={<CustomPCBuilder />} />
             <Route path="quote/:id" element={<QuotationView />} />
             <Route path="custom-pc/quote/:id" element={<QuotationView />} />
+            <Route path="lucky-draw" element={<LuckyDraw />} />
+            <Route path="giveaway" element={<LuckyDraw />} />
+            <Route path="lucky-draw/winners" element={<LuckyDrawWinners />} />
+            <Route path="giveaway/winners" element={<LuckyDrawWinners />} />
             <Route path="prebuilt-pc" element={<PrebuiltPCs />} />
             <Route path="prebuilt-pc/:id" element={<RequireAccount><PrebuiltPCDetail /></RequireAccount>} />
             <Route path="products" element={<ProductList />} />
@@ -96,6 +103,8 @@ export default function App() {
               <Route path="prebuilt-pcs/new" element={<PrebuiltForm />} />
               <Route path="prebuilt-pcs/edit/:id" element={<PrebuiltForm />} />
               <Route path="custom-pc-requests" element={<CustomPCRequests />} />
+              <Route path="lucky-draw" element={<AdminLuckyDraw />} />
+              <Route path="giveaway" element={<AdminLuckyDraw />} />
               <Route path="repairs" element={<AdminRepairsList />} />
               <Route path="repairs/new" element={<RepairForm />} />
               <Route path="repairs/:id" element={<RepairDetail />} />

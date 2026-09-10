@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Heart, Share2, Check, ShieldCheck, Truck, RotateCcw, Cpu, HardDrive, Monitor, Battery, Gift, Star } from 'lucide-react';
+import { ShoppingCart, Heart, Share2, Check, ShieldCheck, Truck, RotateCcw, Cpu, HardDrive, Monitor, Battery, Gift, Star, Maximize2 } from 'lucide-react';
 import { db } from '../../lib/firebase';
 import { doc, getDoc, collection, getDocs, addDoc, query, orderBy, updateDoc, increment, setDoc } from 'firebase/firestore';
 import { createSlug, generateShortId } from '../../utils/slugify';
 import { useCart } from '../../contexts/CartContext';
 import { useSettings } from '../../contexts/SettingsContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { trackProductView } from '../../utils/activityTracker';
 import WarrantyModal from '../../components/WarrantyModal';
+import ProductImageLightbox from '../../components/customer/ProductImageLightbox';
 import { DetailSkeleton } from '../../components/ui/Skeleton';
 import SEO from '../../components/ui/SEO';
 
@@ -14,6 +17,7 @@ export default function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('specs');
+  const { user } = useAuth();
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { addToCart } = useCart();
@@ -23,6 +27,7 @@ export default function ProductDetail() {
   const [reviewForm, setReviewForm] = useState({ name: '', rating: 5, comment: '' });
   const [submittingReview, setSubmittingReview] = useState(false);
   const [mainImageIndex, setMainImageIndex] = useState(0);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [isWarrantyModalOpen, setIsWarrantyModalOpen] = useState(false);
   const [accessoryImages, setAccessoryImages] = useState<Record<string, string>>({});
   const [selectedAccessoryImage, setSelectedAccessoryImage] = useState<string | null>(null);
@@ -43,6 +48,20 @@ export default function ProductDetail() {
             setLoading(false);
             return;
           }
+
+          // Track this product view for customer inquiries & CRM lead follow-up
+          trackProductView({
+            id: docSnap.id,
+            title: productData.title || '',
+            category: productData.category || 'General',
+            price: Number(productData.price || 0),
+            oldPrice: productData.oldPrice ? Number(productData.oldPrice) : undefined,
+            imageUrl: productData.imageUrls?.[0] || productData.imageUrl || '',
+            condition: productData.condition || '',
+            brand: productData.brand || '',
+            sku: productData.sku || '',
+            modelNumber: productData.modelNumber || ''
+          }, user);
 
           const currentViews = productData.views || 0;
 
@@ -337,8 +356,13 @@ export default function ProductDetail() {
             )}
 
             {/* Main Image */}
-            <div className="w-full aspect-[4/3] sm:aspect-video bg-[#f8f9fa] rounded-2xl flex items-center justify-center relative mb-6 overflow-hidden">
-              <button className="absolute top-4 right-4 bg-white border border-slate-200 rounded-full p-2 text-slate-500 hover:text-blue-600 shadow-sm z-10 transition-colors">
+            <div className="w-full aspect-[4/3] sm:aspect-video bg-[#f8f9fa] rounded-2xl flex items-center justify-center relative mb-6 overflow-hidden group">
+              <button
+                onClick={() => setIsLightboxOpen(true)}
+                title="View full screen"
+                aria-label="View full screen"
+                className="absolute top-4 right-4 bg-white/90 hover:bg-white border border-slate-200 rounded-full p-2.5 text-slate-500 hover:text-red-600 shadow-sm z-10 transition-all hover:scale-110 active:scale-95 cursor-pointer"
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" /></svg>
               </button>
 
@@ -346,7 +370,8 @@ export default function ProductDetail() {
                 <img
                   src={product.imageUrls[mainImageIndex]}
                   alt={product.title}
-                  className="w-full h-full object-contain p-8 mix-blend-multiply transition-opacity duration-300"
+                  onClick={() => setIsLightboxOpen(true)}
+                  className="w-full h-full object-contain p-8 mix-blend-multiply transition-transform duration-300 group-hover:scale-105 cursor-zoom-in"
                 />
               ) : (
                 <div className="w-4/5 h-4/5 flex flex-col items-center justify-center relative opacity-50">
@@ -687,6 +712,16 @@ export default function ProductDetail() {
           </div>
         </div>
       )}
+
+      {/* Product Image Fullscreen Lightbox */}
+      <ProductImageLightbox
+        isOpen={isLightboxOpen}
+        onClose={() => setIsLightboxOpen(false)}
+        images={product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls : []}
+        initialIndex={mainImageIndex}
+        productTitle={product.title}
+        onIndexChange={(newIndex) => setMainImageIndex(newIndex)}
+      />
     </div>
   );
 }

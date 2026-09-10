@@ -2,7 +2,21 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
-interface StoreSettings {
+export interface CustomBuildPreset {
+  id: string;
+  name: string;
+  icon?: string;
+  components: {
+    category: string;
+    desc: string;
+    qty: number | string;
+    warranty: string;
+    price: number | string;
+  }[];
+  createdAt?: string;
+}
+
+export interface StoreSettings {
   supportPhone: string;
   estimatedDispatch: string;
   bankOfferText: string;
@@ -29,6 +43,7 @@ interface StoreSettings {
   bestSellerIds: string[];
   newArrivalIds: string[];
   accessoryCombos: { id: string; name: string; items: string[] }[];
+  customBuildPresets?: CustomBuildPreset[];
   promoCards: {
     card1: { subtitle: string; title: string; link: string; bgColor: string };
     card2: { subtitle: string; title: string; link: string; bgColor: string };
@@ -54,6 +69,7 @@ const defaultSettings: StoreSettings = {
   bestSellerIds: [],
   newArrivalIds: [],
   accessoryCombos: [],
+  customBuildPresets: [],
   promoCards: {
     card1: { subtitle: 'Weekend Deals', title: 'Next-gen gaming console', link: '/products', bgColor: 'blue' },
     card2: { subtitle: 'Back to school', title: 'Special discount for students', link: '/products', bgColor: 'red' }

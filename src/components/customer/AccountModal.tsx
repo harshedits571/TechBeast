@@ -4,6 +4,7 @@ import { User, Phone, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
+import { syncGuestViewedProducts } from '../../utils/activityTracker';
 
 interface AccountModalProps {
   isOpen: boolean;
@@ -91,10 +92,14 @@ export default function AccountModal({ isOpen, onSuccess }: AccountModalProps) {
       // Save to local storage so they aren't prompted again
       const accountInfo = {
         id: customerId,
+        uid: user?.uid,
         ...formData
       };
       localStorage.setItem('customerAccountInfo', JSON.stringify(accountInfo));
       
+      // Sync any products viewed while unauthenticated
+      syncGuestViewedProducts(accountInfo).catch(e => console.log("Guest sync notice:", e));
+
       onSuccess(accountInfo);
     } catch (err) {
       console.error("Error creating account:", err);

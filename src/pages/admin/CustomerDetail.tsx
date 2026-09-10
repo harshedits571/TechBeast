@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, MapPin, Map, Calendar, ShoppingCart, Wrench, CheckCircle2, Clock, Trash2, FileText } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, MapPin, Map, Calendar, ShoppingCart, Wrench, CheckCircle2, Clock, Trash2, FileText, Eye, Laptop, Monitor, MessageCircle, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { db } from '../../lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc, arrayUnion, onSnapshot } from 'firebase/firestore';
 import InvoiceModal from '../../components/admin/InvoiceModal';
 import { FormSkeleton } from '../../components/ui/Skeleton';
+import { generateWhatsAppInquiryUrl } from '../../utils/activityTracker';
 
 export default function CustomerDetail() {
   const { id } = useParams();
@@ -13,15 +14,10 @@ export default function CustomerDetail() {
   const [customer, setCustomer] = useState<any>(null);
   const [repairs, setRepairs] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
+  const [viewedProducts, setViewedProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [newNote, setNewNote] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
-
-  useEffect(() => {
-    if (id) {
-      fetchCustomerData(id);
-    }
-  }, [id]);
 
   const safeFormatDate = (dateVal: any) => {
     if (!dateVal) return '-';
@@ -41,99 +37,137 @@ export default function CustomerDetail() {
     }
   };
 
-  const fetchCustomerData = async (rawId: string) => {
+  useEffect(() => {
+    if (!id) return;
     setLoading(true);
-    const targetId = decodeURIComponent(rawId || '').trim();
+    const targetId = decodeURIComponent(id).trim();
 
-    let custData: any = null;
-    let fetchedRepairs: any[] = [];
-    let fetchedOrders: any[] = [];
+    let rawCustomers: any[] = [];
+    let rawRepairs: any[] = [];
+    let rawOrders: any[] = [];
+    let rawViews: any[] = [];
 
-    // 1. Try Direct Doc ID in 'customers'
-    try {
-      const docRef = doc(db, 'customers', targetId);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        custData = { id: docSnap.id, ...docSnap.data() };
+    const syncCRMData = () => {
+      // 1. Locate customer in rawCustomers
+      let custData: any = null;
+      
+      // Match by ID
+      const directMatch = rawCustomers.find(c => c.id === targetId);
+      if (directMatch) {
+        custData = { ...directMatch };
+      } else {
+        // Match by phone, email, or name
+        const match = rawCustomers.find(c => 
+          (c.phone && c.phone === targetId) ||
+          (c.email && c.email.toLowerCase() === targetId.toLowerCase()) ||
+          (c.name && c.name.toLowerCase() === targetId.toLowerCase())
+        );
+        if (match) custData = { ...match };
       }
-    } catch (e) {
-      console.log("Not a direct doc ID", e);
-    }
 
-    // 2. Query 'customers' by Phone, Email, or Name
-    if (!custData) {
-      try {
-        const queries = [
-          query(collection(db, 'customers'), where('phone', '==', targetId)),
-          query(collection(db, 'customers'), where('email', '==', targetId)),
-          query(collection(db, 'customers'), where('name', '==', targetId))
-        ];
+      const searchPhone = custData?.phone || (targetId.match(/^[0-9+]{8,}$/) ? targetId : '');
+      const searchEmail = custData?.email || (targetId.includes('@') ? targetId : '');
+      const searchName = custData?.name || targetId;
 
-        for (const q of queries) {
-          const snap = await getDocs(q);
-          if (!snap.empty) {
-            custData = { id: snap.docs[0].id, ...snap.docs[0].data() };
-            break;
-          }
+      // 2. Filter Repairs
+      const filteredRepairs = rawRepairs.filter(r => 
+        (searchPhone && r.customerPhone === searchPhone) ||
+        (searchEmail && r.customerEmail?.toLowerCase() === searchEmail.toLowerCase()) ||
+        (searchName && r.customerName?.toLowerCase() === searchName.toLowerCase())
+      );
+
+      // 3. Filter Orders
+      const filteredOrders = rawOrders.filter(o => 
+        (searchPhone && o.customerPhone === searchPhone) ||
+        (searchEmail && o.customerEmail?.toLowerCase() === searchEmail.toLowerCase()) ||
+        (searchName && o.customerName?.toLowerCase() === searchName.toLowerCase())
+      );
+
+      // 4. Merge Viewed Products
+      let mergedViews: any[] = [];
+      if (Array.isArray(custData?.viewedProducts)) {
+        mergedViews = [...custData.viewedProducts];
+      }
+
+      const relevantViews = rawViews.filter(v => 
+        (targetId && (v.customerId === targetId || v.userId === targetId)) ||
+        (searchPhone && (v.customerId === searchPhone || v.customerPhone === searchPhone)) ||
+        (searchEmail && v.customerEmail?.toLowerCase() === searchEmail.toLowerCase())
+      );
+
+      relevantViews.forEach(rv => {
+        const existingIdx = mergedViews.findIndex(fv => fv.productId === rv.productId);
+        if (existingIdx >= 0) {
+          mergedViews[existingIdx].viewCount = Math.max(mergedViews[existingIdx].viewCount || 1, rv.viewCount || 1);
+        } else {
+          mergedViews.push({
+            productId: rv.productId,
+            title: rv.productTitle,
+            category: rv.productCategory || 'General',
+            price: Number(rv.productPrice || 0),
+            imageUrl: rv.productImage || '',
+            condition: rv.productCondition || '',
+            brand: rv.productBrand || '',
+            sku: rv.productSku || '',
+            viewedAt: rv.lastViewedAt || rv.viewedAt,
+            viewCount: rv.viewCount || 1
+          });
         }
-      } catch (e) {
-        console.log("Failed querying customers", e);
+      });
+
+      mergedViews.sort((a, b) => new Date(b.viewedAt || 0).getTime() - new Date(a.viewedAt || 0).getTime());
+
+      // 5. Fallback customer record if not pre-existing
+      if (!custData) {
+        const firstOrder = filteredOrders[0];
+        const firstRepair = filteredRepairs[0];
+
+        custData = {
+          id: targetId,
+          name: searchName || firstOrder?.customerName || firstRepair?.customerName || 'Customer',
+          phone: searchPhone || firstOrder?.customerPhone || firstRepair?.customerPhone || '',
+          email: searchEmail || firstOrder?.customerEmail || firstRepair?.customerEmail || '',
+          address: firstOrder?.shippingAddress?.address || firstOrder?.customerAddress || '',
+          city: firstOrder?.shippingAddress?.city || '',
+          notes: []
+        };
       }
-    }
 
-    const searchPhone = custData?.phone || (targetId.match(/^[0-9+]{8,}$/) ? targetId : '');
-    const searchEmail = custData?.email || (targetId.includes('@') ? targetId : '');
-    const searchName = custData?.name || targetId;
+      setCustomer(custData);
+      setRepairs(filteredRepairs);
+      setOrders(filteredOrders);
+      setViewedProducts(mergedViews);
+      setLoading(false);
+    };
 
-    // 3. Safely Fetch Repairs
-    try {
-      const repairsSnap = await getDocs(collection(db, 'repairs'));
-      fetchedRepairs = repairsSnap.docs
-        .map(d => ({ id: d.id, ...d.data() } as any))
-        .filter(r => 
-          (searchPhone && r.customerPhone === searchPhone) ||
-          (searchEmail && r.customerEmail?.toLowerCase() === searchEmail.toLowerCase()) ||
-          (searchName && r.customerName?.toLowerCase() === searchName.toLowerCase())
-        );
-    } catch (e) {
-      console.log("Error fetching repairs for CRM", e);
-    }
+    // Subscriptions
+    const unsubCustomers = onSnapshot(collection(db, 'customers'), (snap) => {
+      rawCustomers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      syncCRMData();
+    }, (err) => console.error("Customer CRM sync error:", err));
 
-    // 4. Safely Fetch Orders
-    try {
-      const ordersSnap = await getDocs(collection(db, 'orders'));
-      fetchedOrders = ordersSnap.docs
-        .map(d => ({ id: d.id, ...d.data() } as any))
-        .filter(o => 
-          (searchPhone && o.customerPhone === searchPhone) ||
-          (searchEmail && o.customerEmail?.toLowerCase() === searchEmail.toLowerCase()) ||
-          (searchName && o.customerName?.toLowerCase() === searchName.toLowerCase())
-        );
-    } catch (e) {
-      console.log("Error fetching orders for CRM", e);
-    }
+    const unsubRepairs = onSnapshot(collection(db, 'repairs'), (snap) => {
+      rawRepairs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      syncCRMData();
+    }, (err) => console.error("Repairs CRM sync error:", err));
 
-    // 5. Always ensure custData exists!
-    if (!custData) {
-      const firstOrder = fetchedOrders[0];
-      const firstRepair = fetchedRepairs[0];
+    const unsubOrders = onSnapshot(collection(db, 'orders'), (snap) => {
+      rawOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      syncCRMData();
+    }, (err) => console.error("Orders CRM sync error:", err));
 
-      custData = {
-        id: targetId,
-        name: searchName || firstOrder?.customerName || firstRepair?.customerName || 'Customer',
-        phone: searchPhone || firstOrder?.customerPhone || firstRepair?.customerPhone || '',
-        email: searchEmail || firstOrder?.customerEmail || firstRepair?.customerEmail || '',
-        address: firstOrder?.shippingAddress?.address || firstOrder?.customerAddress || '',
-        city: firstOrder?.shippingAddress?.city || '',
-        notes: []
-      };
-    }
+    const unsubViews = onSnapshot(collection(db, 'customer_views'), (snap) => {
+      rawViews = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      syncCRMData();
+    }, (err) => console.error("Views CRM sync error:", err));
 
-    setCustomer(custData);
-    setRepairs(fetchedRepairs);
-    setOrders(fetchedOrders);
-    setLoading(false);
-  };
+    return () => {
+      unsubCustomers();
+      unsubRepairs();
+      unsubOrders();
+      unsubViews();
+    };
+  }, [id]);
 
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -213,15 +247,18 @@ export default function CustomerDetail() {
               Joined {customer.createdAt ? format(new Date(customer.createdAt), 'MMM d, yyyy') : 'N/A'}
             </p>
             
-            <div className="w-full flex justify-between px-6 py-4 bg-white/5 rounded-2xl border border-white/5">
+            <div className="w-full grid grid-cols-3 gap-2 px-3 py-4 bg-white/5 rounded-2xl border border-white/5 text-center">
               <div>
-                <div className="text-2xl font-bold text-white">{orders.length}</div>
+                <div className="text-xl font-bold text-white">{orders.length}</div>
                 <div className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mt-1">Orders</div>
               </div>
-              <div className="w-px bg-white/10"></div>
-              <div>
-                <div className="text-2xl font-bold text-white">{repairs.length}</div>
+              <div className="border-x border-white/10">
+                <div className="text-xl font-bold text-white">{repairs.length}</div>
                 <div className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mt-1">Repairs</div>
+              </div>
+              <div>
+                <div className="text-xl font-bold text-emerald-400">{viewedProducts.length}</div>
+                <div className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mt-1">Views</div>
               </div>
             </div>
           </div>
@@ -294,9 +331,141 @@ export default function CustomerDetail() {
 
         </div>
 
-        {/* RIGHT COLUMN: History (Orders & Repairs) */}
+        {/* RIGHT COLUMN: History (Viewed Products, Orders & Repairs) */}
         <div className="lg:col-span-2 space-y-8">
           
+          {/* Products Viewed & Browsing Lead History */}
+          <div className="bg-[#0d0d0e] rounded-3xl border border-white/10 shadow-2xl overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Eye className="h-5 w-5 text-emerald-400" />
+                Products Viewed & Online Interest ({viewedProducts.length})
+              </h2>
+              {customer.phone && viewedProducts.length > 0 && (
+                <a
+                  href={generateWhatsAppInquiryUrl(
+                    customer.phone,
+                    customer.name,
+                    viewedProducts[0].title,
+                    viewedProducts[0].price,
+                    viewedProducts[0].category
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-1.5 text-xs font-bold text-white bg-[#25D366] hover:bg-[#128C7E] rounded-full transition-all uppercase tracking-wider flex items-center gap-1.5 shadow-sm"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  Inquire on WhatsApp
+                </a>
+              )}
+            </div>
+
+            <div className="p-6">
+              {viewedProducts.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 text-sm">
+                  No browsing history or product views recorded for this customer yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-white/10 rounded-2xl bg-white/[0.02]">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-white/5 bg-white/5 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                        <th className="p-3 pl-4">Product Details</th>
+                        <th className="p-3">Category</th>
+                        <th className="p-3">Price</th>
+                        <th className="p-3 text-center">View Count</th>
+                        <th className="p-3">Last Viewed</th>
+                        <th className="p-3 pr-4 text-right">Inquiry</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {viewedProducts.map((prod, idx) => (
+                        <tr key={idx} className="hover:bg-white/5 transition-colors group">
+                          {/* Product */}
+                          <td className="p-3 pl-4">
+                            <div className="flex items-center gap-3">
+                              {prod.imageUrl ? (
+                                <img 
+                                  src={prod.imageUrl} 
+                                  alt={prod.title} 
+                                  className="w-8 h-8 object-contain rounded bg-white/10 p-0.5 shrink-0" 
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded bg-slate-800 flex items-center justify-center shrink-0 text-slate-500">
+                                  <Laptop className="w-4 h-4" />
+                                </div>
+                              )}
+                              <div className="font-bold text-slate-200 group-hover:text-blue-400 transition-colors line-clamp-1 max-w-[200px]">
+                                {prod.title}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Category */}
+                          <td className="p-3 whitespace-nowrap">
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase tracking-widest">
+                              {prod.category || 'Product'}
+                            </span>
+                          </td>
+
+                          {/* Price */}
+                          <td className="p-3 whitespace-nowrap font-extrabold text-emerald-400">
+                            ₹{Number(prod.price || 0).toLocaleString('en-IN')}
+                          </td>
+
+                          {/* View count */}
+                          <td className="p-3 text-center whitespace-nowrap">
+                            <span className="font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20 text-[10px]">
+                              {prod.viewCount || 1}x Views
+                            </span>
+                          </td>
+
+                          {/* Last Viewed */}
+                          <td className="p-3 whitespace-nowrap text-slate-400 text-[11px]">
+                            {safeFormatDate(prod.viewedAt)}
+                          </td>
+
+                          {/* Actions */}
+                          <td className="p-3 pr-4 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-2">
+                              {customer.phone && (
+                                <a
+                                  href={generateWhatsAppInquiryUrl(
+                                    customer.phone,
+                                    customer.name,
+                                    prod.title,
+                                    prod.price,
+                                    prod.category
+                                  )}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-3 py-1.5 bg-[#25D366] hover:bg-[#128C7E] text-white rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 uppercase tracking-wider shadow-sm"
+                                  title="Inquire on WhatsApp"
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5" />
+                                  Inquire
+                                </a>
+                              )}
+                              <a
+                                href={prod.category?.includes('Prebuilt') ? `/prebuilt-pc/${prod.productId}` : `/products/${prod.productId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-lg transition-all border border-white/10"
+                                title="Open product page on website"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Repairs Ticket History */}
           <div className="bg-[#0d0d0e] rounded-3xl border border-white/10 shadow-2xl overflow-hidden flex flex-col">
             <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
