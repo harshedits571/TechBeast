@@ -52,8 +52,6 @@ import {
   Image as ImageIcon,
   Eye
 } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
-import confetti from 'canvas-confetti';
 import { getNextLuckyDrawTicketNumber, getCurrentTicketSequence, updateTicketSequence } from '../../utils/luckyDrawSequence';
 import ImageUpload from '../../components/admin/ImageUpload';
 import { deleteCloudinaryImage } from '../../utils/cloudinary';
@@ -584,10 +582,14 @@ export default function AdminLuckyDraw() {
   // -------------------------------------------------------------------
   // MULTI-STAGE CELEBRATION CONFETTI & FIREWORKS CANNONS
   // -------------------------------------------------------------------
-  const triggerWinnerCelebration = () => {
+  const triggerWinnerCelebration = async () => {
     try {
+      const confettiModule = await import('canvas-confetti').catch(() => null);
+      const fireConfetti = confettiModule?.default || (window as any).confetti;
+      if (!fireConfetti) return;
+
       // Stage 1: Big Center Golden & Emerald Explosion
-      confetti({
+      fireConfetti({
         particleCount: 160,
         spread: 100,
         origin: { y: 0.55 },
@@ -596,14 +598,14 @@ export default function AdminLuckyDraw() {
 
       // Stage 2: Dual Left & Right Side Cannons
       setTimeout(() => {
-        confetti({
+        fireConfetti({
           particleCount: 90,
           angle: 60,
           spread: 80,
           origin: { x: 0.05, y: 0.7 },
           colors: ['#fbbf24', '#f59e0b', '#10b981', '#ffffff']
         });
-        confetti({
+        fireConfetti({
           particleCount: 90,
           angle: 120,
           spread: 80,
@@ -614,7 +616,7 @@ export default function AdminLuckyDraw() {
 
       // Stage 3: High Fireworks Rain Burst
       setTimeout(() => {
-        confetti({
+        fireConfetti({
           particleCount: 110,
           spread: 130,
           startVelocity: 45,
@@ -2002,12 +2004,12 @@ export default function AdminLuckyDraw() {
               </div>
 
               {/* QR Code */}
-              <div className="p-4 bg-slate-50 border-2 border-slate-200 rounded-3xl inline-block shadow-inner">
-                <QRCodeSVG
-                  value={standeeQrUrl}
-                  size={200}
-                  level="H"
-                  includeMargin={true}
+              <div className="p-4 bg-white border-2 border-slate-200 rounded-3xl inline-block shadow-inner">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(standeeQrUrl)}&margin=8`}
+                  alt="Giveaway QR Standee"
+                  className="w-[200px] h-[200px] object-contain rounded-xl mx-auto"
+                  crossOrigin="anonymous"
                 />
               </div>
 
