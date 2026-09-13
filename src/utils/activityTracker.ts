@@ -40,31 +40,46 @@ export interface CustomerLeadInfo {
  * Gets currently stored customer info from localStorage or Firebase Auth
  */
 export function getActiveCustomerInfo(user?: any): CustomerLeadInfo | null {
+  let name = '';
+  let phone = '';
+  let email = '';
+  let uid = user?.uid || '';
+  let id = '';
+
   try {
     const stored = localStorage.getItem('customerAccountInfo');
     if (stored) {
       const parsed = JSON.parse(stored);
-      if (parsed && (parsed.phone || parsed.email || parsed.id)) {
-        return {
-          id: parsed.id || (parsed.phone ? parsed.phone.replace(/\D/g, '') : user?.uid),
-          name: parsed.name || user?.displayName || 'Customer',
-          phone: parsed.phone || '',
-          email: parsed.email || user?.email || '',
-          uid: user?.uid
-        };
+      if (parsed) {
+        name = parsed.name || '';
+        phone = parsed.phone || '';
+        email = parsed.email || '';
+        uid = parsed.uid || uid;
+        id = parsed.id || '';
       }
     }
   } catch (err) {
     console.error("Error reading stored customer account:", err);
   }
 
-  if (user && (user.email || user.displayName || user.phoneNumber)) {
+  if (user) {
+    name = name || user.displayName || 'Customer';
+    email = email || user.email || '';
+    phone = phone || user.phoneNumber || '';
+    uid = user.uid || uid;
+  }
+
+  const cleanPhone = phone ? phone.replace(/\D/g, '').slice(-10) : '';
+  const cleanEmail = email ? email.toLowerCase().trim() : '';
+  const effectiveId = cleanPhone || id || uid || cleanEmail;
+
+  if (effectiveId || cleanPhone || cleanEmail || uid) {
     return {
-      id: user.uid,
-      name: user.displayName || 'Customer',
-      phone: user.phoneNumber || '',
-      email: user.email || '',
-      uid: user.uid
+      id: effectiveId,
+      name: name || 'Customer',
+      phone: cleanPhone || phone,
+      email: cleanEmail,
+      uid: uid
     };
   }
 
@@ -81,9 +96,31 @@ export async function trackProductView(product: ViewedProductInfo, authUser?: an
   const nowIso = new Date().toISOString();
   const customer = getActiveCustomerInfo(authUser);
 
-  // If customer is identified, save to Firestore
-  if (customer && (customer.id || customer.phone || customer.email)) {
-    const customerId = customer.id || (customer.phone ? customer.phone.replace(/\D/g, '') : customer.email);
+  // Always save to guest browsing history in localStorage as immediate resilient fallback
+  try {
+    const guestHistory: ViewedProductInfo[] = JSON.parse(localStorage.getItem('guestViewedProducts') || '[]');
+    const filtered = guestHistory.filter(p => p.id !== product.id);
+    filtered.unshift({
+      id: product.id,
+      title: product.title,
+      category: product.category || 'General',
+      price: Number(product.price || 0),
+      oldPrice: product.oldPrice ? Number(product.oldPrice) : undefined,
+      imageUrl: product.imageUrl || '',
+      condition: product.condition || '',
+      brand: product.brand || '',
+      sku: product.sku || '',
+      modelNumber: product.modelNumber || ''
+    });
+    localStorage.setItem('guestViewedProducts', JSON.stringify(filtered.slice(0, 30)));
+  } catch (e) {
+    // ignore
+  }
+
+  // If customer is identified (via phone, email, or auth user UID), save directly to Firestore
+  if (customer && (customer.id || customer.phone || customer.email || customer.uid)) {
+    const cleanPhone = customer.phone ? customer.phone.replace(/\D/g, '').slice(-10) : '';
+    const customerId = cleanPhone || customer.id || customer.uid || customer.email;
 
     try {
       // 1. Write/Update dedicated view record in `customer_views` collection
@@ -91,16 +128,16 @@ export async function trackProductView(product: ViewedProductInfo, authUser?: an
       const viewDocId = `${customerId}_${product.id}`.replace(/[\/\s]/g, '_');
       const viewDocRef = doc(db, 'customer_views', viewDocId);
       
-      const existingSnap = await getDoc(viewDocRef);
-      const existingCount = existingSnap.exists() ? (existingSnap.data().viewCount || 1) : 0;
-      const firstViewedAt = existingSnap.exists() ? (existingSnap.data().firstViewedAt || nowIso) : nowIso;
+      const existingSnap = await getDoc(viewDocRef).catch(() => null);
+      const existingCount = existingSnap && existingSnap.exists() ? (existingSnap.data().viewCount || 1) : 0;
+      const firstViewedAt = existingSnap && existingSnap.exists() ? (existingSnap.data().firstViewedAt || nowIso) : nowIso;
 
-      await setDoc(viewDocRef, {
+      const viewPayload = {
         customerId: customerId,
         customerName: customer.name || 'Customer',
-        customerPhone: customer.phone || '',
+        customerPhone: cleanPhone || customer.phone || '',
         customerEmail: customer.email || '',
-        userId: customer.uid || '',
+        userId: customer.uid || authUser?.uid || '',
         productId: product.id,
         productTitle: product.title,
         productCategory: product.category || 'General',
@@ -114,14 +151,24 @@ export async function trackProductView(product: ViewedProductInfo, authUser?: an
         firstViewedAt: firstViewedAt,
         lastViewedAt: nowIso,
         updatedAt: nowIso
-      }, { merge: true });
+      };
+
+      await setDoc(viewDocRef, viewPayload, { merge: true }).catch(err => {
+        console.warn("View record setDoc warning:", err);
+      });
+
+      // If user has a separate UID view record, also update that
+      if (customer.uid && customer.uid !== customerId) {
+        const uidViewDocId = `${customer.uid}_${product.id}`.replace(/[\/\s]/g, '_');
+        setDoc(doc(db, 'customer_views', uidViewDocId), viewPayload, { merge: true }).catch(() => {});
+      }
 
       // 2. Update customer document in `customers` collection with an updated array of viewedProducts
       const customerDocRef = doc(db, 'customers', customerId);
-      const customerSnap = await getDoc(customerDocRef);
+      const customerSnap = await getDoc(customerDocRef).catch(() => null);
       
       let viewedList: CustomerViewItem[] = [];
-      if (customerSnap.exists() && Array.isArray(customerSnap.data().viewedProducts)) {
+      if (customerSnap && customerSnap.exists() && Array.isArray(customerSnap.data().viewedProducts)) {
         viewedList = [...customerSnap.data().viewedProducts];
       }
 
@@ -155,8 +202,9 @@ export async function trackProductView(product: ViewedProductInfo, authUser?: an
 
       await setDoc(customerDocRef, {
         name: customer.name,
-        phone: customer.phone,
+        phone: cleanPhone || customer.phone,
         email: customer.email,
+        uid: customer.uid || authUser?.uid || '',
         lastActive: nowIso,
         lastViewedProduct: product.title,
         lastViewedCategory: product.category || 'General',
@@ -167,16 +215,6 @@ export async function trackProductView(product: ViewedProductInfo, authUser?: an
     } catch (err) {
       console.error("Error tracking product view to Firestore:", err);
     }
-  } else {
-    // Save to guest browsing history in localStorage
-    try {
-      const guestHistory: ViewedProductInfo[] = JSON.parse(localStorage.getItem('guestViewedProducts') || '[]');
-      const filtered = guestHistory.filter(p => p.id !== product.id);
-      filtered.unshift(product);
-      localStorage.setItem('guestViewedProducts', JSON.stringify(filtered.slice(0, 20)));
-    } catch (e) {
-      // ignore
-    }
   }
 }
 
@@ -184,24 +222,22 @@ export async function trackProductView(product: ViewedProductInfo, authUser?: an
  * Flushes and syncs guest viewed products to Firestore once the user logs in or creates an account
  */
 export async function syncGuestViewedProducts(customer: CustomerLeadInfo) {
-  if (!customer || (!customer.id && !customer.phone && !customer.email)) return;
+  if (!customer || (!customer.id && !customer.phone && !customer.email && !customer.uid)) return;
   
   try {
     const raw = localStorage.getItem('guestViewedProducts');
-    if (!raw) return;
-    const guestHistory: ViewedProductInfo[] = JSON.parse(raw);
-    if (!Array.isArray(guestHistory) || guestHistory.length === 0) return;
+    const guestHistory: ViewedProductInfo[] = raw ? JSON.parse(raw) : [];
 
-    for (const prod of guestHistory) {
-      await trackProductView(prod, {
-        uid: customer.uid,
-        displayName: customer.name,
-        email: customer.email,
-        phoneNumber: customer.phone
-      });
+    if (Array.isArray(guestHistory) && guestHistory.length > 0) {
+      for (const prod of guestHistory) {
+        await trackProductView(prod, {
+          uid: customer.uid,
+          displayName: customer.name,
+          email: customer.email,
+          phoneNumber: customer.phone
+        });
+      }
     }
-
-    localStorage.removeItem('guestViewedProducts');
   } catch (err) {
     console.error("Error syncing guest viewed products:", err);
   }

@@ -51,38 +51,34 @@ export default function AccountModal({ isOpen, onSuccess }: AccountModalProps) {
     setError('');
 
     try {
+      const cleanPhone = formData.phone.replace(/\D/g, '').slice(-10);
+      const customerId = cleanPhone || formData.phone.replace(/\D/g, '');
+
       // 1. Update the user's primary Firebase Auth profile document
       if (user) {
         const userRef = doc(db, 'users', user.uid);
-        await updateDoc(userRef, {
+        await setDoc(userRef, {
           name: formData.name,
-          phone: formData.phone,
+          phone: cleanPhone || formData.phone,
+          email: formData.email,
           profileCompletedAt: new Date().toISOString()
-        }).catch(err => console.error("Error updating users doc:", err));
+        }, { merge: true }).catch(err => console.error("Error updating users doc:", err));
       }
 
-      // 2. Also register them in the 'customers' collection for marketing/admin
-      const customerId = formData.phone.replace(/\D/g, '');
+      // 2. Also register / update them in the 'customers' collection for marketing/admin
       const customerRef = doc(db, 'customers', customerId);
       
       try {
-        // Try to create the customer. If they already exist, this will evaluate as an update
-        // and fail due to firestore rules (unauthenticated users can't update).
         await setDoc(customerRef, {
           name: formData.name,
           email: formData.email,
-          phone: formData.phone,
-          totalSpent: 0,
-          ordersCount: 0,
-          totalRepairs: 0,
+          phone: cleanPhone || formData.phone,
+          uid: user?.uid || '',
           registeredOnline: true,
           createdAt: new Date().toISOString(),
           lastActive: new Date().toISOString()
-        });
+        }, { merge: true });
       } catch (err: any) {
-        // If the error is permission-denied, it means the customer already exists!
-        // We can safely ignore this and just log them in locally.
-        // We might not be able to update their lastActive, but that's a fair tradeoff for security.
         if (err.code !== 'permission-denied') {
           console.error("Firestore error:", err);
           throw err;
@@ -93,11 +89,13 @@ export default function AccountModal({ isOpen, onSuccess }: AccountModalProps) {
       const accountInfo = {
         id: customerId,
         uid: user?.uid,
-        ...formData
+        name: formData.name,
+        phone: cleanPhone || formData.phone,
+        email: formData.email
       };
       localStorage.setItem('customerAccountInfo', JSON.stringify(accountInfo));
       
-      // Sync any products viewed while unauthenticated
+      // Sync any products viewed while unauthenticated or prior to profile completion
       syncGuestViewedProducts(accountInfo).catch(e => console.log("Guest sync notice:", e));
 
       onSuccess(accountInfo);

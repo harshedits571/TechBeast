@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, MapPin, Map, Calendar, ShoppingCart, Wrench, CheckCircle2, Clock, Trash2, FileText, Eye, Laptop, Monitor, MessageCircle, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, ShoppingCart, Wrench, CheckCircle2, Clock, Trash2, FileText, Eye, Laptop, Monitor, MessageCircle, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { db } from '../../lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs, updateDoc, arrayUnion, onSnapshot } from 'firebase/firestore';
@@ -42,91 +42,162 @@ export default function CustomerDetail() {
     setLoading(true);
     const targetId = decodeURIComponent(id).trim();
 
+    let rawUsers: any[] = [];
     let rawCustomers: any[] = [];
     let rawRepairs: any[] = [];
     let rawOrders: any[] = [];
     let rawViews: any[] = [];
 
     const syncCRMData = () => {
-      // 1. Locate customer in rawCustomers
+      const cleanTargetPhone = targetId.replace(/\D/g, '').slice(-10);
+      const cleanTargetEmail = targetId.includes('@') ? targetId.toLowerCase().trim() : '';
+
+      // 1. Locate customer profile across rawCustomers and rawUsers
       let custData: any = null;
-      
-      // Match by ID
-      const directMatch = rawCustomers.find(c => c.id === targetId);
-      if (directMatch) {
-        custData = { ...directMatch };
-      } else {
-        // Match by phone, email, or name
-        const match = rawCustomers.find(c => 
-          (c.phone && c.phone === targetId) ||
-          (c.email && c.email.toLowerCase() === targetId.toLowerCase()) ||
+
+      // Check rawCustomers first
+      custData = rawCustomers.find(c => {
+        const cPhone = c.phone ? c.phone.replace(/\D/g, '').slice(-10) : '';
+        const cEmail = (c.email || '').toLowerCase().trim();
+        const cUid = c.uid || c.id || '';
+        return (
+          c.id === targetId ||
+          cUid === targetId ||
+          (cleanTargetPhone && cPhone === cleanTargetPhone) ||
+          (cleanTargetEmail && cEmail === cleanTargetEmail) ||
           (c.name && c.name.toLowerCase() === targetId.toLowerCase())
         );
-        if (match) custData = { ...match };
+      });
+
+      // Also check rawUsers (Firebase Auth users collection)
+      const userMatch = rawUsers.find(u => {
+        const uPhone = u.phone ? u.phone.replace(/\D/g, '').slice(-10) : '';
+        const uEmail = (u.email || '').toLowerCase().trim();
+        const uid = u.id || u.uid;
+        return (
+          uid === targetId ||
+          (cleanTargetPhone && uPhone === cleanTargetPhone) ||
+          (cleanTargetEmail && uEmail === cleanTargetEmail) ||
+          (u.name && u.name.toLowerCase() === targetId.toLowerCase())
+        );
+      });
+
+      // Merge userMatch into custData
+      if (userMatch) {
+        if (!custData) {
+          custData = {
+            id: userMatch.id || targetId,
+            name: userMatch.name || 'Customer',
+            email: userMatch.email || '',
+            phone: userMatch.phone || '',
+            uid: userMatch.id || userMatch.uid || targetId,
+            registeredOnline: true,
+            createdAt: userMatch.createdAt || '',
+            lastActive: userMatch.lastActive || '',
+            notes: []
+          };
+        } else {
+          if (!custData.email && userMatch.email) custData.email = userMatch.email;
+          if (!custData.phone && userMatch.phone) custData.phone = userMatch.phone;
+          if ((!custData.name || custData.name === 'Customer') && userMatch.name) custData.name = userMatch.name;
+          if (!custData.uid && (userMatch.id || userMatch.uid)) custData.uid = userMatch.id || userMatch.uid;
+          if (!custData.createdAt && userMatch.createdAt) custData.createdAt = userMatch.createdAt;
+          if (userMatch.lastActive && (!custData.lastActive || new Date(userMatch.lastActive).getTime() > new Date(custData.lastActive).getTime())) {
+            custData.lastActive = userMatch.lastActive;
+          }
+        }
       }
 
-      const searchPhone = custData?.phone || (targetId.match(/^[0-9+]{8,}$/) ? targetId : '');
-      const searchEmail = custData?.email || (targetId.includes('@') ? targetId : '');
+      const searchPhone = custData?.phone ? custData.phone.replace(/\D/g, '').slice(-10) : cleanTargetPhone;
+      const searchEmail = (custData?.email || cleanTargetEmail || '').toLowerCase().trim();
+      const searchUid = custData?.uid || (targetId.length > 20 && !targetId.includes('@') ? targetId : '');
       const searchName = custData?.name || targetId;
 
       // 2. Filter Repairs
-      const filteredRepairs = rawRepairs.filter(r => 
-        (searchPhone && r.customerPhone === searchPhone) ||
-        (searchEmail && r.customerEmail?.toLowerCase() === searchEmail.toLowerCase()) ||
-        (searchName && r.customerName?.toLowerCase() === searchName.toLowerCase())
-      );
-
-      // 3. Filter Orders
-      const filteredOrders = rawOrders.filter(o => 
-        (searchPhone && o.customerPhone === searchPhone) ||
-        (searchEmail && o.customerEmail?.toLowerCase() === searchEmail.toLowerCase()) ||
-        (searchName && o.customerName?.toLowerCase() === searchName.toLowerCase())
-      );
-
-      // 4. Merge Viewed Products
-      let mergedViews: any[] = [];
-      if (Array.isArray(custData?.viewedProducts)) {
-        mergedViews = [...custData.viewedProducts];
-      }
-
-      const relevantViews = rawViews.filter(v => 
-        (targetId && (v.customerId === targetId || v.userId === targetId)) ||
-        (searchPhone && (v.customerId === searchPhone || v.customerPhone === searchPhone)) ||
-        (searchEmail && v.customerEmail?.toLowerCase() === searchEmail.toLowerCase())
-      );
-
-      relevantViews.forEach(rv => {
-        const existingIdx = mergedViews.findIndex(fv => fv.productId === rv.productId);
-        if (existingIdx >= 0) {
-          mergedViews[existingIdx].viewCount = Math.max(mergedViews[existingIdx].viewCount || 1, rv.viewCount || 1);
-        } else {
-          mergedViews.push({
-            productId: rv.productId,
-            title: rv.productTitle,
-            category: rv.productCategory || 'General',
-            price: Number(rv.productPrice || 0),
-            imageUrl: rv.productImage || '',
-            condition: rv.productCondition || '',
-            brand: rv.productBrand || '',
-            sku: rv.productSku || '',
-            viewedAt: rv.lastViewedAt || rv.viewedAt,
-            viewCount: rv.viewCount || 1
-          });
-        }
+      const filteredRepairs = rawRepairs.filter(r => {
+        const rPhone = r.customerPhone ? r.customerPhone.replace(/\D/g, '').slice(-10) : '';
+        const rEmail = (r.customerEmail || '').toLowerCase().trim();
+        const rName = (r.customerName || '').toLowerCase().trim();
+        return (
+          (searchPhone && rPhone === searchPhone) ||
+          (searchEmail && rEmail === searchEmail) ||
+          (searchName && searchName !== 'Customer' && rName === searchName.toLowerCase())
+        );
       });
 
-      mergedViews.sort((a, b) => new Date(b.viewedAt || 0).getTime() - new Date(a.viewedAt || 0).getTime());
+      // 3. Filter Orders
+      const filteredOrders = rawOrders.filter(o => {
+        const oPhone = o.customerPhone ? o.customerPhone.replace(/\D/g, '').slice(-10) : '';
+        const oEmail = (o.customerEmail || '').toLowerCase().trim();
+        const oName = (o.customerName || '').toLowerCase().trim();
+        return (
+          (searchPhone && oPhone === searchPhone) ||
+          (searchEmail && oEmail === searchEmail) ||
+          (searchName && searchName !== 'Customer' && oName === searchName.toLowerCase())
+        );
+      });
+
+      // 4. Merge Viewed Products
+      const mergedViewsMap = new Map<string, any>();
+
+      // From customer doc's viewedProducts array
+      if (Array.isArray(custData?.viewedProducts)) {
+        custData.viewedProducts.forEach((item: any) => {
+          if (!item || !item.productId) return;
+          mergedViewsMap.set(item.productId, { ...item, viewCount: item.viewCount || 1 });
+        });
+      }
+
+      // From customer_views collection
+      const relevantViews = rawViews.filter(v => {
+        const vPhone = v.customerPhone ? v.customerPhone.replace(/\D/g, '').slice(-10) : '';
+        const vEmail = (v.customerEmail || '').toLowerCase().trim();
+        const vCustId = v.customerId || '';
+        const vUserId = v.userId || '';
+        return (
+          (targetId && (vCustId === targetId || vUserId === targetId)) ||
+          (searchUid && (vUserId === searchUid || vCustId === searchUid)) ||
+          (searchPhone && (vPhone === searchPhone || vCustId === searchPhone)) ||
+          (searchEmail && vEmail === searchEmail)
+        );
+      });
+
+      relevantViews.forEach(rv => {
+        if (!rv || !rv.productId) return;
+        const existing = mergedViewsMap.get(rv.productId);
+        const count = Math.max(existing?.viewCount || 0, rv.viewCount || 1);
+        const viewedAt = (rv.lastViewedAt || rv.viewedAt || existing?.viewedAt || new Date().toISOString());
+
+        mergedViewsMap.set(rv.productId, {
+          productId: rv.productId,
+          title: rv.productTitle || existing?.title || 'Product',
+          category: rv.productCategory || existing?.category || 'General',
+          price: Number(rv.productPrice || existing?.price || 0),
+          oldPrice: rv.productOldPrice ? Number(rv.productOldPrice) : existing?.oldPrice,
+          imageUrl: rv.productImage || existing?.imageUrl || '',
+          condition: rv.productCondition || existing?.condition || '',
+          brand: rv.productBrand || existing?.brand || '',
+          sku: rv.productSku || existing?.sku || '',
+          viewedAt: viewedAt,
+          viewCount: count
+        });
+      });
+
+      const mergedViews = Array.from(mergedViewsMap.values()).sort(
+        (a: any, b: any) => new Date(b.viewedAt || 0).getTime() - new Date(a.viewedAt || 0).getTime()
+      );
 
       // 5. Fallback customer record if not pre-existing
       if (!custData) {
         const firstOrder = filteredOrders[0];
         const firstRepair = filteredRepairs[0];
+        const firstView = relevantViews[0];
 
         custData = {
           id: targetId,
-          name: searchName || firstOrder?.customerName || firstRepair?.customerName || 'Customer',
-          phone: searchPhone || firstOrder?.customerPhone || firstRepair?.customerPhone || '',
-          email: searchEmail || firstOrder?.customerEmail || firstRepair?.customerEmail || '',
+          name: (searchName !== targetId ? searchName : '') || firstView?.customerName || firstOrder?.customerName || firstRepair?.customerName || 'Customer',
+          phone: searchPhone || firstView?.customerPhone || firstOrder?.customerPhone || firstRepair?.customerPhone || '',
+          email: searchEmail || firstView?.customerEmail || firstOrder?.customerEmail || firstRepair?.customerEmail || '',
           address: firstOrder?.shippingAddress?.address || firstOrder?.customerAddress || '',
           city: firstOrder?.shippingAddress?.city || '',
           notes: []
@@ -141,6 +212,11 @@ export default function CustomerDetail() {
     };
 
     // Subscriptions
+    const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
+      rawUsers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      syncCRMData();
+    }, (err) => console.error("Users CRM sync error:", err));
+
     const unsubCustomers = onSnapshot(collection(db, 'customers'), (snap) => {
       rawCustomers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       syncCRMData();
@@ -162,6 +238,7 @@ export default function CustomerDetail() {
     }, (err) => console.error("Views CRM sync error:", err));
 
     return () => {
+      unsubUsers();
       unsubCustomers();
       unsubRepairs();
       unsubOrders();
@@ -180,7 +257,8 @@ export default function CustomerDetail() {
     };
 
     try {
-      await updateDoc(doc(db, 'customers', id), {
+      const targetDocId = customer?.id || id;
+      await updateDoc(doc(db, 'customers', targetDocId), {
         notes: arrayUnion(noteObj)
       });
       setCustomer((prev: any) => ({

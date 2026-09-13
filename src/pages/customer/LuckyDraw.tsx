@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { db } from '../../lib/firebase';
 import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { 
@@ -77,10 +78,8 @@ export default function LuckyDraw() {
   const [config, setConfig] = useState<GiveawayConfig>(DEFAULT_CONFIG);
   const [loadingConfig, setLoadingConfig] = useState(true);
 
-  // Store PIN Authorization Gate
-  const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
-    return sessionStorage.getItem('tb_store_unlocked') === 'true';
-  });
+  // Store PIN Authorization Gate (Strict single-use: requires PIN on every refresh or new entry)
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
   const [enteredPin, setEnteredPin] = useState('');
   const [pinError, setPinError] = useState('');
 
@@ -111,6 +110,12 @@ export default function LuckyDraw() {
   const ticketRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Clear any legacy session locks to ensure fresh PIN prompt on page load
+    try {
+      sessionStorage.removeItem('tb_store_unlocked');
+      localStorage.removeItem('tb_store_unlocked');
+    } catch (e) {}
+
     async function fetchConfig() {
       try {
         const docRef = doc(db, 'giveaway_config', 'activeCampaign');
@@ -132,8 +137,8 @@ export default function LuckyDraw() {
     const correctPin = config.storePin || '7890';
     if (enteredPin.trim() === correctPin.trim()) {
       setIsUnlocked(true);
-      sessionStorage.setItem('tb_store_unlocked', 'true');
       setPinError('');
+      setEnteredPin('');
     } else {
       setPinError('Invalid Store Counter PIN. Please ask store staff to unlock.');
     }
@@ -218,6 +223,16 @@ export default function LuckyDraw() {
         createdAt: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
       });
 
+      // Immediately clear inputs and lock form for next use
+      setName('');
+      setPhone('');
+      setPlace('');
+      setBillNo('');
+      setCustomItem('');
+      setEmail('');
+      setIsUnlocked(false);
+      setEnteredPin('');
+
       triggerConfetti();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
@@ -274,69 +289,101 @@ export default function LuckyDraw() {
             <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-full text-xs font-bold text-emerald-800">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> 100% Genuine Store Draw
             </div>
-            <a
-              href="/lucky-draw/winners"
-              className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-full text-xs font-bold text-blue-700 transition"
+            <Link
+              to="/lucky-draw/winners"
+              className="flex items-center gap-1.5 px-3.5 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-full text-xs font-bold text-amber-900 transition"
             >
-              <Trophy className="w-3.5 h-3.5 text-amber-500" /> View Past Winners
-            </a>
+              <Trophy className="w-3.5 h-3.5 text-amber-600" /> View Past Winners
+            </Link>
           </div>
         </div>
 
         {/* 2. PIN AUTHORIZATION GATE (STORE STAFF UNLOCKS FOR WALK-IN CUSTOMER) */}
         {!isUnlocked && !submittedTicket && (
-          <div className="max-w-md mx-auto bg-white border-2 border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm text-center space-y-5 animate-fade-in">
-            <div className="w-14 h-14 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto border border-red-200">
-              <Lock className="w-7 h-7" />
-            </div>
-
-            <div>
-              <h2 className="text-xl font-extrabold text-slate-900 font-heading uppercase">
-                Store Staff Authorization
-              </h2>
-              <p className="text-xs text-slate-500 mt-1">
-                Please hand this screen to the Tech Beast billing counter staff to enter the store authorization PIN.
-              </p>
-            </div>
-
-            <form onSubmit={handleUnlockPin} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-center gap-1">
-                  <KeyRound className="w-3.5 h-3.5 text-red-600" /> Counter Staff PIN:
-                </label>
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={enteredPin}
-                  onChange={(e) => {
-                    setEnteredPin(e.target.value);
-                    setPinError('');
-                  }}
-                  placeholder="Enter Store PIN"
-                  className="w-full text-center tracking-widest text-lg font-mono font-black bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-slate-900 focus:border-red-500 focus:bg-white focus:outline-none transition"
-                  autoFocus
-                />
+          <div className="max-w-md mx-auto space-y-4 animate-fade-in">
+            <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm text-center space-y-5">
+              <div className="w-14 h-14 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto border border-red-200">
+                <Lock className="w-7 h-7" />
               </div>
 
-              {pinError && (
-                <div className="text-xs font-bold text-red-600 flex items-center justify-center gap-1 bg-red-50 p-2.5 rounded-xl border border-red-200">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{pinError}</span>
+              <div>
+                <h2 className="text-xl font-extrabold text-slate-900 font-heading uppercase">
+                  Store Staff Authorization
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Please hand this screen to the Tech Beast billing counter staff to enter the store authorization PIN.
+                </p>
+              </div>
+
+              <form onSubmit={handleUnlockPin} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-center gap-1">
+                    <KeyRound className="w-3.5 h-3.5 text-red-600" /> Counter Staff PIN:
+                  </label>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={enteredPin}
+                    onChange={(e) => {
+                      setEnteredPin(e.target.value);
+                      setPinError('');
+                    }}
+                    placeholder="Enter Store PIN"
+                    className="w-full text-center tracking-widest text-lg font-mono font-black bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-slate-900 focus:border-red-500 focus:bg-white focus:outline-none transition"
+                    autoFocus
+                  />
                 </div>
-              )}
 
-              <button
-                type="submit"
-                className="w-full py-3.5 bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition cursor-pointer"
+                {pinError && (
+                  <div className="text-xs font-bold text-red-600 flex items-center justify-center gap-1 bg-red-50 p-2.5 rounded-xl border border-red-200">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{pinError}</span>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full py-3.5 bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition cursor-pointer"
+                >
+                  Unlock Customer Form
+                </button>
+              </form>
+
+              <p className="text-[11px] text-slate-400">
+                🔒 In-store security verification to ensure only genuine buyers enter the lucky draw.
+              </p>
+
+              {/* Prominent Past Winners Option Inside Card */}
+              <div className="pt-3 border-t border-slate-100">
+                <Link
+                  to="/lucky-draw/winners"
+                  className="w-full py-3 px-4 bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300/80 rounded-2xl text-xs font-black flex items-center justify-center gap-2 transition group shadow-xs"
+                >
+                  <Trophy className="w-4 h-4 text-amber-600 group-hover:scale-110 transition-transform shrink-0" />
+                  <span>View Past Lucky Draw Winners</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-amber-600 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Direct Winners Banner Card Below Authorization Card */}
+            <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-amber-500/10 border border-amber-200 rounded-2xl p-4 text-center space-y-2">
+              <div className="flex items-center justify-center gap-2 text-slate-900 font-extrabold text-xs sm:text-sm">
+                <Trophy className="w-4 h-4 text-amber-500 shrink-0" />
+                <span>Looking for Past Lucky Draw Results?</span>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                See all announced customer winners, prizes won, and prize handover photo archives.
+              </p>
+              <Link
+                to="/lucky-draw/winners"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 hover:text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition shadow-xs mt-1"
               >
-                Unlock Customer Form
-              </button>
-            </form>
-
-            <p className="text-[11px] text-slate-400">
-              🔒 In-store security verification to ensure only genuine buyers enter the lucky draw.
-            </p>
+                <span>Open Winners Gallery & Hall of Fame</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
         )}
 
@@ -432,10 +479,16 @@ export default function LuckyDraw() {
                 <button
                   onClick={() => {
                     setSubmittedTicket(null);
+                    setIsUnlocked(false);
+                    setEnteredPin('');
+                    setPinError('');
                     setName('');
                     setPhone('');
                     setPlace('');
                     setBillNo('');
+                    setCustomItem('');
+                    setEmail('');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
                   className="w-full sm:w-auto px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition cursor-pointer"
                 >

@@ -125,6 +125,24 @@ export default function ProductDetail() {
     fetchReviews();
   }, [id]);
 
+  // Ensure product view is recorded for current user once product & user are resolved
+  useEffect(() => {
+    if (product && product.id) {
+      trackProductView({
+        id: product.id,
+        title: product.title || '',
+        category: product.category || 'General',
+        price: Number(product.price || 0),
+        oldPrice: product.oldPrice ? Number(product.oldPrice) : undefined,
+        imageUrl: product.imageUrls?.[0] || product.imageUrl || '',
+        condition: product.condition || '',
+        brand: product.brand || '',
+        sku: product.sku || '',
+        modelNumber: product.modelNumber || ''
+      }, user);
+    }
+  }, [product?.id, user?.uid]);
+
   if (loading || settingsLoading) {
     return <DetailSkeleton />;
   }

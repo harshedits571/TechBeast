@@ -52,7 +52,7 @@ import {
   Image as ImageIcon,
   Eye
 } from 'lucide-react';
-import { getNextLuckyDrawTicketNumber, getCurrentTicketSequence, updateTicketSequence } from '../../utils/luckyDrawSequence';
+import { getNextLuckyDrawTicketNumber, getCurrentTicketSequence, updateTicketSequence, formatTicketNumber, extractTicketSeq } from '../../utils/luckyDrawSequence';
 import ImageUpload from '../../components/admin/ImageUpload';
 import { deleteCloudinaryImage } from '../../utils/cloudinary';
 
@@ -256,6 +256,10 @@ export default function AdminLuckyDraw() {
   const [currentSeq, setCurrentSeq] = useState<number>(1000);
   const [editingSeq, setEditingSeq] = useState<string>('1001');
 
+  // Wheel Visual Density Test / Ephemeral Preview State (Zero Firebase Impact)
+  const [previewEntryCount, setPreviewEntryCount] = useState<number | null>(null);
+  const [customPreviewInput, setCustomPreviewInput] = useState<string>('50');
+
   // Realistic Wheel Canvas State
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bigScreenCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -335,9 +339,9 @@ export default function AdminLuckyDraw() {
 
     // 4. Ticket Sequence
     try {
-      const seq = await getCurrentTicketSequence();
-      setCurrentSeq(seq);
-      setEditingSeq(String(seq + 1));
+      const nextSeq = await getCurrentTicketSequence();
+      setCurrentSeq(nextSeq);
+      setEditingSeq(String(nextSeq).padStart(4, '0'));
     } catch (err) {
       console.warn("Giveaway ticket sequence fetch note:", err);
     }
@@ -348,12 +352,44 @@ export default function AdminLuckyDraw() {
   useEffect(() => {
     fetchData();
 
-    // Set up real-time live sync for giveaway entries
+    // Set up real-time live sync for giveaway entries & auto-advance next ticket number
     const qEntries = query(collection(db, 'giveaway_entries'), orderBy('createdAt', 'desc'));
     const unsubEntries = onSnapshot(qEntries, (snap) => {
       const entriesList = snap.docs.map(d => ({ id: d.id, ...d.data() })) as GiveawayEntry[];
       setEntries(entriesList);
+
+      // Automatically compute and update next sequence number in real-time
+      let maxSeq = 0;
+      entriesList.forEach(item => {
+        const num = extractTicketSeq(item.ticketNumber);
+        if (num > maxSeq && num < 20000) {
+          maxSeq = num;
+        }
+      });
+      const nextNumber = maxSeq + 1;
+      setCurrentSeq(nextNumber);
+      setEditingSeq(String(nextNumber).padStart(4, '0'));
     }, (err) => console.warn("Live giveaway entries sync:", err));
+
+    // Set up real-time live sync for ticket counter
+    const unsubCounter = onSnapshot(doc(db, 'giveaway_config', 'ticketCounter'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        let configuredSeq = 0;
+        if (typeof data?.nextSeq === 'number' && data.nextSeq >= 1) {
+          configuredSeq = data.nextSeq;
+        } else if (typeof data?.currentSeq === 'number' && data.currentSeq >= 0) {
+          configuredSeq = data.currentSeq + 1;
+        }
+        if (configuredSeq > 0) {
+          setCurrentSeq(prev => {
+            const val = Math.max(prev, configuredSeq);
+            setEditingSeq(String(val).padStart(4, '0'));
+            return val;
+          });
+        }
+      }
+    }, (err) => console.warn("Live ticket counter sync:", err));
 
     // Set up real-time live sync for giveaway winners
     const qWinners = query(collection(db, 'giveaway_winners'), orderBy('drawnAt', 'desc'));
@@ -364,6 +400,7 @@ export default function AdminLuckyDraw() {
 
     return () => {
       unsubEntries();
+      unsubCounter();
       unsubWinners();
     };
   }, []);
@@ -408,6 +445,53 @@ export default function AdminLuckyDraw() {
     )
   ) as string[];
 
+  // Realistic Sample Pool Generator for Ephemeral Visual Preview (Zero Database Writes)
+  const generateMockEntries = (count: number, roundNum = 1): GiveawayEntry[] => {
+    const sampleNames = [
+      'Rahul Sharma', 'Sneha Patil', 'Mohammed Zaid', 'Priya Kulkarni', 'Amit Verma',
+      'Ananya Hegde', 'Karthik Rao', 'Farhan Khan', 'Divya Nayak', 'Rohan Deshmukh',
+      'Pooja Shetty', 'Aditya Joshi', 'Deepa Goudar', 'Suresh Hiremath', 'Megha Shinde',
+      'Varun Kamath', 'Shweta Kadam', 'Nikhil Pujari', 'Ayesha Siddiqui', 'Vinay Kumar',
+      'Keerthi Prabhu', 'Arun Angadi', 'Savitri Hallur', 'Tanveer Ahmed', 'Pallavi Patil',
+      'Chetan Biradar', 'Soumya Pai', 'Mahesh Bellad', 'Kavya Dharwad', 'Praveen Desai',
+      'Geeta Hubli', 'Santosh Badiger', 'Afrin Banu', 'Girish Koliwad', 'Radha Joshi',
+      'Manoj Hubballi', 'Neha Kulkarni', 'Abhishek Saraf', 'Shruti Nayak', 'Darshan Gowda',
+      'Harish Meti', 'Rupa Kembhavi', 'Imran Soudagar', 'Chaitra Patil', 'Ganesh Kotian',
+      'Preeti Navalur', 'Naveen Doddamani', 'Jyoti Morab', 'Basavaraj Kattimani', 'Vidya Sankeshwar',
+      'Manjunath Javali', 'Reshma Nadaf', 'Sachin Kalghatgi', 'Rekha Hiremath', 'Prashant Hosmani',
+      'Swati Kavathekar', 'Sameer Shaikh', 'Archana Bhat', 'Sunil Unkal', 'Akshata Karwar',
+      'Yogesh Kuntoji', 'Savita Toravi', 'Altaf Patel', 'Roopa Kulkarni', 'Kiran Hubli',
+      'Bhavana Shirahatti', 'Mustaq Sayed', 'Shubha Rayar', 'Mallikarjun Gasti', 'Netra Savanur',
+      'Ravi Kundgol', 'Lakshmi Bengeri', 'Junaid Jamadar', 'Anuradha Ron', 'Pradeep Hangal',
+      'Shalini Alnavar', 'Nadeem Tamboli', 'Rashmi Byadgi', 'Ramesh Shiggaon', 'Kusuma Haveri',
+      'Venkatesh Joshi', 'Zeenat Khan', 'Chandru Badiger', 'Asha Katti', 'Guruprasanna G',
+      'Anita Hegde', 'Sadiq Bagalkot', 'Poornima Patil', 'Deepak Maratha', 'Mamata Deshpande',
+      'Raghavendra Rao', 'Zoya Sheikh', 'Kiran Kumar', 'Sangeeta Bellad', 'Vijay Hiremath',
+      'Kavita Joshi', 'Anand Kulkarni', 'Tasneem Kausar', 'Rakesh Shetty', 'Shilpa Nayak'
+    ];
+
+    return Array.from({ length: count }, (_, idx) => {
+      const seq = (idx + 1).toString().padStart(4, '0');
+      const name = sampleNames[idx % sampleNames.length] || `Customer ${idx + 1}`;
+      return {
+        id: `mock-preview-entry-${idx + 1}`,
+        ticketNumber: `TB-LUCKY-${seq}`,
+        campaignId: 'preview_mode',
+        campaignName: 'Visual Preview Mode',
+        roundNumber: roundNum,
+        customerName: name,
+        customerPhone: '9876543210',
+        customerEmail: `customer${idx + 1}@example.com`,
+        place: idx % 2 === 0 ? 'Hubli' : 'Dharwad',
+        billNumber: `DEMO-${2025000 + idx}`,
+        itemPurchased: idx % 3 === 0 ? 'Gaming Laptop' : idx % 3 === 1 ? 'NVMe SSD 1TB' : 'Mechanical Keyboard',
+        purchaseDate: new Date().toISOString().split('T')[0],
+        createdAt: new Date().toISOString(),
+        isWinner: false,
+      };
+    });
+  };
+
   // -------------------------------------------------------------------
   // HIGH-END LUXURY WHEEL CANVAS RENDERING
   // -------------------------------------------------------------------
@@ -422,15 +506,19 @@ export default function AdminLuckyDraw() {
 
     ctx.clearRect(0, 0, size, size);
 
-    // Items on the wheel
-    const items = eligiblePool.length > 0 ? eligiblePool : [
-      { ticketNumber: 'TB-1001', customerName: 'Waiting For' },
-      { ticketNumber: 'TB-1002', customerName: 'Store Entries' },
-      { ticketNumber: 'TB-1003', customerName: 'Counter Scan' },
-      { ticketNumber: 'TB-1004', customerName: 'QR Code' },
-      { ticketNumber: 'TB-1005', customerName: 'To Join' },
-      { ticketNumber: 'TB-1006', customerName: 'Lucky Draw' }
-    ];
+    // Items on the wheel (uses ephemeral preview entries when preview mode is active)
+    const items = previewEntryCount !== null
+      ? generateMockEntries(previewEntryCount, config.roundNumber || 1)
+      : eligiblePool.length > 0
+      ? eligiblePool
+      : [
+        { ticketNumber: 'TB-LUCKY-0001', customerName: 'Waiting For' },
+        { ticketNumber: 'TB-LUCKY-0002', customerName: 'Store Entries' },
+        { ticketNumber: 'TB-LUCKY-0003', customerName: 'Counter Scan' },
+        { ticketNumber: 'TB-LUCKY-0004', customerName: 'QR Code' },
+        { ticketNumber: 'TB-LUCKY-0005', customerName: 'To Join' },
+        { ticketNumber: 'TB-LUCKY-0006', customerName: 'Lucky Draw' }
+      ];
 
     const numSlices = items.length;
     const sliceAngle = (2 * Math.PI) / numSlices;
@@ -493,28 +581,29 @@ export default function AdminLuckyDraw() {
       // Dynamic sizing based on number of slices
       const isCrowded = numSlices > 16;
       const isVeryCrowded = numSlices > 28;
+      const isSuperCrowded = numSlices > 45;
 
-      const maxChars = isVeryCrowded ? 10 : isCrowded ? 13 : 18;
+      const maxChars = isSuperCrowded ? 9 : isVeryCrowded ? 11 : isCrowded ? 13 : 18;
       const rawName = item.customerName || 'Customer';
       const displayName = rawName.length > maxChars 
         ? rawName.slice(0, maxChars - 1) + '…' 
         : rawName;
 
-      const nameFontSize = isVeryCrowded ? 10 : isCrowded ? 11 : 13;
-      const ticketFontSize = isVeryCrowded ? 8 : isCrowded ? 9 : 10;
+      const nameFontSize = isSuperCrowded ? 8.5 : isVeryCrowded ? 10 : isCrowded ? 11 : 13;
+      const ticketFontSize = isSuperCrowded ? 7 : isVeryCrowded ? 8 : isCrowded ? 9 : 10;
 
       // 1. Primary Line: Customer Name (Prominent, Bold & White)
       ctx.fillStyle = '#ffffff';
       ctx.font = `bold ${nameFontSize}px "Plus Jakarta Sans", sans-serif`;
       ctx.shadowColor = '#000000';
       ctx.shadowBlur = 4;
-      ctx.fillText(displayName, radius - 20, -2);
+      ctx.fillText(displayName, radius - 20, isSuperCrowded ? -1 : -2);
       
       // 2. Secondary Line: Ticket Number (Smaller below)
       ctx.font = `600 ${ticketFontSize}px "Plus Jakarta Sans", monospace, sans-serif`;
       ctx.fillStyle = '#fbbf24'; // Champagne Gold
       ctx.shadowBlur = 2;
-      ctx.fillText(`${item.ticketNumber}`, radius - 20, isVeryCrowded ? 8 : 11);
+      ctx.fillText(`${item.ticketNumber}`, radius - 20, isSuperCrowded ? 7 : isVeryCrowded ? 8 : 11);
 
       ctx.restore();
     }
@@ -577,7 +666,7 @@ export default function AdminLuckyDraw() {
 
   useEffect(() => {
     drawWheel(wheelAngleRef.current, needleAngleRef.current);
-  }, [eligiblePool, isBigScreenMode]);
+  }, [eligiblePool, previewEntryCount, isBigScreenMode]);
 
   // -------------------------------------------------------------------
   // MULTI-STAGE CELEBRATION CONFETTI & FIREWORKS CANNONS
@@ -633,7 +722,12 @@ export default function AdminLuckyDraw() {
    // REALISTIC WHEEL PHYSICS ENGINE
    // -------------------------------------------------------------------
    const startRealisticSpin = () => {
-    if (eligiblePool.length === 0) {
+    const isPreviewSpin = previewEntryCount !== null;
+    const poolToSpin = isPreviewSpin
+      ? generateMockEntries(previewEntryCount, config.roundNumber || 1)
+      : eligiblePool;
+
+    if (poolToSpin.length === 0) {
       alert("No eligible participants in this round to spin!");
       return;
     }
@@ -645,12 +739,12 @@ export default function AdminLuckyDraw() {
     if (soundEnabled) playSoundEffect('start');
 
 
-    // 1. Pick a truly random winner from the eligible pool
-    const winnerIndex = Math.floor(Math.random() * eligiblePool.length);
-    const targetWinner = eligiblePool[winnerIndex];
+    // 1. Pick a truly random winner from the pool
+    const winnerIndex = Math.floor(Math.random() * poolToSpin.length);
+    const targetWinner = poolToSpin[winnerIndex];
 
     // Calculate target angle so the 12 o'clock needle (270° / 1.5π) lands precisely on winnerIndex slice center
-    const numSlices = eligiblePool.length;
+    const numSlices = poolToSpin.length;
     const sliceAngle = (2 * Math.PI) / numSlices;
     const pointerAngle = 1.5 * Math.PI; // Top pointer is at 270 degrees
     const sliceCenter = winnerIndex * sliceAngle + sliceAngle / 2;
@@ -719,7 +813,7 @@ export default function AdminLuckyDraw() {
           prizeWon: selectedPrize.title,
           rank: selectedPrize.rank,
           roundNumber: config.roundNumber || 1,
-          campaignName: config.campaignName,
+          campaignName: isPreviewSpin ? `[TEST PREVIEW] ${config.campaignName}` : config.campaignName,
           drawnAt: new Date().toISOString()
         };
 
@@ -1089,8 +1183,9 @@ export default function AdminLuckyDraw() {
       if (match) {
         const seqNum = parseInt(match[1], 10);
         if (!isNaN(seqNum)) {
-          setCurrentSeq(prev => Math.max(prev, seqNum));
-          setEditingSeq(String(Math.max(currentSeq, seqNum) + 1));
+          const nextVal = seqNum + 1;
+          setCurrentSeq(nextVal);
+          setEditingSeq(String(nextVal).padStart(4, '0'));
         }
       }
 
@@ -1121,9 +1216,10 @@ export default function AdminLuckyDraw() {
     }
     setIsUpdatingSeq(true);
     try {
-      await updateTicketSequence(num - 1);
-      setCurrentSeq(num - 1);
-      showToast(`Next ticket serial number set to TB-LUCKY-${String(num).padStart(4, '0')}!`);
+      await updateTicketSequence(num);
+      setCurrentSeq(num);
+      const formatted = formatTicketNumber(num);
+      showToast(`Next ticket serial number set to ${formatted}!`);
     } catch (err) {
       console.error(err);
       showToast("Failed to update ticket sequence");
@@ -1248,7 +1344,14 @@ export default function AdminLuckyDraw() {
                 <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
                   <span className="text-amber-400 font-bold uppercase">{config.campaignName || 'Active Contest'}</span>
                   <span>•</span>
-                  <span>{eligiblePool.length} Eligible Participants</span>
+                  {previewEntryCount !== null ? (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold flex items-center gap-1.5">
+                      <Eye className="w-3.5 h-3.5 text-amber-400" />
+                      Visual Preview: {previewEntryCount} Names (Test Mode)
+                    </span>
+                  ) : (
+                    <span>{eligiblePool.length} Eligible Participants</span>
+                  )}
                   <span>•</span>
                   <span>Draw Date: {config.drawDate}</span>
                 </div>
@@ -1270,6 +1373,19 @@ export default function AdminLuckyDraw() {
 
             {/* Controls */}
             <div className="flex items-center gap-2">
+              {previewEntryCount !== null && (
+                <button
+                  onClick={() => {
+                    setPreviewEntryCount(null);
+                    setCurrentWinner(null);
+                    setWinningEntry(null);
+                  }}
+                  className="px-3 py-2 bg-red-600/80 hover:bg-red-600 text-white border border-red-500/50 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                  title="Remove fake preview names and return to real store entries"
+                >
+                  <X className="w-4 h-4" /> Exit Preview
+                </button>
+              )}
               <button
                 onClick={() => setSoundEnabled(!soundEnabled)}
                 className={`p-2.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
@@ -1312,10 +1428,14 @@ export default function AdminLuckyDraw() {
             <div>
               <button
                 onClick={startRealisticSpin}
-                disabled={isSpinning || eligiblePool.length === 0}
+                disabled={isSpinning || (previewEntryCount === null && eligiblePool.length === 0)}
                 className="px-12 sm:px-16 py-4 sm:py-4.5 bg-red-600 hover:bg-red-500 text-white font-black text-sm sm:text-base uppercase tracking-widest rounded-xl shadow-xl shadow-red-900/20 transform active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
               >
-                {isSpinning ? 'SPINNING WHEEL...' : `SPIN FOR ${selectedPrize.subtitle.toUpperCase()}`}
+                {isSpinning 
+                  ? 'SPINNING WHEEL...' 
+                  : previewEntryCount !== null 
+                  ? `TEST SPIN FOR ${selectedPrize.subtitle.toUpperCase()} (${previewEntryCount} NAMES)` 
+                  : `SPIN FOR ${selectedPrize.subtitle.toUpperCase()}`}
               </button>
             </div>
           </div>
@@ -1458,18 +1578,46 @@ export default function AdminLuckyDraw() {
                   >
                     <PartyPopper className="w-4 h-4 text-amber-400" /> Replay Confetti
                   </button>
-                  <button
-                    onClick={handleSendWinnerWhatsApp}
-                    className="w-full sm:w-auto px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-emerald-900/30"
-                  >
-                    <Send className="w-4 h-4" /> Send WhatsApp Alert
-                  </button>
-                  <button
-                    onClick={handleConfirmWinnerAndNext}
-                    className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-amber-500/20"
-                  >
-                    <CheckCircle className="w-4 h-4" /> Confirm & Next Prize <ChevronRight className="w-4 h-4" />
-                  </button>
+
+                  {previewEntryCount !== null ? (
+                    <>
+                      <button
+                        onClick={() => {
+                          setCurrentWinner(null);
+                          setWinningEntry(null);
+                          setTimeout(() => startRealisticSpin(), 150);
+                        }}
+                        className="w-full sm:w-auto px-5 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-purple-900/30"
+                      >
+                        <RotateCw className="w-4 h-4" /> Spin Again (Simulation)
+                      </button>
+                      <button
+                        onClick={() => {
+                          setPreviewEntryCount(null);
+                          setCurrentWinner(null);
+                          setWinningEntry(null);
+                        }}
+                        className="w-full sm:w-auto px-6 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-red-900/20"
+                      >
+                        <X className="w-4 h-4" /> Exit Preview Mode
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={handleSendWinnerWhatsApp}
+                        className="w-full sm:w-auto px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-emerald-900/30"
+                      >
+                        <Send className="w-4 h-4" /> Send WhatsApp Alert
+                      </button>
+                      <button
+                        onClick={handleConfirmWinnerAndNext}
+                        className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-amber-500/20"
+                      >
+                        <CheckCircle className="w-4 h-4" /> Confirm & Next Prize <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
                 </div>
 
               </div>
@@ -1591,6 +1739,163 @@ export default function AdminLuckyDraw() {
       {/* ==================================================== */}
       {activeTab === 'wheel' && (
         <div className="space-y-6 print:hidden">
+
+          {/* WHEEL VISUAL DENSITY / TEST PREVIEW BAR */}
+          <div className="bg-slate-900/90 border border-purple-500/30 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-lg shadow-purple-950/20">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-400 flex-shrink-0">
+                <Eye className="w-5 h-5" />
+              </div>
+              <div className="text-left space-y-0.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-white text-xs uppercase tracking-wider">
+                    Wheel Visual Preview & Density Test
+                  </span>
+                  {previewEntryCount !== null ? (
+                    <span className="px-2 py-0.5 rounded-full bg-purple-500/25 text-purple-300 border border-purple-500/40 text-[10px] font-black uppercase tracking-wider animate-pulse">
+                      Simulating {previewEntryCount} Names
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[10px] font-bold uppercase tracking-wider">
+                      Live Store Pool ({eligiblePool.length} Active)
+                    </span>
+                  )}
+                </div>
+                <p className="text-slate-400 text-[11px] leading-relaxed">
+                  {previewEntryCount !== null
+                    ? "Previewing wheel appearance with sample names. Your real customer database and tickets are 100% untouched."
+                    : "Test how the wheel looks with 20, 40, 60, or 80 participants. Switch back anytime with 1 click."}
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Preset Buttons & Controls */}
+            <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto justify-start md:justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewEntryCount(null);
+                  setCurrentWinner(null);
+                  setWinningEntry(null);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  previewEntryCount === null
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30'
+                    : 'bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800'
+                }`}
+              >
+                <CheckCircle className="w-3.5 h-3.5" />
+                <span>Real Live ({eligiblePool.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewEntryCount(20);
+                  setCurrentWinner(null);
+                  setWinningEntry(null);
+                }}
+                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  previewEntryCount === 20
+                    ? 'bg-purple-600 text-white shadow-md shadow-purple-900/30 ring-1 ring-purple-400'
+                    : 'bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800'
+                }`}
+              >
+                20 Names
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewEntryCount(40);
+                  setCurrentWinner(null);
+                  setWinningEntry(null);
+                }}
+                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  previewEntryCount === 40
+                    ? 'bg-purple-600 text-white shadow-md shadow-purple-900/30 ring-1 ring-purple-400'
+                    : 'bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800'
+                }`}
+              >
+                40 Names
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewEntryCount(60);
+                  setCurrentWinner(null);
+                  setWinningEntry(null);
+                }}
+                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  previewEntryCount === 60
+                    ? 'bg-purple-600 text-white shadow-md shadow-purple-900/30 ring-1 ring-purple-400'
+                    : 'bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800'
+                }`}
+              >
+                60 Names
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewEntryCount(80);
+                  setCurrentWinner(null);
+                  setWinningEntry(null);
+                }}
+                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  previewEntryCount === 80
+                    ? 'bg-purple-600 text-white shadow-md shadow-purple-900/30 ring-1 ring-purple-400'
+                    : 'bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800'
+                }`}
+              >
+                80 Names
+              </button>
+
+              {/* Custom Count Stepper / Apply */}
+              <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl px-2 py-1">
+                <span className="text-[10px] uppercase font-bold text-slate-500">Custom:</span>
+                <input
+                  type="number"
+                  min="5"
+                  max="100"
+                  value={customPreviewInput}
+                  onChange={(e) => setCustomPreviewInput(e.target.value)}
+                  className="w-10 bg-slate-900 text-white text-xs font-mono font-bold rounded px-1 py-0.5 border border-slate-700 text-center"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const parsed = parseInt(customPreviewInput, 10);
+                    if (!isNaN(parsed) && parsed >= 4 && parsed <= 120) {
+                      setPreviewEntryCount(parsed);
+                      setCurrentWinner(null);
+                      setWinningEntry(null);
+                    }
+                  }}
+                  className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-purple-300 rounded text-[11px] font-bold cursor-pointer"
+                >
+                  Set
+                </button>
+              </div>
+
+              {previewEntryCount !== null && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreviewEntryCount(null);
+                    setCurrentWinner(null);
+                    setWinningEntry(null);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/40 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                  title="Remove fake preview names and return to real customer pool"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Remove Fake Names</span>
+                </button>
+              )}
+            </div>
+          </div>
           
           {/* SEQUENTIAL PRIZE STEPPER */}
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3">
@@ -1599,7 +1904,15 @@ export default function AdminLuckyDraw() {
                 <Trophy className="w-4 h-4 text-amber-400" /> Prize Drawing Schedule:
               </span>
               <span className="text-slate-400 font-medium">
-                <strong className="text-white">{eligiblePool.length}</strong> Participants in Current Pool
+                {previewEntryCount !== null ? (
+                  <span className="text-purple-300 font-bold">
+                    👁️ {previewEntryCount} Simulated Preview Participants
+                  </span>
+                ) : (
+                  <>
+                    <strong className="text-white">{eligiblePool.length}</strong> Participants in Current Pool
+                  </>
+                )}
               </span>
             </div>
 
@@ -1692,6 +2005,30 @@ export default function AdminLuckyDraw() {
           {/* MAIN STAGE: ROTATING CANVAS WHEEL */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-10 text-center relative overflow-hidden shadow-xl space-y-6">
             
+            {/* Active Preview Banner (Removable with 1 click) */}
+            {previewEntryCount !== null && (
+              <div className="bg-purple-950/60 border border-purple-500/40 text-purple-200 px-4 py-3 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 text-xs animate-fade-in max-w-xl mx-auto shadow-inner">
+                <div className="flex items-center gap-2 text-left">
+                  <Eye className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                  <span>
+                    <strong>Visual Density Preview:</strong> Showing <strong>{previewEntryCount} sample names</strong> on the wheel. Database records are 100% safe.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreviewEntryCount(null);
+                    setCurrentWinner(null);
+                    setWinningEntry(null);
+                  }}
+                  className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-[11px] uppercase tracking-wider flex items-center gap-1 transition cursor-pointer flex-shrink-0 shadow-sm"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Remove Fake Names</span>
+                </button>
+              </div>
+            )}
+
             {/* Center Canvas */}
             <div className="relative inline-block mx-auto">
               <canvas
@@ -1706,10 +2043,14 @@ export default function AdminLuckyDraw() {
             <div>
               <button
                 onClick={startRealisticSpin}
-                disabled={isSpinning || eligiblePool.length === 0}
+                disabled={isSpinning || (previewEntryCount === null && eligiblePool.length === 0)}
                 className="px-10 sm:px-14 py-3.5 sm:py-4 bg-red-600 hover:bg-red-500 text-white font-bold text-sm sm:text-base uppercase tracking-wider rounded-xl shadow-lg shadow-red-900/20 transform active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
               >
-                {isSpinning ? 'SPINNING THE WHEEL...' : `SPIN FOR ${selectedPrize.subtitle.toUpperCase()}`}
+                {isSpinning 
+                  ? 'SPINNING THE WHEEL...' 
+                  : previewEntryCount !== null 
+                  ? `TEST SPIN FOR ${selectedPrize.subtitle.toUpperCase()} (${previewEntryCount} NAMES)` 
+                  : `SPIN FOR ${selectedPrize.subtitle.toUpperCase()}`}
               </button>
             </div>
 
@@ -1728,9 +2069,15 @@ export default function AdminLuckyDraw() {
                 {/* Celebration Header Ribbon */}
                 <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300 text-xs font-black uppercase tracking-widest animate-ribbon-float">
                   <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin-slow" />
-                  <span>WINNER ANNOUNCED!</span>
+                  <span>{previewEntryCount !== null ? 'TEST SIMULATION WINNER' : 'WINNER ANNOUNCED!'}</span>
                   <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin-slow" />
                 </div>
+
+                {previewEntryCount !== null && (
+                  <div className="px-3 py-1 rounded-lg bg-purple-950/80 border border-purple-500/40 text-purple-300 text-[11px] font-bold">
+                    🧪 Ephemeral Visual Preview Result — No database records modified.
+                  </div>
+                )}
 
                 {/* Prize Rank Tag */}
                 <div className="text-xs font-bold uppercase text-amber-400 tracking-wider">
@@ -1781,18 +2128,46 @@ export default function AdminLuckyDraw() {
                   >
                     <PartyPopper className="w-3.5 h-3.5" /> Celebrate Again
                   </button>
-                  <button
-                    onClick={handleSendWinnerWhatsApp}
-                    className="w-full sm:flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-lg shadow-emerald-900/30"
-                  >
-                    <Send className="w-3.5 h-3.5" /> Send WhatsApp Alert
-                  </button>
-                  <button
-                    onClick={handleConfirmWinnerAndNext}
-                    className="w-full sm:flex-1 py-2.5 bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-lg shadow-amber-500/20"
-                  >
-                    <CheckCircle className="w-3.5 h-3.5" /> Save & Next Prize <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
+
+                  {previewEntryCount !== null ? (
+                    <>
+                      <button
+                        onClick={() => {
+                          setCurrentWinner(null);
+                          setWinningEntry(null);
+                          setTimeout(() => startRealisticSpin(), 150);
+                        }}
+                        className="w-full sm:flex-1 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-lg shadow-purple-900/30"
+                      >
+                        <RotateCw className="w-3.5 h-3.5" /> Test Spin Again
+                      </button>
+                      <button
+                        onClick={() => {
+                          setPreviewEntryCount(null);
+                          setCurrentWinner(null);
+                          setWinningEntry(null);
+                        }}
+                        className="w-full sm:flex-1 py-2.5 bg-red-600/90 hover:bg-red-600 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-lg shadow-red-900/20"
+                      >
+                        <X className="w-3.5 h-3.5" /> Remove Fake Names
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={handleSendWinnerWhatsApp}
+                        className="w-full sm:flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-lg shadow-emerald-900/30"
+                      >
+                        <Send className="w-3.5 h-3.5" /> Send WhatsApp Alert
+                      </button>
+                      <button
+                        onClick={handleConfirmWinnerAndNext}
+                        className="w-full sm:flex-1 py-2.5 bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-lg shadow-amber-500/20"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" /> Save & Next Prize <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -2392,18 +2767,18 @@ export default function AdminLuckyDraw() {
             {/* Ticket Serial Sequence Settings */}
             <div className="bg-slate-950/80 border border-slate-800 p-4 rounded-xl space-y-2">
               <label className="block text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center justify-between">
-                <span className="flex items-center gap-1.5"><Hash className="w-3.5 h-3.5 text-amber-400" /> Ticket Serial Number Sequence</span>
-                <span className="text-[10px] text-slate-400 font-mono">Format: TB-LUCKY-XXXX</span>
+                <span className="flex items-center gap-1.5"><Hash className="w-3.5 h-3.5 text-amber-400" /> Next Ticket Serial Number</span>
+                <span className="text-[10px] text-slate-400 font-mono">Format: TB-LUCKY-XXXX (4-Digit)</span>
               </label>
               <div className="flex items-center gap-2">
                 <div className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 flex items-center gap-2">
                   <span className="text-xs text-slate-500 font-mono font-bold">TB-LUCKY-</span>
                   <input
-                    type="number"
-                    min="1"
+                    type="text"
+                    maxLength={6}
                     value={editingSeq}
-                    onChange={(e) => setEditingSeq(e.target.value)}
-                    placeholder="1001"
+                    onChange={(e) => setEditingSeq(e.target.value.replace(/\D/g, ''))}
+                    placeholder="0001"
                     className="w-full bg-transparent text-xs text-amber-300 font-mono font-bold focus:outline-none"
                   />
                 </div>
@@ -2427,7 +2802,7 @@ export default function AdminLuckyDraw() {
                 </button>
               </div>
               <span className="text-[10px] text-slate-400 block">
-                * All new lucky draw tickets increment sequentially (e.g. 1001 → 1002 → 1003). You can set or reset the next starting number here.
+                * Automatically advances in real-time as tickets are issued (e.g. 0005 → 0006 → 0007). You can also set a custom next ticket number anytime.
               </span>
             </div>
 

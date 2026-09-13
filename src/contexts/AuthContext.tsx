@@ -11,6 +11,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
+import { syncGuestViewedProducts } from '../utils/activityTracker';
 
 export type UserRole = 'admin' | 'customer';
 
@@ -44,17 +45,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           // Fetch user role from Firestore
           const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+          let userData: any = null;
           if (userDoc.exists()) {
-            setRole(userDoc.data().role as UserRole);
+            userData = userDoc.data();
+            setRole(userData.role as UserRole);
           } else {
             // Default to customer if no record exists
-            await setDoc(doc(db, 'users', currentUser.uid), {
+            userData = {
               email: currentUser.email,
+              name: currentUser.displayName || 'Customer',
               role: 'customer',
               createdAt: new Date().toISOString()
-            });
+            };
+            await setDoc(doc(db, 'users', currentUser.uid), userData, { merge: true });
             setRole('customer');
           }
+
+          // Cache customer lead account info in localStorage
+          const cleanPhone = userData?.phone ? userData.phone.replace(/\D/g, '').slice(-10) : '';
+          const accountInfo = {
+            id: cleanPhone || currentUser.uid,
+            uid: currentUser.uid,
+            name: userData?.name || currentUser.displayName || 'Customer',
+            phone: cleanPhone || userData?.phone || currentUser.phoneNumber || '',
+            email: userData?.email || currentUser.email || ''
+          };
+          localStorage.setItem('customerAccountInfo', JSON.stringify(accountInfo));
+
+          // Auto-sync guest viewed products to Firestore under this account
+          syncGuestViewedProducts(accountInfo).catch(err => console.log("Guest view sync notice:", err));
         } catch (error) {
           console.error("Error fetching user role:", error);
           setRole('customer'); // fallback
@@ -70,9 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loginWithEmail = async (email: string, password: string) => {
-    const userCred = await signInWithEmailAndPassword(auth, email, password);
-    // If it's a customer and they aren't verified, we could throw an error here,
-    // but we'll let the UI handle checking user.emailVerified.
+    await signInWithEmailAndPassword(auth, email, password);
   };
 
   const signupWithEmail = async (email: string, password: string) => {
@@ -82,7 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email,
       role: 'customer',
       createdAt: new Date().toISOString()
-    });
+    }, { merge: true });
   };
 
   const loginWithGoogle = async () => {
@@ -94,9 +111,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!userDoc.exists()) {
       await setDoc(doc(db, 'users', userCred.user.uid), {
         email: userCred.user.email,
+        name: userCred.user.displayName || 'Customer',
         role: 'customer',
         createdAt: new Date().toISOString()
-      });
+      }, { merge: true });
     }
   };
 

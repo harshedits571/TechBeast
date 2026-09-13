@@ -23,6 +23,7 @@ import { createSlug, generateShortId } from '../../utils/slugify';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useAuth } from '../../contexts/AuthContext';
 import SEO from '../../components/ui/SEO';
+import { trackProductView } from '../../utils/activityTracker';
 
 interface ComponentOption {
   id: string;
@@ -475,6 +476,28 @@ export default function CustomPCBuilder() {
       });
       setSavedQuoteId(docId);
       setShowSuccessModal(true);
+
+      // Track custom PC configuration under customer lead history
+      const cleanPhone = cPhone ? cPhone.replace(/\D/g, '').slice(-10) : '';
+      if (cleanPhone || user?.uid) {
+        trackProductView({
+          id: `quote-${docId}`,
+          title: `${platform.toUpperCase()} Custom PC Rig (₹${finalPrice.toLocaleString('en-IN')})`,
+          category: 'Custom PC',
+          price: finalPrice,
+          oldPrice: subTotal,
+          imageUrl: platform === 'intel'
+            ? "https://images.unsplash.com/photo-1587202372775-e229f172b9d7?auto=format&fit=crop&w=600&q=80"
+            : "https://images.unsplash.com/photo-1591799264318-7e6ef8ddb7ea?auto=format&fit=crop&w=600&q=80",
+          condition: 'Custom Build',
+          brand: 'Tech Beast Custom Rig'
+        }, {
+          uid: user?.uid,
+          displayName: cName,
+          email: user?.email,
+          phoneNumber: cPhone
+        }).catch(e => console.log("Custom PC view tracking notice:", e));
+      }
     } catch (err) {
       console.error("Error saving custom pc request:", err);
     }

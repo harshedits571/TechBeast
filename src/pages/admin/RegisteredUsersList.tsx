@@ -78,80 +78,136 @@ export default function RegisteredUsersList() {
   // Real-time synchronization logic
   useEffect(() => {
     setLoading(true);
+    let rawUsers: any[] = [];
     let rawCustomers: any[] = [];
     let rawViews: any[] = [];
 
     const processAndSync = () => {
       const customersMap = new Map<string, CustomerLead>();
 
-      // 1. Process customers
+      // Helper to find or create a user in customersMap
+      const findOrCreateUser = (id: string, phone: string, email: string, uid: string, name: string): CustomerLead => {
+        const cleanPhone = phone ? phone.replace(/\D/g, '').slice(-10) : (id && id.match(/^\d{10}$/) ? id : '');
+        const cleanEmail = (email || '').toLowerCase().trim();
+        const cleanUid = uid || (id && !id.match(/^\d{10}$/) && !id.includes('@') ? id : '');
+
+        // Try to find existing entry in customersMap by cleanPhone, cleanEmail, or cleanUid
+        let foundKey: string | null = null;
+        for (const [key, item] of customersMap.entries()) {
+          const itemPhone = item.phone ? item.phone.replace(/\D/g, '').slice(-10) : '';
+          const itemEmail = (item.email || '').toLowerCase().trim();
+          const itemUid = item.id || '';
+
+          if (cleanPhone && itemPhone && cleanPhone === itemPhone) {
+            foundKey = key;
+            break;
+          }
+          if (cleanEmail && itemEmail && cleanEmail === itemEmail) {
+            foundKey = key;
+            break;
+          }
+          if (cleanUid && (itemUid === cleanUid || (item as any).uid === cleanUid)) {
+            foundKey = key;
+            break;
+          }
+        }
+
+        if (foundKey) {
+          const existing = customersMap.get(foundKey)!;
+          if (name && name !== 'Customer' && (!existing.name || existing.name === 'Customer')) {
+            existing.name = name;
+          }
+          if (cleanPhone && !existing.phone) {
+            existing.phone = cleanPhone;
+          }
+          if (cleanEmail && !existing.email) {
+            existing.email = cleanEmail;
+          }
+          return existing;
+        }
+
+        // Create new
+        const primaryKey = cleanPhone || cleanEmail || cleanUid || id;
+        const newLead: CustomerLead = {
+          id: primaryKey,
+          name: name || 'Customer',
+          email: cleanEmail,
+          phone: cleanPhone || phone,
+          createdAt: '',
+          lastActive: '',
+          lastViewedProduct: '',
+          lastViewedCategory: '',
+          viewedProducts: [],
+          totalViews: 0,
+          registeredOnline: true
+        };
+        customersMap.set(primaryKey, newLead);
+        return newLead;
+      };
+
+      // 1. Process users collection (Firebase Auth registered web users)
+      rawUsers.forEach(docSnap => {
+        const data = typeof docSnap.data === 'function' ? docSnap.data() : docSnap;
+        if (data.role === 'admin') return; // Skip admin accounts
+        const uid = docSnap.id || data.uid;
+
+        const cust = findOrCreateUser(uid, data.phone || '', data.email || '', uid, data.name || '');
+        if (data.createdAt && (!cust.createdAt || new Date(data.createdAt).getTime() < new Date(cust.createdAt).getTime())) {
+          cust.createdAt = data.createdAt;
+        }
+        if (data.lastActive && (!cust.lastActive || new Date(data.lastActive).getTime() > new Date(cust.lastActive).getTime())) {
+          cust.lastActive = data.lastActive;
+        }
+      });
+
+      // 2. Process customers collection
       rawCustomers.forEach(docSnap => {
         const data = typeof docSnap.data === 'function' ? docSnap.data() : docSnap;
         const id = docSnap.id || data.id;
 
-        // Include if registeredOnline is true OR if they have viewedProducts
-        if (data.registeredOnline || (data.viewedProducts && data.viewedProducts.length > 0)) {
-          const rawList: CustomerViewItem[] = Array.isArray(data.viewedProducts) ? data.viewedProducts : [];
-          
-          // Strict deduplication by productId: combine view counts and keep latest timestamp
-          const dedupedMap = new Map<string, CustomerViewItem>();
-          rawList.forEach(item => {
-            if (!item.productId) return;
-            const existing = dedupedMap.get(item.productId);
-            if (existing) {
-              existing.viewCount = (existing.viewCount || 1) + (item.viewCount || 1);
-              if (new Date(item.viewedAt || 0).getTime() > new Date(existing.viewedAt || 0).getTime()) {
-                existing.viewedAt = item.viewedAt;
+        const cust = findOrCreateUser(id, data.phone || '', data.email || '', data.uid || '', data.name || '');
+        if (data.createdAt && (!cust.createdAt || new Date(data.createdAt).getTime() < new Date(cust.createdAt).getTime())) {
+          cust.createdAt = data.createdAt;
+        }
+        if (data.lastActive && (!cust.lastActive || new Date(data.lastActive).getTime() > new Date(cust.lastActive).getTime())) {
+          cust.lastActive = data.lastActive;
+        }
+        if (data.totalSpent) cust.totalSpent = (cust.totalSpent || 0) + data.totalSpent;
+        if (data.ordersCount) cust.ordersCount = (cust.ordersCount || 0) + data.ordersCount;
+
+        // Merge viewedProducts array if present on customer doc
+        if (Array.isArray(data.viewedProducts)) {
+          data.viewedProducts.forEach((vItem: CustomerViewItem) => {
+            if (!vItem || !vItem.productId) return;
+            const existingIdx = cust.viewedProducts.findIndex(p => p.productId === vItem.productId);
+            if (existingIdx >= 0) {
+              cust.viewedProducts[existingIdx].viewCount = Math.max(
+                cust.viewedProducts[existingIdx].viewCount || 1,
+                vItem.viewCount || 1
+              );
+              if (new Date(vItem.viewedAt || 0).getTime() > new Date(cust.viewedProducts[existingIdx].viewedAt || 0).getTime()) {
+                cust.viewedProducts[existingIdx].viewedAt = vItem.viewedAt;
               }
             } else {
-              dedupedMap.set(item.productId, { ...item, viewCount: item.viewCount || 1 });
+              cust.viewedProducts.push({ ...vItem, viewCount: vItem.viewCount || 1 });
             }
-          });
-
-          const viewedList = Array.from(dedupedMap.values());
-          const totalViews = viewedList.reduce((sum, item) => sum + (item.viewCount || 1), 0);
-          
-          customersMap.set(id, {
-            id: id,
-            name: data.name || 'Customer',
-            email: data.email || '',
-            phone: data.phone || '',
-            createdAt: data.createdAt || '',
-            lastActive: data.lastActive || data.createdAt || '',
-            lastViewedProduct: data.lastViewedProduct || (viewedList[0]?.title) || '',
-            lastViewedCategory: data.lastViewedCategory || (viewedList[0]?.category) || '',
-            viewedProducts: viewedList,
-            totalViews: totalViews,
-            totalSpent: data.totalSpent || 0,
-            ordersCount: data.ordersCount || 0,
-            registeredOnline: !!data.registeredOnline
           });
         }
       });
 
-      // 2. Process customer_views collection to merge live granular views
+      // 3. Process customer_views collection to merge live granular views
       rawViews.forEach(vDoc => {
         const vData = typeof vDoc.data === 'function' ? vDoc.data() : vDoc;
-        const custId = vData.customerId || (vData.customerPhone ? vData.customerPhone.replace(/\D/g, '') : null);
-        if (!custId) return;
+        const custId = vData.customerId || (vData.customerPhone ? vData.customerPhone.replace(/\D/g, '') : null) || vData.userId;
+        if (!custId && !vData.customerEmail) return;
 
-        let cust = customersMap.get(custId);
-        if (!cust) {
-          cust = {
-            id: custId,
-            name: vData.customerName || 'Customer',
-            email: vData.customerEmail || '',
-            phone: vData.customerPhone || '',
-            createdAt: vData.firstViewedAt || vData.viewedAt || '',
-            lastActive: vData.lastViewedAt || vData.viewedAt || '',
-            lastViewedProduct: vData.productTitle || '',
-            lastViewedCategory: vData.productCategory || '',
-            viewedProducts: [],
-            totalViews: 0,
-            registeredOnline: true
-          };
-          customersMap.set(custId, cust);
-        }
+        const cust = findOrCreateUser(
+          custId || vData.userId || '',
+          vData.customerPhone || '',
+          vData.customerEmail || '',
+          vData.userId || '',
+          vData.customerName || ''
+        );
 
         // Update lastActive timestamp if more recent
         const viewDateStr = vData.lastViewedAt || vData.viewedAt;
@@ -162,8 +218,11 @@ export default function RegisteredUsersList() {
             cust.lastActive = viewDateStr;
           }
         }
+        if (!cust.createdAt && (vData.firstViewedAt || vData.viewedAt)) {
+          cust.createdAt = vData.firstViewedAt || vData.viewedAt;
+        }
 
-        const existingViewIndex = cust.viewedProducts?.findIndex(item => item.productId === vData.productId);
+        const existingViewIndex = cust.viewedProducts.findIndex(item => item.productId === vData.productId);
         const viewItem: CustomerViewItem = {
           productId: vData.productId,
           title: vData.productTitle,
@@ -178,19 +237,18 @@ export default function RegisteredUsersList() {
           viewCount: Number(vData.viewCount || 1)
         };
 
-        if (existingViewIndex !== undefined && existingViewIndex >= 0 && cust.viewedProducts) {
+        if (existingViewIndex >= 0) {
           cust.viewedProducts[existingViewIndex] = {
             ...cust.viewedProducts[existingViewIndex],
             ...viewItem,
             viewCount: Math.max(cust.viewedProducts[existingViewIndex].viewCount || 1, viewItem.viewCount)
           };
         } else {
-          cust.viewedProducts = cust.viewedProducts || [];
           cust.viewedProducts.push(viewItem);
         }
       });
 
-      // Convert map to array and recalculate stats
+      // 4. Convert map to array and recalculate stats
       const result = Array.from(customersMap.values()).map(c => {
         const viewed = (c.viewedProducts || []).sort((a, b) => 
           new Date(b.viewedAt || 0).getTime() - new Date(a.viewedAt || 0).getTime()
@@ -209,7 +267,14 @@ export default function RegisteredUsersList() {
       setLoading(false);
     };
 
-    // Set up real-time onSnapshot listeners
+    // Set up real-time onSnapshot listeners for users, customers, and customer_views
+    const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+      rawUsers = snapshot.docs;
+      processAndSync();
+    }, (err) => {
+      console.error("Live sync error on users collection:", err);
+    });
+
     const unsubCustomers = onSnapshot(collection(db, 'customers'), (snapshot) => {
       rawCustomers = snapshot.docs;
       processAndSync();
@@ -227,6 +292,7 @@ export default function RegisteredUsersList() {
     });
 
     return () => {
+      unsubUsers();
       unsubCustomers();
       unsubViews();
     };

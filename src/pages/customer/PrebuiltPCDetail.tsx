@@ -147,6 +147,22 @@ export default function PrebuiltPCDetail() {
     fetchPrebuilt();
   }, [id]);
 
+  // Ensure prebuilt view is recorded for current user once product & user are resolved
+  useEffect(() => {
+    if (product && product.id) {
+      trackProductView({
+        id: product.id,
+        title: product.title || 'Prebuilt Gaming Desktop',
+        category: 'Prebuilt PC',
+        price: product.price,
+        oldPrice: product.oldPrice,
+        imageUrl: product.imageUrl,
+        condition: 'New',
+        brand: 'Tech Beast Gaming'
+      }, user);
+    }
+  }, [product?.id, user?.uid]);
+
   // Pricing
   const basePrice = product?.price || 98500;
   const upgradeTotal = selectedRam.price + selectedCooler.price + selectedPrimarySsd.price + selectedSecStorage.price + selectedOS.price;
