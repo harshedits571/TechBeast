@@ -48,13 +48,15 @@ import {
   Star,
   Copy,
   MessageCircle,
-  Camera,
+  Camera, 
   Image as ImageIcon,
-  Eye
+  Eye,
+  Edit2
 } from 'lucide-react';
 import { getNextLuckyDrawTicketNumber, getCurrentTicketSequence, updateTicketSequence, formatTicketNumber, extractTicketSeq } from '../../utils/luckyDrawSequence';
 import ImageUpload from '../../components/admin/ImageUpload';
 import { deleteCloudinaryImage } from '../../utils/cloudinary';
+import { useSecurityPin } from '../../contexts/SecurityPinContext';
 
 interface GiveawayPrize {
   id: string;
@@ -210,6 +212,7 @@ const LUXURY_SLICES = [
 ];
 
 export default function AdminLuckyDraw() {
+  const { confirmWithPin } = useSecurityPin();
   const [activeTab, setActiveTab] = useState<'wheel' | 'entries' | 'standee' | 'winners' | 'campaign'>('wheel');
   const [config, setConfig] = useState<GiveawayConfig>(DEFAULT_CONFIG);
   const [entries, setEntries] = useState<GiveawayEntry[]>([]);
@@ -233,6 +236,27 @@ export default function AdminLuckyDraw() {
   const [editingWinnerPhoto, setEditingWinnerPhoto] = useState<WinnerRecord | null>(null);
   const [winnerPhotoList, setWinnerPhotoList] = useState<string[]>([]);
   const [isSavingWinnerPhotos, setIsSavingWinnerPhotos] = useState(false);
+
+  // Add / Restore Winner Modal State
+  const [showAddWinnerModal, setShowAddWinnerModal] = useState(false);
+  const [winnerSourceMode, setWinnerSourceMode] = useState<'from_entry' | 'manual'>('from_entry');
+  const [selectedEntryId, setSelectedEntryId] = useState<string>('');
+  const [winnerTicketNumber, setWinnerTicketNumber] = useState('');
+  const [winnerCustomerName, setWinnerCustomerName] = useState('');
+  const [winnerCustomerPhone, setWinnerCustomerPhone] = useState('');
+  const [winnerPlace, setWinnerPlace] = useState('Hubli');
+  const [winnerBillNumber, setWinnerBillNumber] = useState('');
+  const [winnerItemPurchased, setWinnerItemPurchased] = useState('Used Laptop');
+  const [winnerPrizeWon, setWinnerPrizeWon] = useState('');
+  const [winnerRank, setWinnerRank] = useState<number>(1);
+  const [winnerCampaignName, setWinnerCampaignName] = useState('');
+  const [winnerRoundNumber, setWinnerRoundNumber] = useState<number>(1);
+  const [winnerDrawnAt, setWinnerDrawnAt] = useState('');
+  const [isSavingWinner, setIsSavingWinner] = useState(false);
+
+  // Edit Winner Modal State
+  const [editingWinnerRecord, setEditingWinnerRecord] = useState<WinnerRecord | null>(null);
+  const [isSavingEditWinner, setIsSavingEditWinner] = useState(false);
 
   // Launch New Contest Event Modal
   const [showNewContestModal, setShowNewContestModal] = useState(false);
@@ -901,39 +925,180 @@ export default function AdminLuckyDraw() {
     showToast(`Opening WhatsApp for ${winner.customerName}...`);
   };
 
-  // Delete winner from database & auto-delete photos from Cloudinary
-  const handleDeleteWinner = async (winner: WinnerRecord) => {
+  // Delete winner from database & auto-delete photos from Cloudinary (Protected with 4-Digit Security PIN)
+  const handleDeleteWinner = (winner: WinnerRecord) => {
     if (!winner.id) {
       showToast("Cannot delete winner without ID");
       return;
     }
-    if (!window.confirm(`Are you sure you want to remove ${winner.customerName || 'this winner'} from the winners archive? This will also delete any uploaded photos from Cloudinary.`)) return;
 
+    confirmWithPin({
+      title: "Delete Lucky Draw Winner",
+      itemName: `${winner.customerName || 'Winner'} (Ticket: ${winner.ticketNumber})`,
+      description: "Enter your 4-digit Admin PIN to permanently remove this winner from the archive. Any ceremony photos on Cloudinary will also be cleaned up.",
+      confirmText: "Verify PIN & Delete Winner",
+      onConfirm: async () => {
+        // 1. Delete all Cloudinary photos associated with this winner
+        const photosToDelete = [
+          ...(winner.photos || []),
+          ...(winner.photoUrl ? [winner.photoUrl] : [])
+        ];
+
+        const uniqueCloudinaryPhotos = Array.from(new Set(photosToDelete)).filter(url => url && url.includes('cloudinary.com'));
+        
+        if (uniqueCloudinaryPhotos.length > 0) {
+          console.log(`Deleting ${uniqueCloudinaryPhotos.length} Cloudinary images for winner ${winner.customerName}...`);
+          await Promise.allSettled(uniqueCloudinaryPhotos.map(url => deleteCloudinaryImage(url)));
+        }
+
+        // 2. Delete document from Firestore
+        await deleteDoc(doc(db, 'giveaway_winners', winner.id!));
+        
+        // 3. Instant local state update
+        setPastWinners(prev => prev.filter(w => w.id !== winner.id));
+        showToast(`Removed ${winner.customerName || 'winner'} & deleted photos from Cloudinary`);
+        
+        fetchData(false).catch(() => {});
+      }
+    });
+  };
+
+  // Open Add / Restore Winner Modal
+  const handleOpenAddWinnerModal = (presetEntry?: GiveawayEntry) => {
+    if (presetEntry) {
+      setWinnerSourceMode('from_entry');
+      setSelectedEntryId(presetEntry.id);
+      setWinnerTicketNumber(presetEntry.ticketNumber || '');
+      setWinnerCustomerName(presetEntry.customerName || '');
+      setWinnerCustomerPhone(presetEntry.customerPhone || '');
+      setWinnerPlace(presetEntry.place || 'Hubli');
+      setWinnerBillNumber(presetEntry.billNumber || '');
+      setWinnerItemPurchased(presetEntry.itemPurchased || 'Used Laptop');
+      setWinnerCampaignName(presetEntry.campaignName || config.campaignName || 'Tech Beast In-Store Mega Lucky Draw');
+      setWinnerRoundNumber(presetEntry.roundNumber || config.roundNumber || 1);
+    } else {
+      setWinnerSourceMode(entries.length > 0 ? 'from_entry' : 'manual');
+      setSelectedEntryId('');
+      setWinnerTicketNumber('');
+      setWinnerCustomerName('');
+      setWinnerCustomerPhone('');
+      setWinnerPlace('Hubli');
+      setWinnerBillNumber('');
+      setWinnerItemPurchased('Used Laptop');
+      setWinnerCampaignName(config.campaignName || 'Tech Beast In-Store Mega Lucky Draw');
+      setWinnerRoundNumber(config.roundNumber || 1);
+    }
+    setWinnerPrizeWon(config.prizes?.[0]?.title || 'RGB Mechanical Gaming Keyboard & Mouse Kit');
+    setWinnerRank(1);
+    setWinnerDrawnAt(new Date().toISOString().slice(0, 16));
+    setShowAddWinnerModal(true);
+  };
+
+  // Select customer from registered entries to autofill
+  const handleSelectEntryForWinner = (entryId: string) => {
+    setSelectedEntryId(entryId);
+    const found = entries.find(e => e.id === entryId);
+    if (found) {
+      setWinnerTicketNumber(found.ticketNumber || '');
+      setWinnerCustomerName(found.customerName || '');
+      setWinnerCustomerPhone(found.customerPhone || '');
+      setWinnerPlace(found.place || 'Hubli');
+      setWinnerBillNumber(found.billNumber || '');
+      setWinnerItemPurchased(found.itemPurchased || 'Used Laptop');
+      if (found.campaignName) setWinnerCampaignName(found.campaignName);
+      if (found.roundNumber) setWinnerRoundNumber(found.roundNumber);
+    }
+  };
+
+  // Save / Restore Winner to Firestore & Local State
+  const handleSaveWinnerToArchive = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isSavingWinner) return;
+
+    if (!winnerCustomerName.trim() || !winnerTicketNumber.trim() || !winnerPrizeWon.trim()) {
+      showToast("Please enter Customer Name, Ticket Number, and Prize Won");
+      return;
+    }
+
+    setIsSavingWinner(true);
     try {
-      // 1. Delete all Cloudinary photos associated with this winner
-      const photosToDelete = [
-        ...(winner.photos || []),
-        ...(winner.photoUrl ? [winner.photoUrl] : [])
-      ];
+      const cleanPhone = winnerCustomerPhone.replace(/\D/g, '');
+      const newWinnerDoc: Omit<WinnerRecord, 'id'> = {
+        ticketNumber: winnerTicketNumber.trim().toUpperCase(),
+        customerName: winnerCustomerName.trim(),
+        customerPhone: cleanPhone || winnerCustomerPhone.trim(),
+        place: winnerPlace.trim() || 'Hubli',
+        billNumber: winnerBillNumber.trim().toUpperCase(),
+        itemPurchased: winnerItemPurchased.trim(),
+        prizeWon: winnerPrizeWon.trim(),
+        rank: Number(winnerRank) || 1,
+        roundNumber: Number(winnerRoundNumber) || config.roundNumber || 1,
+        campaignName: winnerCampaignName.trim() || config.campaignName || 'Tech Beast In-Store Mega Lucky Draw',
+        drawnAt: winnerDrawnAt ? new Date(winnerDrawnAt).toISOString() : new Date().toISOString()
+      };
 
-      const uniqueCloudinaryPhotos = Array.from(new Set(photosToDelete)).filter(url => url && url.includes('cloudinary.com'));
-      
-      if (uniqueCloudinaryPhotos.length > 0) {
-        console.log(`Deleting ${uniqueCloudinaryPhotos.length} Cloudinary images for winner ${winner.customerName}...`);
-        await Promise.allSettled(uniqueCloudinaryPhotos.map(url => deleteCloudinaryImage(url)));
+      const docRef = await addDoc(collection(db, 'giveaway_winners'), newWinnerDoc);
+      const createdWinner: WinnerRecord = { id: docRef.id, ...newWinnerDoc };
+
+      // Update matching entry in giveaway_entries if exists
+      const matchingEntry = entries.find(
+        e => (selectedEntryId && e.id === selectedEntryId) || 
+             e.ticketNumber.toUpperCase() === winnerTicketNumber.trim().toUpperCase()
+      );
+      if (matchingEntry) {
+        await updateDoc(doc(db, 'giveaway_entries', matchingEntry.id), {
+          isWinner: true,
+          prizeWon: winnerPrizeWon.trim()
+        });
+        setEntries(prev => prev.map(e => e.id === matchingEntry.id ? { ...e, isWinner: true, prizeWon: winnerPrizeWon.trim() } : e));
       }
 
-      // 2. Delete document from Firestore
-      await deleteDoc(doc(db, 'giveaway_winners', winner.id));
-      
-      // 3. Instant local state update
-      setPastWinners(prev => prev.filter(w => w.id !== winner.id));
-      showToast(`Removed ${winner.customerName || 'winner'} & deleted photos from Cloudinary`);
-      
+      setPastWinners(prev => [createdWinner, ...prev]);
+      setShowAddWinnerModal(false);
+      showToast(`🏆 ${winnerCustomerName} successfully saved to Winners Archive!`);
       fetchData(false).catch(() => {});
     } catch (err) {
-      console.error("Error deleting winner:", err);
-      showToast("Failed to delete winner");
+      console.error("Error adding winner:", err);
+      showToast("Failed to save winner to archive");
+    } finally {
+      setIsSavingWinner(false);
+    }
+  };
+
+  // Open Edit Winner Modal
+  const handleOpenEditWinnerModal = (winner: WinnerRecord) => {
+    setEditingWinnerRecord({ ...winner });
+  };
+
+  // Save Edited Winner
+  const handleSaveEditedWinner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingWinnerRecord || !editingWinnerRecord.id || isSavingEditWinner) return;
+
+    setIsSavingEditWinner(true);
+    try {
+      const { id, ...dataToSave } = editingWinnerRecord;
+      await updateDoc(doc(db, 'giveaway_winners', id), {
+        customerName: dataToSave.customerName.trim(),
+        customerPhone: dataToSave.customerPhone.trim(),
+        ticketNumber: dataToSave.ticketNumber.trim().toUpperCase(),
+        place: dataToSave.place?.trim() || 'Hubli',
+        billNumber: dataToSave.billNumber?.trim() || '',
+        itemPurchased: dataToSave.itemPurchased?.trim() || '',
+        prizeWon: dataToSave.prizeWon.trim(),
+        rank: Number(dataToSave.rank) || 1,
+        campaignName: dataToSave.campaignName || config.campaignName,
+        roundNumber: Number(dataToSave.roundNumber) || 1
+      });
+
+      setPastWinners(prev => prev.map(w => w.id === id ? { ...w, ...dataToSave } : w));
+      setEditingWinnerRecord(null);
+      showToast(`Winner details updated for ${dataToSave.customerName}!`);
+    } catch (err) {
+      console.error("Error updating winner:", err);
+      showToast("Failed to update winner details");
+    } finally {
+      setIsSavingEditWinner(false);
     }
   };
 
@@ -1241,17 +1406,19 @@ export default function AdminLuckyDraw() {
     }
   };
 
-  // Delete Entry
-  const handleDeleteEntry = async (entryId: string, ticketNo: string) => {
-    if (!window.confirm(`Delete entry ${ticketNo}?`)) return;
-    try {
-      await deleteDoc(doc(db, 'giveaway_entries', entryId));
-      setEntries(entries.filter(e => e.id !== entryId));
-      showToast(`Entry ${ticketNo} deleted`);
-    } catch (err) {
-      console.error(err);
-      showToast("Failed to delete entry");
-    }
+  // Delete Entry (Protected with 4-Digit Security PIN)
+  const handleDeleteEntry = (entryId: string, ticketNo: string, customerName?: string) => {
+    confirmWithPin({
+      title: "Delete Lucky Draw Ticket",
+      itemName: `${customerName || 'Customer Entry'} (Ticket: ${ticketNo})`,
+      description: `Enter your 4-digit Admin PIN to permanently delete ticket ${ticketNo} from the contest ledger.`,
+      confirmText: "Verify PIN & Delete Ticket",
+      onConfirm: async () => {
+        await deleteDoc(doc(db, 'giveaway_entries', entryId));
+        setEntries(prev => prev.filter(e => e.id !== entryId));
+        showToast(`Entry ${ticketNo} deleted`);
+      }
+    });
   };
 
   // Export CSV
@@ -2304,13 +2471,25 @@ export default function AdminLuckyDraw() {
                           </button>
                         </td>
                         <td className="p-3 text-right">
-                          <button
-                            onClick={() => handleDeleteEntry(entry.id, entry.ticketNumber)}
-                            className="p-1.5 text-red-400 hover:bg-red-950/40 rounded-lg transition cursor-pointer"
-                            title="Delete entry"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => {
+                                handleOpenAddWinnerModal(entry);
+                                setActiveTab('winners');
+                              }}
+                              className="p-1.5 text-amber-400 hover:bg-amber-400/10 rounded-lg transition cursor-pointer"
+                              title="Record / Restore as Winner in Archive"
+                            >
+                              <Trophy className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteEntry(entry.id, entry.ticketNumber, entry.customerName)}
+                              className="p-1.5 text-red-400 hover:bg-red-950/40 rounded-lg transition cursor-pointer"
+                              title="Delete entry"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -2465,6 +2644,15 @@ export default function AdminLuckyDraw() {
                     ))}
                   </select>
                 )}
+
+                {/* Add / Restore Winner Button */}
+                <button
+                  type="button"
+                  onClick={() => handleOpenAddWinnerModal()}
+                  className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition cursor-pointer active:scale-95"
+                >
+                  <Plus className="w-3.5 h-3.5" /> + Add / Restore Winner
+                </button>
 
                 {/* 1-Click WhatsApp to Winners Button */}
                 <button
@@ -2635,6 +2823,16 @@ export default function AdminLuckyDraw() {
                               <span>WhatsApp</span>
                             </>
                           )}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditWinnerModal(winner)}
+                          className="py-2 px-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 hover:border-slate-600 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                          title="Edit winner details"
+                        >
+                          <Edit2 className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Edit</span>
                         </button>
 
                         <button
@@ -3428,6 +3626,455 @@ export default function AdminLuckyDraw() {
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* ADD / RESTORE WINNER MODAL */}
+      {/* ==================================================== */}
+      {showAddWinnerModal && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-7 max-w-xl w-full shadow-2xl space-y-5 my-8 relative flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <Trophy className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white uppercase font-heading">
+                    Add / Restore Winner
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Restore a deleted winner or manually record a winner into the archive
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => !isSavingWinner && setShowAddWinnerModal(false)} 
+                disabled={isSavingWinner}
+                className="text-slate-400 hover:text-white cursor-pointer disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveWinnerToArchive} className="overflow-y-auto space-y-4 flex-1 pr-1">
+              {/* Source Mode Toggle */}
+              <div className="bg-slate-950 p-1.5 rounded-xl border border-slate-800 grid grid-cols-2 gap-1 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setWinnerSourceMode('from_entry')}
+                  className={`py-2 px-3 rounded-lg transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                    winnerSourceMode === 'from_entry'
+                      ? 'bg-amber-500 text-slate-950 shadow-md font-black'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <CheckCircle className="w-3.5 h-3.5" /> Select Registered Customer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWinnerSourceMode('manual')}
+                  className={`py-2 px-3 rounded-lg transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                    winnerSourceMode === 'manual'
+                      ? 'bg-amber-500 text-slate-950 shadow-md font-black'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Plus className="w-3.5 h-3.5" /> Type Custom Details
+                </button>
+              </div>
+
+              {/* If Mode is from_entry: Customer Entry Dropdown Search */}
+              {winnerSourceMode === 'from_entry' && (
+                <div className="space-y-1.5 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                  <label className="block text-xs font-bold text-amber-400 uppercase tracking-wider">
+                    Search & Select Customer from Entries Ledger:
+                  </label>
+                  <select
+                    value={selectedEntryId}
+                    onChange={(e) => handleSelectEntryForWinner(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-200 focus:outline-none focus:border-amber-400 cursor-pointer"
+                  >
+                    <option value="">-- Choose from {entries.length} Registered Customer Entries --</option>
+                    {entries.map(e => (
+                      <option key={e.id} value={e.id}>
+                        {e.ticketNumber} • {e.customerName} ({e.customerPhone}) • {e.itemPurchased || 'Item'} • Bill: {e.billNumber || 'N/A'}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-400">
+                    Selecting a customer automatically autofills their ticket number, phone, and invoice data below.
+                  </p>
+                </div>
+              )}
+
+              {/* Customer Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                    Winning Ticket Number: *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={winnerTicketNumber}
+                    onChange={(e) => setWinnerTicketNumber(e.target.value)}
+                    placeholder="e.g. TB-2026-1001"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                    Customer Full Name: *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={winnerCustomerName}
+                    onChange={(e) => setWinnerCustomerName(e.target.value)}
+                    placeholder="e.g. Rajesh Kumar"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                    WhatsApp Mobile:
+                  </label>
+                  <input
+                    type="text"
+                    value={winnerCustomerPhone}
+                    onChange={(e) => setWinnerCustomerPhone(e.target.value)}
+                    placeholder="e.g. 9876543210"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                    City / Place:
+                  </label>
+                  <input
+                    type="text"
+                    value={winnerPlace}
+                    onChange={(e) => setWinnerPlace(e.target.value)}
+                    placeholder="e.g. Hubli / Dharwad"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                    Bill / Invoice Number:
+                  </label>
+                  <input
+                    type="text"
+                    value={winnerBillNumber}
+                    onChange={(e) => setWinnerBillNumber(e.target.value)}
+                    placeholder="e.g. INV-2026-89"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                    Item Purchased:
+                  </label>
+                  <input
+                    type="text"
+                    value={winnerItemPurchased}
+                    onChange={(e) => setWinnerItemPurchased(e.target.value)}
+                    placeholder="e.g. Dell Latitude Laptop / Gaming PC"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              {/* Prize & Contest Details */}
+              <div className="border-t border-slate-800 pt-3 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">
+                      Prize Rank:
+                    </label>
+                    <select
+                      value={winnerRank}
+                      onChange={(e) => {
+                        const rank = Number(e.target.value);
+                        setWinnerRank(rank);
+                        const matchingPrize = config.prizes?.find(p => p.rank === rank);
+                        if (matchingPrize) {
+                          setWinnerPrizeWon(matchingPrize.title);
+                        }
+                      }}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+                    >
+                      <option value={1}>🥇 1st Prize Winner</option>
+                      <option value={2}>🥈 2nd Prize Winner</option>
+                      <option value={3}>🥉 3rd Prize Winner</option>
+                      <option value={4}>🎁 4th Prize Winner</option>
+                      <option value={5}>🎁 5th Prize Winner</option>
+                      <option value={6}>🎁 Special Winner</option>
+                    </select>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">
+                      Prize Won Title: *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={winnerPrizeWon}
+                      onChange={(e) => setWinnerPrizeWon(e.target.value)}
+                      placeholder="e.g. RGB Mechanical Gaming Keyboard & Mouse Kit"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-amber-300 font-bold focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                      Contest / Campaign:
+                    </label>
+                    <input
+                      type="text"
+                      value={winnerCampaignName}
+                      onChange={(e) => setWinnerCampaignName(e.target.value)}
+                      placeholder="e.g. Tech Beast In-Store Mega Lucky Draw"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                      Drawn Date:
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={winnerDrawnAt}
+                      onChange={(e) => setWinnerDrawnAt(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  disabled={isSavingWinner}
+                  onClick={() => setShowAddWinnerModal(false)}
+                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 font-bold rounded-xl text-xs cursor-pointer transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingWinner}
+                  className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-60 text-slate-950 font-black rounded-xl text-xs shadow-lg shadow-amber-500/20 flex items-center gap-2 cursor-pointer transition"
+                >
+                  {isSavingWinner ? (
+                    <>
+                      <RotateCw className="w-4 h-4 animate-spin text-slate-950" />
+                      <span>Saving to Archive...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Save & Restore Winner</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* EDIT WINNER DETAILS MODAL */}
+      {/* ==================================================== */}
+      {editingWinnerRecord && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-7 max-w-lg w-full shadow-2xl space-y-5 my-8 relative flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <Edit2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white uppercase font-heading">
+                    Edit Winner Details
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Update winner name, prize, or contact info
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => !isSavingEditWinner && setEditingWinnerRecord(null)} 
+                disabled={isSavingEditWinner}
+                className="text-slate-400 hover:text-white cursor-pointer disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedWinner} className="overflow-y-auto space-y-4 flex-1 pr-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                    Ticket Number:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingWinnerRecord.ticketNumber}
+                    onChange={(e) => setEditingWinnerRecord({ ...editingWinnerRecord, ticketNumber: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                    Customer Name:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingWinnerRecord.customerName}
+                    onChange={(e) => setEditingWinnerRecord({ ...editingWinnerRecord, customerName: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                    WhatsApp Phone:
+                  </label>
+                  <input
+                    type="text"
+                    value={editingWinnerRecord.customerPhone}
+                    onChange={(e) => setEditingWinnerRecord({ ...editingWinnerRecord, customerPhone: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                    City / Place:
+                  </label>
+                  <input
+                    type="text"
+                    value={editingWinnerRecord.place || ''}
+                    onChange={(e) => setEditingWinnerRecord({ ...editingWinnerRecord, place: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                    Bill / Invoice:
+                  </label>
+                  <input
+                    type="text"
+                    value={editingWinnerRecord.billNumber || ''}
+                    onChange={(e) => setEditingWinnerRecord({ ...editingWinnerRecord, billNumber: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                    Item Purchased:
+                  </label>
+                  <input
+                    type="text"
+                    value={editingWinnerRecord.itemPurchased || ''}
+                    onChange={(e) => setEditingWinnerRecord({ ...editingWinnerRecord, itemPurchased: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">
+                    Rank:
+                  </label>
+                  <select
+                    value={editingWinnerRecord.rank || 1}
+                    onChange={(e) => setEditingWinnerRecord({ ...editingWinnerRecord, rank: Number(e.target.value) })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+                  >
+                    <option value={1}>🥇 1st Prize</option>
+                    <option value={2}>🥈 2nd Prize</option>
+                    <option value={3}>🥉 3rd Prize</option>
+                    <option value={4}>🎁 4th Prize</option>
+                    <option value={5}>🎁 5th Prize</option>
+                    <option value={6}>🎁 Special</option>
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">
+                    Prize Won:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingWinnerRecord.prizeWon}
+                    onChange={(e) => setEditingWinnerRecord({ ...editingWinnerRecord, prizeWon: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-amber-300 font-bold focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  disabled={isSavingEditWinner}
+                  onClick={() => setEditingWinnerRecord(null)}
+                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 font-bold rounded-xl text-xs cursor-pointer transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEditWinner}
+                  className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-60 text-slate-950 font-black rounded-xl text-xs shadow-lg shadow-amber-500/20 flex items-center gap-2 cursor-pointer transition"
+                >
+                  {isSavingEditWinner ? (
+                    <>
+                      <RotateCw className="w-4 h-4 animate-spin text-slate-950" />
+                      <span>Updating Winner...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>Save Changes</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

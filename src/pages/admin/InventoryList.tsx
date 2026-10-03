@@ -7,8 +7,10 @@ import { useAdmin } from '../../contexts/AdminContext';
 import { deleteCloudinaryImage } from '../../utils/cloudinary';
 import { TableBodySkeleton } from '../../components/ui/Skeleton';
 import ComboManagerModal from '../../components/admin/ComboManagerModal';
+import { useSecurityPin } from '../../contexts/SecurityPinContext';
 
 export default function InventoryList() {
+  const { confirmWithPin } = useSecurityPin();
   const navigate = useNavigate();
   const { inventoryState } = useAdmin();
   const { data: inventory, loading: inventoryLoading } = inventoryState;
@@ -44,25 +46,31 @@ export default function InventoryList() {
   const isLoading = loading || inventoryLoading;
 
 
-  const handleDeleteItem = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this inventory item? This will also delete its images from Cloudinary.")) {
-      try {
-        const itemToDelete = inventory.find(i => i.id === id);
-        
-        // Delete images from Cloudinary first
-        if (itemToDelete?.imageUrls?.length > 0) {
-          console.log(`Deleting ${itemToDelete.imageUrls.length} images from Cloudinary...`);
-          for (const url of itemToDelete.imageUrls) {
-            await deleteCloudinaryImage(url);
+  const handleDeleteItem = (id: string, name?: string) => {
+    confirmWithPin({
+      title: "Delete Inventory Item",
+      itemName: name || id,
+      description: "Enter your 4-digit Admin PIN to permanently delete this item from inventory and remove associated Cloudinary images.",
+      confirmText: "Verify PIN & Delete Item",
+      onConfirm: async () => {
+        try {
+          const itemToDelete = inventory.find(i => i.id === id);
+          
+          // Delete images from Cloudinary first
+          if (itemToDelete?.imageUrls?.length > 0) {
+            console.log(`Deleting ${itemToDelete.imageUrls.length} images from Cloudinary...`);
+            for (const url of itemToDelete.imageUrls) {
+              await deleteCloudinaryImage(url);
+            }
           }
-        }
 
-        await deleteDoc(doc(db, "inventory", id));
-      } catch (error) {
-        console.error("Error deleting item:", error);
-        alert("Failed to delete item.");
+          await deleteDoc(doc(db, "inventory", id));
+        } catch (error) {
+          console.error("Error deleting item:", error);
+          alert("Failed to delete item.");
+        }
       }
-    }
+    });
   };
 
   const filteredInventory = inventory.filter(item => {
@@ -173,7 +181,7 @@ export default function InventoryList() {
                         <button onClick={() => navigate(`/admin/inventory/edit/${item.id}`)} className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors">
                           <Edit className="h-4 w-4" />
                         </button>
-                        <button onClick={() => handleDeleteItem(item.id)} className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
+                        <button onClick={() => handleDeleteItem(item.id, item.name)} className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>

@@ -7,7 +7,10 @@ import { useAdmin } from '../../contexts/AdminContext';
 import { exportToCsv } from '../../utils/exportCsv';
 import { TableBodySkeleton } from '../../components/ui/Skeleton';
 import { deleteCloudinaryImage } from '../../utils/cloudinary';
+import { useSecurityPin } from '../../contexts/SecurityPinContext';
+
 export default function ProductsList() {
+  const { confirmWithPin } = useSecurityPin();
   const { productsState } = useAdmin();
   const { data: products, loading, pageSize, setPageSize, currentPage, setCurrentPage, hasNextPage, setCursors } = productsState;
 
@@ -62,25 +65,31 @@ export default function ProductsList() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this product? This will also delete its images from Cloudinary.")) {
-      try {
-        const productToDelete = products.find(p => p.id === id);
+  const handleDelete = (id: string, title?: string) => {
+    confirmWithPin({
+      title: "Delete Product",
+      itemName: title || id,
+      description: "Enter your 4-digit Admin PIN to permanently delete this product and its Cloudinary media assets.",
+      confirmText: "Verify PIN & Delete Product",
+      onConfirm: async () => {
+        try {
+          const productToDelete = products.find(p => p.id === id);
 
-        // Delete images from Cloudinary first
-        if (productToDelete?.imageUrls?.length > 0) {
-          console.log(`Deleting ${productToDelete.imageUrls.length} images from Cloudinary...`);
-          for (const url of productToDelete.imageUrls) {
-            await deleteCloudinaryImage(url);
+          // Delete images from Cloudinary first
+          if (productToDelete?.imageUrls?.length > 0) {
+            console.log(`Deleting ${productToDelete.imageUrls.length} images from Cloudinary...`);
+            for (const url of productToDelete.imageUrls) {
+              await deleteCloudinaryImage(url);
+            }
           }
-        }
 
-        await deleteDoc(doc(db, "products", id));
-      } catch (error) {
-        console.error("Error deleting product:", error);
-        alert("Failed to delete product.");
+          await deleteDoc(doc(db, "products", id));
+        } catch (error) {
+          console.error("Error deleting product:", error);
+          alert("Failed to delete product.");
+        }
       }
-    }
+    });
   };
 
   const toggleDropdown = (id: string) => {
@@ -278,7 +287,7 @@ export default function ProductsList() {
                           <Link to={`/admin/products/edit/${product.id}`} className="text-slate-500 hover:text-blue-400 transition-colors p-1" title="Edit">
                             <Edit className="h-4 w-4" />
                           </Link>
-                          <button onClick={() => handleDelete(product.id)} className="text-slate-500 hover:text-red-400 transition-colors p-1" title="Delete">
+                          <button onClick={() => handleDelete(product.id, product.title)} className="text-slate-500 hover:text-red-400 transition-colors p-1" title="Delete">
                             <Trash2 className="h-4 w-4" />
                           </button>
                           <div className="relative">

@@ -31,6 +31,8 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     } catch (err: any) {
       if (err.code === 'auth/operation-not-allowed') {
         setError('Google authentication is not enabled in your Firebase Console.');
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setError(''); // User cancelled popup, silently reset
       } else {
         setError(err.message || 'Google sign-in failed.');
       }

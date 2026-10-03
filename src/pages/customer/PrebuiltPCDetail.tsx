@@ -65,25 +65,43 @@ export default function PrebuiltPCDetail() {
         let data: any = null;
 
         // 1. Check settings prebuilts
-        const settingsSnap = await getDoc(doc(db, 'settings', 'prebuilts'));
-        if (settingsSnap.exists() && settingsSnap.data().items && settingsSnap.data().items[id]) {
-          data = settingsSnap.data().items[id];
+        try {
+          const settingsSnap = await getDoc(doc(db, 'settings', 'prebuilts'));
+          if (settingsSnap.exists() && settingsSnap.data().items && settingsSnap.data().items[id]) {
+            data = settingsSnap.data().items[id];
+          }
+        } catch (e) {
+          console.warn("Settings prebuilts fetch error:", e);
         }
 
         // 2. Check prebuilts collection
         if (!data) {
-          const prebuiltSnap = await getDoc(doc(db, "prebuilts", id));
-          if (prebuiltSnap.exists()) {
-            data = prebuiltSnap.data();
-          }
+          try {
+            const prebuiltSnap = await getDoc(doc(db, "prebuilts", id));
+            if (prebuiltSnap.exists()) {
+              data = prebuiltSnap.data();
+            }
+          } catch (e) {}
         }
 
         // 3. Check products collection
         if (!data) {
-          const docSnap = await getDoc(doc(db, "products", id));
-          if (docSnap.exists()) {
-            data = docSnap.data();
-          }
+          try {
+            const docSnap = await getDoc(doc(db, "products", id));
+            if (docSnap.exists()) {
+              data = docSnap.data();
+            }
+          } catch (e) {}
+        }
+
+        // 4. Check prebuilt-pcs collection
+        if (!data) {
+          try {
+            const pcsSnap = await getDoc(doc(db, "prebuilt-pcs", id));
+            if (pcsSnap.exists()) {
+              data = pcsSnap.data();
+            }
+          } catch (e) {}
         }
 
         if (data && data.status !== 'Offline') {
@@ -92,6 +110,7 @@ export default function PrebuiltPCDetail() {
             title: data.title || data.name || 'Prebuilt Gaming Desktop',
             price: Number(data.price || 0),
             oldPrice: Number(data.oldPrice || 0),
+            status: data.status || 'In Stock',
             imageUrl: data.imageUrl || (data.imageUrls && data.imageUrls[0]) || 'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?auto=format&fit=crop&w=800&q=80',
             imageUrls: data.imageUrls || (data.imageUrl ? [data.imageUrl] : []),
             cabinet: data.cabinet || data.cabinetFormFactor || 'Ant Esports ARGB Gaming Cabinet',
@@ -341,7 +360,18 @@ export default function PrebuiltPCDetail() {
           <div className="lg:col-span-6 space-y-6">
             
             {/* Model Name Box */}
-            <div className="bg-slate-200/70 border border-slate-300 rounded-2xl p-4 text-center">
+            <div className="bg-slate-200/70 border border-slate-300 rounded-2xl p-4 text-center space-y-1.5">
+              <div className="flex items-center justify-center gap-2">
+                <span className={`text-[10px] font-black uppercase px-3 py-0.5 rounded-full shadow-sm flex items-center gap-1 ${
+                  product?.status === 'Out of Stock' 
+                    ? 'bg-red-600 text-white' 
+                    : product?.status === 'Pre-Order' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-emerald-600 text-white'
+                }`}>
+                  {product?.status || 'In Stock'}
+                </span>
+              </div>
               <h1 className="text-2xl font-black tracking-wider text-slate-900 uppercase">{product?.title}</h1>
             </div>
 
@@ -577,15 +607,24 @@ export default function PrebuiltPCDetail() {
                 onClick={handleWhatsAppQuote}
                 className="w-full sm:w-auto bg-[#25D366] hover:bg-[#128C7E] text-white py-3.5 px-6 rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-600/20"
               >
-                <MessageCircle className="w-4 h-4" /> Get WhatsApp Quotation
+                <MessageCircle className="w-4 h-4" /> {product?.status === 'Out of Stock' ? 'Inquire on WhatsApp' : 'Get WhatsApp Quotation'}
               </button>
 
-              <button 
-                onClick={handleAddToCart}
-                className="w-full sm:w-auto bg-purple-700 hover:bg-purple-800 text-white py-3.5 px-6 rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md shadow-purple-600/20"
-              >
-                <ShoppingCart className="w-4 h-4" /> Add Upgraded Prebuilt To Cart
-              </button>
+              {product?.status === 'Out of Stock' ? (
+                <button 
+                  disabled
+                  className="w-full sm:w-auto bg-slate-200 text-slate-400 py-3.5 px-6 rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-not-allowed border border-slate-300 shadow-none"
+                >
+                  <ShoppingCart className="w-4 h-4" /> Out of Stock
+                </button>
+              ) : (
+                <button 
+                  onClick={handleAddToCart}
+                  className="w-full sm:w-auto bg-purple-700 hover:bg-purple-800 text-white py-3.5 px-6 rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md shadow-purple-600/20"
+                >
+                  <ShoppingCart className="w-4 h-4" /> Add Upgraded Prebuilt To Cart
+                </button>
+              )}
             </div>
           </div>
 

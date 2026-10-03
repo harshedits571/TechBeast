@@ -1,17 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, Plus, Trash2 } from 'lucide-react';
+import { Save, Plus, Trash2, Lock, KeyRound, ShieldCheck, Eye, EyeOff, ShieldAlert } from 'lucide-react';
 import { FormSkeleton } from '../../components/ui/Skeleton';
 import { useSettings } from '../../contexts/SettingsContext';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import ImageUpload from '../../components/admin/ImageUpload';
 import { deleteCloudinaryImage } from '../../utils/cloudinary';
+import { useSecurityPin } from '../../contexts/SecurityPinContext';
 
 export default function Settings() {
+  const { confirmWithPin } = useSecurityPin();
   const { settings, updateSettings, loading } = useSettings();
   const [formData, setFormData] = useState(settings);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [showPin, setShowPin] = useState(false);
 
   const [activeTab, setActiveTab] = useState('general');
   const [allProducts, setAllProducts] = useState<any[]>([]);
@@ -218,17 +221,25 @@ export default function Settings() {
     setFormData({ ...formData, heroBanners: newBanners });
   };
 
-  const removeHeroBanner = async (index: number) => {
-    const bannerToRemove = formData.heroBanners[index];
-    if (bannerToRemove && bannerToRemove.imageUrl) {
-      try {
-        await deleteCloudinaryImage(bannerToRemove.imageUrl);
-      } catch (err) {
-        console.error("Failed to delete banner image from Cloudinary:", err);
+  const removeHeroBanner = (index: number) => {
+    confirmWithPin({
+      title: "Delete Promotional Banner",
+      itemName: `Hero Banner #${index + 1}`,
+      description: "Enter your 4-digit Admin PIN to remove this banner and clean up its Cloudinary image.",
+      confirmText: "Verify PIN & Delete Banner",
+      onConfirm: async () => {
+        const bannerToRemove = formData.heroBanners[index];
+        if (bannerToRemove && bannerToRemove.imageUrl) {
+          try {
+            await deleteCloudinaryImage(bannerToRemove.imageUrl);
+          } catch (err) {
+            console.error("Failed to delete banner image from Cloudinary:", err);
+          }
+        }
+        const newBanners = formData.heroBanners.filter((_, i) => i !== index);
+        setFormData(prev => ({ ...prev, heroBanners: newBanners }));
       }
-    }
-    const newBanners = formData.heroBanners.filter((_, i) => i !== index);
-    setFormData({ ...formData, heroBanners: newBanners });
+    });
   };
 
   const autoFitBannerImage = (index: number) => {
@@ -277,10 +288,11 @@ export default function Settings() {
         <p className="text-sm text-slate-500 mt-1">Manage global configuration, homepage design, and product curation.</p>
       </div>
 
-      <div className="flex border-b border-white/10">
-        <button onClick={() => setActiveTab('general')} className={`px-6 py-3 text-sm font-bold uppercase tracking-wider ${activeTab === 'general' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-300'}`}>General</button>
-        <button onClick={() => setActiveTab('homepage')} className={`px-6 py-3 text-sm font-bold uppercase tracking-wider ${activeTab === 'homepage' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-300'}`}>Homepage & Offers</button>
-        <button onClick={() => setActiveTab('curation')} className={`px-6 py-3 text-sm font-bold uppercase tracking-wider ${activeTab === 'curation' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-300'}`}>Product Curation</button>
+      <div className="flex border-b border-white/10 flex-wrap">
+        <button type="button" onClick={() => setActiveTab('general')} className={`px-6 py-3 text-sm font-bold uppercase tracking-wider ${activeTab === 'general' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-300'}`}>General</button>
+        <button type="button" onClick={() => setActiveTab('homepage')} className={`px-6 py-3 text-sm font-bold uppercase tracking-wider ${activeTab === 'homepage' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-300'}`}>Homepage & Offers</button>
+        <button type="button" onClick={() => setActiveTab('curation')} className={`px-6 py-3 text-sm font-bold uppercase tracking-wider ${activeTab === 'curation' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-300'}`}>Product Curation</button>
+        <button type="button" onClick={() => setActiveTab('security')} className={`px-6 py-3 text-sm font-bold uppercase tracking-wider ${activeTab === 'security' ? 'text-red-400 border-b-2 border-red-500' : 'text-slate-400 hover:text-slate-300'}`}>🔒 Security & PIN</button>
       </div>
 
       <form onSubmit={handleSubmit} className="bg-[#0d0d0e] rounded-3xl border border-white/10 shadow-2xl p-8 space-y-8 relative">
@@ -294,6 +306,70 @@ export default function Settings() {
         {/* GENERAL TAB */}
         {activeTab === 'general' && (
           <div className="space-y-8">
+            {/* 🔒 ADMIN 4-DIGIT SECURITY & DELETION PIN */}
+            <div className="bg-gradient-to-r from-red-950/30 to-amber-950/20 border border-red-500/30 p-6 rounded-2xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0">
+                    <Lock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                      Admin Security & Deletion PIN
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Required for deleting Products, Lucky Draw Winners, Customer Entries, Prebuilts, and Inventory.
+                    </p>
+                  </div>
+                </div>
+                <span className="bg-amber-500/10 text-amber-300 border border-amber-500/30 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full self-start sm:self-center">
+                  Accidental Delete Protection
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div>
+                  <label className="flex items-center justify-between text-xs text-slate-300 font-bold uppercase tracking-wider mb-2">
+                    <span className="flex items-center gap-1.5"><KeyRound className="w-3.5 h-3.5 text-amber-400" /> Set 4-Digit PIN</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowPin(!showPin)}
+                      className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 normal-case font-normal cursor-pointer"
+                    >
+                      {showPin ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                      <span>{showPin ? 'Hide' : 'Reveal'}</span>
+                    </button>
+                  </label>
+                  <input
+                    type={showPin ? 'text' : 'password'}
+                    name="adminSecurityPin"
+                    maxLength={4}
+                    pattern="[0-9]{4}"
+                    value={formData.adminSecurityPin || '1234'}
+                    onChange={(e) => {
+                      const cleaned = e.target.value.replace(/\D/g, '').slice(0, 4);
+                      setFormData(prev => ({ ...prev, adminSecurityPin: cleaned }));
+                    }}
+                    placeholder="1234"
+                    className="w-full bg-slate-950 border border-red-500/40 rounded-xl px-4 py-3 text-amber-300 font-mono text-lg font-black tracking-widest focus:outline-none focus:border-amber-400 transition-colors"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1.5">
+                    Default PIN is <strong className="font-mono text-slate-400">1234</strong>. Enter 4 numeric digits.
+                  </p>
+                </div>
+
+                <div className="bg-slate-950/60 border border-white/5 p-4 rounded-xl text-xs text-slate-300 space-y-2 flex flex-col justify-center">
+                  <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Active Protection Status</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Whenever an admin clicks any delete button anywhere on the platform, a secure prompt will ask for this exact 4-digit PIN before proceeding.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <label className="flex flex-col gap-2 text-sm text-slate-400 font-bold uppercase tracking-widest">
                 Store Name
@@ -696,6 +772,73 @@ export default function Settings() {
           <div className="space-y-8">
             {renderProductSelector('bestSellerIds', 'Best Sellers', 'Select which products to showcase in the Best Sellers section on the homepage.')}
             {renderProductSelector('newArrivalIds', 'New Arrivals', 'Select which products to showcase in the New Arrivals section.')}
+          </div>
+        )}
+
+        {/* SECURITY TAB */}
+        {activeTab === 'security' && (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-br from-red-950/40 via-slate-900 to-amber-950/20 border border-red-500/30 p-8 rounded-3xl space-y-6">
+              <div className="flex items-center gap-4 border-b border-white/10 pb-5">
+                <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0">
+                  <ShieldAlert className="w-8 h-8" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-white uppercase tracking-tight">
+                    Admin 4-Digit Security PIN Management
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    This security PIN safeguards your entire store database against accidental deletions.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <label className="flex items-center justify-between text-xs text-slate-300 font-bold uppercase tracking-wider">
+                    <span className="flex items-center gap-2"><KeyRound className="w-4 h-4 text-amber-400" /> Current / New 4-Digit PIN:</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowPin(!showPin)}
+                      className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 font-semibold cursor-pointer"
+                    >
+                      {showPin ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      <span>{showPin ? 'Hide PIN' : 'Reveal PIN'}</span>
+                    </button>
+                  </label>
+                  
+                  <input
+                    type={showPin ? 'text' : 'password'}
+                    name="adminSecurityPin"
+                    maxLength={4}
+                    pattern="[0-9]{4}"
+                    value={formData.adminSecurityPin || '1234'}
+                    onChange={(e) => {
+                      const cleaned = e.target.value.replace(/\D/g, '').slice(0, 4);
+                      setFormData(prev => ({ ...prev, adminSecurityPin: cleaned }));
+                    }}
+                    placeholder="1234"
+                    className="w-full bg-slate-950 border-2 border-red-500/50 focus:border-amber-400 rounded-2xl px-5 py-4 text-amber-300 font-mono text-2xl font-black tracking-[0.3em] text-center focus:outline-none transition-all shadow-inner"
+                  />
+                  <p className="text-xs text-slate-400">
+                    💡 The factory default PIN is <strong className="font-mono text-amber-300">1234</strong>. Change it here anytime and click <strong>"Save Settings"</strong> below.
+                  </p>
+                </div>
+
+                <div className="bg-slate-950/80 border border-white/10 p-5 rounded-2xl space-y-3">
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400" /> Protected Operations
+                  </h4>
+                  <ul className="text-xs text-slate-400 space-y-1.5 list-disc list-inside">
+                    <li><strong className="text-slate-200">Lucky Draw:</strong> Deleting winners or customer entry tickets</li>
+                    <li><strong className="text-slate-200">Products & Catalog:</strong> Deleting laptops, desktops, accessories</li>
+                    <li><strong className="text-slate-200">Prebuilt PCs:</strong> Deleting prebuilt gaming rigs</li>
+                    <li><strong className="text-slate-200">Inventory:</strong> Removing parts, spare components, or combos</li>
+                    <li><strong className="text-slate-200">Marketing:</strong> Deleting homepage hero promotional banners</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

@@ -47,15 +47,50 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const item = updatedCart[i];
       if (!item) continue;
 
+      // Custom PC Builder items are built-to-order configurations
+      if (item.id && (item.id.startsWith('custom-pc-') || item.id.startsWith('custom-build-'))) {
+        continue;
+      }
+
       try {
+        const rawId = item.id && item.id.startsWith('prebuilt-') 
+          ? item.id.replace(/^prebuilt-/, '').replace(/-\d+$/, '') 
+          : item.id;
+
         // Try products collection first
         let docSnap = await getDoc(doc(db, 'products', item.id));
+        if (!docSnap.exists() && rawId !== item.id) {
+          docSnap = await getDoc(doc(db, 'products', rawId));
+        }
         if (!docSnap.exists()) {
-          // If not found, try prebuilt-pcs
+          docSnap = await getDoc(doc(db, 'prebuilts', item.id));
+        }
+        if (!docSnap.exists() && rawId !== item.id) {
+          docSnap = await getDoc(doc(db, 'prebuilts', rawId));
+        }
+        if (!docSnap.exists()) {
           docSnap = await getDoc(doc(db, 'prebuilt-pcs', item.id));
+        }
+        if (!docSnap.exists() && rawId !== item.id) {
+          docSnap = await getDoc(doc(db, 'prebuilt-pcs', rawId));
         }
 
         if (!docSnap.exists()) {
+          // Check settings prebuilts as well
+          const settingsSnap = await getDoc(doc(db, 'settings', 'prebuilts')).catch(() => null);
+          if (settingsSnap && settingsSnap.exists() && settingsSnap.data().items) {
+            const items = settingsSnap.data().items;
+            const found = items[item.id] || items[rawId];
+            if (found) {
+              if (found.status === 'Offline' || found.status === 'Out of Stock') {
+                updatedCart[i].quantity = 0;
+                cartChanged = true;
+                continue;
+              }
+              continue; // Found in settings and valid
+            }
+          }
+
           // Product was completely removed from the database
           updatedCart[i].quantity = 0;
           cartChanged = true;
@@ -63,16 +98,21 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
 
         const data = docSnap.data();
-        const currentStock = data.stock !== undefined ? data.stock : 0;
+        if (data.status === 'Offline' || data.status === 'Out of Stock') {
+          updatedCart[i].quantity = 0;
+          cartChanged = true;
+          continue;
+        }
+
+        const currentStock = data.stock !== undefined ? data.stock : 999;
         
-        if (item.stock !== currentStock) {
+        if (item.stock !== undefined && item.stock !== currentStock) {
           updatedCart[i].stock = currentStock;
           cartChanged = true;
         }
 
         // If the quantity in cart exceeds available stock, reduce it
-        // If stock is 0, this will set quantity to 0 (which gets filtered out)
-        if (updatedCart[i].quantity > currentStock) {
+        if (currentStock !== undefined && updatedCart[i].quantity > currentStock) {
           updatedCart[i].quantity = currentStock;
           cartChanged = true;
         }

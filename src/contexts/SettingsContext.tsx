@@ -48,6 +48,7 @@ export interface StoreSettings {
     card1: { subtitle: string; title: string; link: string; bgColor: string };
     card2: { subtitle: string; title: string; link: string; bgColor: string };
   };
+  adminSecurityPin?: string;
 }
 
 const defaultSettings: StoreSettings = {
@@ -73,7 +74,8 @@ const defaultSettings: StoreSettings = {
   promoCards: {
     card1: { subtitle: 'Weekend Deals', title: 'Next-gen gaming console', link: '/products', bgColor: 'blue' },
     card2: { subtitle: 'Back to school', title: 'Special discount for students', link: '/products', bgColor: 'red' }
-  }
+  },
+  adminSecurityPin: '1234'
 };
 
 interface SettingsContextType {

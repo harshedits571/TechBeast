@@ -57,26 +57,52 @@ export default function PrebuiltForm() {
     if (!id) return;
     const fetchDoc = async () => {
       try {
-        // Try settings prebuilts first
-        const settingsSnap = await getDoc(doc(db, 'settings', 'prebuilts'));
-        if (settingsSnap.exists() && settingsSnap.data().items && settingsSnap.data().items[id]) {
-          const docData = settingsSnap.data().items[id];
+        let docData: any = null;
+
+        // 1. Try settings prebuilts first
+        try {
+          const settingsSnap = await getDoc(doc(db, 'settings', 'prebuilts'));
+          if (settingsSnap.exists() && settingsSnap.data().items && settingsSnap.data().items[id]) {
+            docData = settingsSnap.data().items[id];
+          }
+        } catch (e) {
+          console.warn("Error fetching from settings/prebuilts:", e);
+        }
+
+        // 2. Try prebuilts collection
+        if (!docData) {
+          try {
+            const preSnap = await getDoc(doc(db, "prebuilts", id));
+            if (preSnap.exists()) {
+              docData = preSnap.data();
+            }
+          } catch (e) {}
+        }
+
+        // 3. Try products collection
+        if (!docData) {
+          try {
+            const prodSnap = await getDoc(doc(db, "products", id));
+            if (prodSnap.exists()) {
+              docData = prodSnap.data();
+            }
+          } catch (e) {}
+        }
+
+        // 4. Try prebuilt-pcs collection
+        if (!docData) {
+          try {
+            const pcsSnap = await getDoc(doc(db, "prebuilt-pcs", id));
+            if (pcsSnap.exists()) {
+              docData = pcsSnap.data();
+            }
+          } catch (e) {}
+        }
+
+        if (docData) {
           setFormData(prev => ({ 
             ...prev, 
             ...docData, 
-            imageUrls: docData.imageUrls || (docData.imageUrl ? [docData.imageUrl] : [])
-          }));
-          setLoading(false);
-          return;
-        }
-
-        // Try products collection
-        const prodSnap = await getDoc(doc(db, "products", id));
-        if (prodSnap.exists()) {
-          const docData = prodSnap.data();
-          setFormData(prev => ({ 
-            ...prev, 
-            ...docData,
             imageUrls: docData.imageUrls || (docData.imageUrl ? [docData.imageUrl] : [])
           }));
         }
@@ -131,6 +157,7 @@ export default function PrebuiltForm() {
     setIsSubmitting(true);
     try {
       const prebuiltId = id || `prebuilt-${Date.now()}`;
+      const nowIso = new Date().toISOString();
       const dataToSave: any = {
         ...formData,
         id: prebuiltId,
@@ -140,19 +167,40 @@ export default function PrebuiltForm() {
         oldPrice: Number(formData.oldPrice || 0),
         imageUrls: formData.imageUrls || [],
         imageUrl: formData.imageUrls && formData.imageUrls.length > 0 ? formData.imageUrls[0] : '',
-        updatedAt: new Date().toISOString()
+        status: formData.status || 'In Stock',
+        updatedAt: nowIso
       };
 
-      // 1. Save to settings collection 'prebuilts' (always permitted)
-      const settingsRef = doc(db, 'settings', 'prebuilts');
-      const settingsSnap = await getDoc(settingsRef);
-      const existingData = settingsSnap.exists() ? settingsSnap.data() : {};
-      const existingItems = existingData.items || {};
-      existingItems[prebuiltId] = dataToSave;
-      await setDoc(settingsRef, { items: existingItems }, { merge: true });
+      // 1. Save to settings collection 'prebuilts'
+      try {
+        const settingsRef = doc(db, 'settings', 'prebuilts');
+        const settingsSnap = await getDoc(settingsRef);
+        const existingData = settingsSnap.exists() ? settingsSnap.data() : {};
+        const existingItems = existingData.items || {};
+        existingItems[prebuiltId] = dataToSave;
+        await setDoc(settingsRef, { items: existingItems }, { merge: true });
+      } catch (e) {
+        console.warn("Failed to write to settings/prebuilts:", e);
+      }
 
       // 2. Save to products collection
-      await setDoc(doc(db, "products", prebuiltId), dataToSave, { merge: true }).catch(() => {});
+      try {
+        await setDoc(doc(db, "products", prebuiltId), dataToSave, { merge: true });
+      } catch (e) {
+        console.warn("Failed to write to products:", e);
+      }
+
+      // 3. Save to prebuilts collection
+      try {
+        await setDoc(doc(db, "prebuilts", prebuiltId), dataToSave, { merge: true });
+      } catch (e) {
+        console.warn("Failed to write to prebuilts collection:", e);
+      }
+
+      // 4. Save to prebuilt-pcs collection
+      try {
+        await setDoc(doc(db, "prebuilt-pcs", prebuiltId), dataToSave, { merge: true });
+      } catch (e) {}
 
       navigate('/admin/prebuilt-pcs');
     } catch (err) {

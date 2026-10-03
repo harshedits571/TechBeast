@@ -41,13 +41,56 @@ export default function Checkout() {
     try {
       // 0. Pre-checkout validation
       for (const item of cart) {
+        if (!item) continue;
+        if (item.id && (item.id.startsWith('custom-pc-') || item.id.startsWith('custom-build-'))) {
+          continue;
+        }
+
+        const rawId = item.id && item.id.startsWith('prebuilt-') 
+          ? item.id.replace(/^prebuilt-/, '').replace(/-\d+$/, '') 
+          : item.id;
+
         let docSnap = await getDoc(doc(db, 'products', item.id));
+        if (!docSnap.exists() && rawId !== item.id) {
+          docSnap = await getDoc(doc(db, 'products', rawId));
+        }
+        if (!docSnap.exists()) {
+          docSnap = await getDoc(doc(db, 'prebuilts', item.id));
+        }
+        if (!docSnap.exists() && rawId !== item.id) {
+          docSnap = await getDoc(doc(db, 'prebuilts', rawId));
+        }
         if (!docSnap.exists()) {
           docSnap = await getDoc(doc(db, 'prebuilt-pcs', item.id));
         }
+        if (!docSnap.exists() && rawId !== item.id) {
+          docSnap = await getDoc(doc(db, 'prebuilt-pcs', rawId));
+        }
+
+        let isAvailable = docSnap.exists();
+        if (docSnap.exists()) {
+          const d = docSnap.data();
+          if (d.status === 'Offline' || d.status === 'Out of Stock') {
+            isAvailable = false;
+          } else if (d.stock !== undefined && d.stock < item.quantity) {
+            isAvailable = false;
+          }
+        } else {
+          // Check settings prebuilts fallback
+          try {
+            const settingsSnap = await getDoc(doc(db, 'settings', 'prebuilts'));
+            if (settingsSnap.exists() && settingsSnap.data().items) {
+              const items = settingsSnap.data().items;
+              const found = items[item.id] || items[rawId];
+              if (found && found.status !== 'Offline' && found.status !== 'Out of Stock') {
+                isAvailable = true;
+              }
+            }
+          } catch {}
+        }
         
-        if (!docSnap.exists() || (docSnap.data().stock !== undefined && docSnap.data().stock < item.quantity)) {
-          setError(`Sorry, "${item.title}" is out of stock or no longer available in the requested quantity. Your cart has been updated.`);
+        if (!isAvailable) {
+          setError(`Sorry, "${item.title}" is currently out of stock or unavailable. Your cart has been updated.`);
           await validateCart(); // Auto-correct their cart
           setLoading(false);
           return;

@@ -1,6 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { SettingsProvider } from '../../contexts/SettingsContext';
 import { AdminProvider } from '../../contexts/AdminContext';
+import { SecurityPinProvider } from '../../contexts/SecurityPinContext';
 import {
   LayoutDashboard,
   Package,
@@ -44,6 +45,7 @@ export default function AdminLayout() {
   return (
     <AdminProvider>
       <SettingsProvider>
+        <SecurityPinProvider>
         <div className="min-h-[100dvh] bg-[#0a0a0b] text-slate-300 flex font-sans">
           {/* Mobile Overlay */}
           {isMobileMenuOpen && (
@@ -160,6 +162,7 @@ export default function AdminLayout() {
             </footer>
           </main>
         </div>
+        </SecurityPinProvider>
       </SettingsProvider>
     </AdminProvider>
   );

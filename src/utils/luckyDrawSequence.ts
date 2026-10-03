@@ -1,8 +1,8 @@
 import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, runTransaction } from 'firebase/firestore';
 
 /**
- * Extracts the trailing integer from a ticket number string (e.g. "TB-LUCKY-001" -> 1, "TB-LUCKY-1002" -> 1002).
+ * Extracts the trailing integer from a ticket number string (e.g. "TB-LUCKY-0001" -> 1, "TB-LUCKY-0050" -> 50).
  */
 export function extractTicketSeq(ticketNumber?: string): number {
   if (!ticketNumber) return 0;
@@ -16,7 +16,7 @@ export function extractTicketSeq(ticketNumber?: string): number {
 
 /**
  * Formats a sequence number into the standard 4-digit ticket string:
- * - Always 4 digits (e.g. 1 -> "TB-LUCKY-0001", 5 -> "TB-LUCKY-0005", 50 -> "TB-LUCKY-0050", 1001 -> "TB-LUCKY-1001")
+ * - Always 4 digits (e.g. 1 -> "TB-LUCKY-0001", 2 -> "TB-LUCKY-0002", 50 -> "TB-LUCKY-0050", 1001 -> "TB-LUCKY-1001")
  */
 export function formatTicketNumber(seq: number): string {
   const safeSeq = Math.max(1, Math.floor(seq || 1));
@@ -25,16 +25,16 @@ export function formatTicketNumber(seq: number): string {
 
 /**
  * Finds the highest sequential ticket number in giveaway_entries.
- * Ignores old emergency random timestamps (> 20000).
+ * Filters out legacy emergency random timestamps (> 20000).
  */
-async function getMaxExistingEntrySeq(): Promise<number> {
+export async function getMaxExistingEntrySeq(): Promise<number> {
   try {
     const snap = await getDocs(collection(db, 'giveaway_entries'));
     let maxSeq = 0;
     snap.docs.forEach(docSnap => {
       const data = docSnap.data();
       const num = extractTicketSeq(data.ticketNumber);
-      // Only consider sequential numbers under 20000 (filters out legacy Date.now() % 90000 bugs)
+      // Only consider sequential numbers under 20000 (filters out legacy Date.now() % 90000 random fallback IDs)
       if (num > maxSeq && num < 20000) {
         maxSeq = num;
       }
@@ -47,71 +47,79 @@ async function getMaxExistingEntrySeq(): Promise<number> {
 }
 
 /**
- * Generates the next sequential lucky draw ticket number (e.g. TB-LUCKY-001, TB-LUCKY-002, TB-LUCKY-051).
- * 1. Checks configured starting sequence from admin.
- * 2. Compares against existing database tickets to prevent duplicates and ensure continuation.
- * 3. Never returns random numbers.
+ * Generates the next sequential lucky draw ticket number atomically.
+ * 1. Checks existing giveaway_entries to ensure continuation without resetting.
+ * 2. Uses an atomic Firestore transaction so simultaneous customer QR scans never duplicate.
+ * 3. Advances the counter automatically for guest customer mobile submissions.
  */
 export async function getNextLuckyDrawTicketNumber(): Promise<string> {
   const counterRef = doc(db, 'giveaway_config', 'ticketCounter');
 
   try {
-    let configuredSeq: number | null = null;
-    let manualOverrideTime = 0;
-
-    // 1. Check if admin configured a sequence
-    try {
-      const snap = await getDoc(counterRef);
-      if (snap.exists()) {
-        const data = snap.data();
-        if (typeof data?.nextSeq === 'number' && data.nextSeq >= 1) {
-          configuredSeq = data.nextSeq;
-        } else if (typeof data?.currentSeq === 'number' && data.currentSeq >= 0) {
-          configuredSeq = data.currentSeq + 1;
-        }
-        if (data?.manualOverrideAt) {
-          manualOverrideTime = new Date(data.manualOverrideAt).getTime();
-        }
-      }
-    } catch (e) {
-      // Ignore permission warnings on customer device
-    }
-
-    // 2. Read the maximum sequence already used in giveaway_entries
+    // 1. Get the current highest ticket number in the database to prevent duplicate numbers
     const maxExisting = await getMaxExistingEntrySeq();
 
-    // 3. Determine next sequence
-    let nextSeq = 1;
-    if (configuredSeq !== null && configuredSeq > 0) {
-      if (configuredSeq > maxExisting) {
-        nextSeq = configuredSeq;
-      } else if (manualOverrideTime > Date.now() - 5 * 60 * 1000 && maxExisting === 0) {
-        nextSeq = configuredSeq;
-      } else {
-        nextSeq = maxExisting + 1;
-      }
-    } else {
-      nextSeq = maxExisting > 0 ? maxExisting + 1 : 1;
-    }
+    // 2. Perform an atomic transaction on the ticketCounter document
+    const assignedTicketNumber = await runTransaction(db, async (transaction) => {
+      const counterDoc = await transaction.get(counterRef);
+      let nextSeq = 1;
 
-    // 4. Update the counter document for next time (non-blocking)
-    try {
-      await setDoc(counterRef, {
-        nextSeq: nextSeq + 1,
-        currentSeq: nextSeq,
-        lastGeneratedTicket: formatTicketNumber(nextSeq),
+      if (counterDoc.exists()) {
+        const data = counterDoc.data();
+        let configuredNext: number | null = null;
+        if (typeof data?.nextSeq === 'number' && data.nextSeq >= 1) {
+          configuredNext = data.nextSeq;
+        } else if (typeof data?.currentSeq === 'number' && data.currentSeq >= 0) {
+          configuredNext = data.currentSeq + 1;
+        }
+
+        if (configuredNext !== null && configuredNext > maxExisting) {
+          nextSeq = configuredNext;
+        } else {
+          nextSeq = maxExisting + 1;
+        }
+      } else {
+        nextSeq = maxExisting > 0 ? maxExisting + 1 : 1;
+      }
+
+      // Update the counter document atomically
+      transaction.set(
+        counterRef,
+        {
+          currentSeq: nextSeq,
+          nextSeq: nextSeq + 1,
+          lastGeneratedTicket: formatTicketNumber(nextSeq),
+          prefix: 'TB-LUCKY-',
+          updatedAt: new Date().toISOString()
+        },
+        { merge: true }
+      );
+
+      return formatTicketNumber(nextSeq);
+    });
+
+    return assignedTicketNumber;
+  } catch (err) {
+    console.warn("Transaction note, using robust entry-based fallback sequence:", err);
+
+    // Fallback: Query highest existing ticket and increment
+    const fallbackMax = await getMaxExistingEntrySeq();
+    const fallbackSeq = fallbackMax > 0 ? fallbackMax + 1 : 1;
+
+    // Attempt asynchronous update to ticketCounter
+    setDoc(
+      counterRef,
+      {
+        currentSeq: fallbackSeq,
+        nextSeq: fallbackSeq + 1,
+        lastGeneratedTicket: formatTicketNumber(fallbackSeq),
         prefix: 'TB-LUCKY-',
         updatedAt: new Date().toISOString()
-      }, { merge: true });
-    } catch (e) {
-      // If customer cannot write to giveaway_config, the next entry read will base it on giveaway_entries
-    }
+      },
+      { merge: true }
+    ).catch(() => {});
 
-    return formatTicketNumber(nextSeq);
-  } catch (err) {
-    console.error("Error generating ticket sequence:", err);
-    const fallbackMax = await getMaxExistingEntrySeq();
-    return formatTicketNumber(fallbackMax > 0 ? fallbackMax + 1 : 1);
+    return formatTicketNumber(fallbackSeq);
   }
 }
 
@@ -137,13 +145,14 @@ export async function getCurrentTicketSequence(): Promise<number> {
     return maxExisting > 0 ? maxExisting + 1 : 1;
   } catch (e) {
     console.warn("Error getting ticket sequence:", e);
-    return 1;
+    const maxExisting = await getMaxExistingEntrySeq();
+    return maxExisting > 0 ? maxExisting + 1 : 1;
   }
 }
 
 /**
  * Allows admin to manually update/reset the next ticket sequence number.
- * @param nextTicketNum - The exact next ticket number to be assigned (e.g. 1 for 001, 1001 for 1001)
+ * @param nextTicketNum - The exact next ticket number to be assigned (e.g. 3 for TB-LUCKY-0003)
  */
 export async function updateTicketSequence(nextTicketNum: number): Promise<void> {
   const safeNum = Math.max(1, Math.floor(nextTicketNum || 1));
