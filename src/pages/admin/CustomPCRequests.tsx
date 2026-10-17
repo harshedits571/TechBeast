@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { db } from '../../lib/firebase';
 import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc, query, orderBy, limit, setDoc, onSnapshot } from 'firebase/firestore';
 import { Trash2, ExternalLink, Calendar, Phone, User, Cpu, RotateCw, FileText, Send, Printer, Plus, Sparkles, X, Save, CheckCircle, ChevronLeft, ChevronRight, Layers, Zap, Eye, Edit3, Columns, ArrowLeft } from 'lucide-react';
@@ -1547,7 +1548,15 @@ export default function CustomPCRequests() {
           <p className="text-xs text-slate-400 mt-1">Manage customer builds & generate printable PDF store quotations</p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            to="/admin/blank-quotation"
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-white border border-amber-500/30 rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer uppercase tracking-wider"
+            title="Print Blank Quotations for Handwriting with pen"
+          >
+            <Printer className="w-4 h-4 text-amber-400" />
+            🖨️ Blank Quotation Paper
+          </Link>
           <button
             onClick={() => {
               if (!showGenerator) {
@@ -1665,6 +1674,14 @@ export default function CustomPCRequests() {
               >
                 <ExternalLink className="w-3.5 h-3.5" /> 🔗 Link
               </button>
+              <Link
+                to="/admin/blank-quotation"
+                target="_blank"
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-white border border-amber-500/30 font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
+                title="Open & Print Blank Quotation Sheets for Handwriting"
+              >
+                <Printer className="w-3.5 h-3.5 text-amber-400" /> 📝 Blank Sheets
+              </Link>
               <button
                 onClick={handlePrint}
                 className="hidden sm:flex px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold rounded-xl text-xs items-center gap-1.5 transition cursor-pointer"

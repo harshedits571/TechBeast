@@ -17,7 +17,8 @@ import {
   ShoppingBag,
   Menu,
   X,
-  Gift
+  Gift,
+  Printer
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -46,7 +47,7 @@ export default function AdminLayout() {
     <AdminProvider>
       <SettingsProvider>
         <SecurityPinProvider>
-        <div className="min-h-[100dvh] bg-[#0a0a0b] text-slate-300 flex font-sans">
+        <div className="min-h-[100dvh] print:min-h-0 bg-[#0a0a0b] print:bg-white text-slate-300 print:text-black flex print:block font-sans">
           {/* Mobile Overlay */}
           {isMobileMenuOpen && (
             <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setIsMobileMenuOpen(false)}></div>
@@ -114,7 +115,7 @@ export default function AdminLayout() {
           </aside>
 
           {/* Main Content */}
-          <main className="flex-1 flex flex-col lg:ml-64 print:ml-0 min-h-[100dvh] w-full lg:w-[calc(100%-16rem)] overflow-x-hidden">
+          <main className="flex-1 flex flex-col lg:ml-64 print:ml-0 min-h-[100dvh] print:min-h-0 w-full lg:w-[calc(100%-16rem)] print:w-full overflow-x-hidden print:overflow-visible">
             {/* Top Header */}
             <header className="h-16 lg:h-20 border-b border-white/5 px-4 lg:px-8 flex items-center justify-between bg-[#0a0a0b] sticky top-0 z-30 print:hidden">
               <div className="flex items-center gap-2 lg:gap-4">
@@ -144,7 +145,7 @@ export default function AdminLayout() {
             </header>
 
             {/* Page Content */}
-            <div className="flex-1 p-4 md:p-6 lg:p-8">
+            <div className="flex-1 p-4 md:p-6 lg:p-8 print:p-0 print:m-0 print:overflow-visible">
               <Outlet />
             </div>
 

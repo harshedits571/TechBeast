@@ -126,3 +126,68 @@ input[type="number"] {
   appearance: textfield;
 }
 
+/* ==========================================================================
+   PRINT MEDIA RULES (For Clean A4 Blank Quotation & Invoice Sheets)
+   ========================================================================== */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 4mm 5mm !important;
+  }
+
+  html, body {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Completely suppress scrollbars in print preview and printed media */
+  *, *::before, *::after {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
+  *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  #root, main, [class*="min-h-"] {
+    min-height: 0 !important;
+    height: auto !important;
+    background-color: #ffffff !important;
+    overflow: visible !important;
+  }
+
+  #printable-blank-quotation {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: visible !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  /* Ink saver monochrome mode */
+  .print-mono {
+    filter: grayscale(100%) contrast(110%) !important;
+  }
+}
+
+

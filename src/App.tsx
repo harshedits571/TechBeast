@@ -32,6 +32,7 @@ import RegisteredUsersList from './pages/admin/RegisteredUsersList';
 
 import ProductForm from './pages/admin/ProductForm';
 import CustomPCRequests from './pages/admin/CustomPCRequests';
+import BlankQuotation from './pages/admin/BlankQuotation';
 import OrderList from './pages/admin/OrderList';
 import OrderDetail from './pages/admin/OrderDetail';
 import PrebuiltsList from './pages/admin/PrebuiltsList';
@@ -103,6 +104,7 @@ export default function App() {
               <Route path="prebuilt-pcs/new" element={<PrebuiltForm />} />
               <Route path="prebuilt-pcs/edit/:id" element={<PrebuiltForm />} />
               <Route path="custom-pc-requests" element={<CustomPCRequests />} />
+              <Route path="blank-quotation" element={<BlankQuotation />} />
               <Route path="lucky-draw" element={<AdminLuckyDraw />} />
               <Route path="giveaway" element={<AdminLuckyDraw />} />
               <Route path="repairs" element={<AdminRepairsList />} />
